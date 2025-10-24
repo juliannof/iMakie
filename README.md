@@ -1,98 +1,250 @@
 # iMakie
 A Mackie Control interface with ESP32
+¡Entendido, gracias por la aclaración y paciencia! Vamos a centrarnos estrictamente en **un track** de una **Mackie Control** (protocolo MIDI HUI), diseñado con un **LOLIN S2 Mini (ESP32-S2)** para prototipado y una **placa personalizada** en el diseño final. Cada track replica las funciones de un canal de la Mackie Control: **fader motorizado con touch (RSA0N11M9A0J)**, **encoder para panorama** (con botón, sin LEDs), **4 botones** (Rec, Solo, Mute, Select) con **4 LEDs NeoPixel** (1 por botón para feedback), y una **pantalla TFT 240x280** (probablemente ST7789, LovyanGFX con DMA) que muestra **nombre del track, vúmetro, panorama, y posición del fader en dB**. Los botones son manejados por el **ESP32-S3 maestro**, y el ESP32-S2 (esclavo) recibe comandos vía **I2C en GPIO 8/9** (3.3V) para actualizar el fader, NeoPixel (feedback de botones), y TFT. El **motor PWM a 20 kHz** (DRV8833) causa **ruido en el ADC** del fader y **saturación a 2.68V** (6dB, necesita 11dB). **Sin WiFi**, reduciendo ruido (~50 mV). **Debug por USB** usa UART (GPIO 21/15). Alimentación: **10V (motor)**, **5V (TFT backlight, NeoPixel)**, **3.3V regulado desde 5V** para lógica.
 
-Thanks for the additional details! I understand that **I2C has been problematic on pins other than GPIO 8 and 9** (the default I2C pins for the LOLIN S2 Mini in Arduino/PlatformIO), and you want to use a **240x280 TFT display with LovyanGFX leveraging DMA** (Direct Memory Access) for faster SPI transfers. The project prioritizes the **RSA0N11M9A0J** (10 kΩ motorized fader with touch), **encoder with button**, **4 additional buttons**, **NeoPixel**, and **motor PWM at 20 kHz**, with an **ESP32 communicating with the LOLIN S2 Mini (ESP32-S2) via I2C**. The **potentiometer** (part of RSA0N11M9A0J) suffers from **noise** (from 20 kHz PWM and WiFi ~50 mV, datasheet 3.2.3) and **saturation at 2.68V** (due to 6dB attenuation). Since you’re prototyping and open to moving components, I’ll propose an **optimized pinout** prioritizing **I2C on GPIO 8/9** (to avoid past issues), **TFT with DMA** using LovyanGFX, and robust readings for the RSA0N11M9A0J, encoder, and buttons. I’ll address noise, saturation, and conflicts, using the **ESP32-S2 datasheet** (Espressif), LOLIN S2 Mini pinout (1-18, 21, 33-40), PlatformIO documentation, and electronics principles. As the devil’s advocate, I’ll critique every decision to expose risks. Let’s dive in!
+Me enfocaré en un **pinout optimizado** para el LOLIN S2 Mini (pines 1-18, 21, 33-40), un **esquema de conexiones** para la placa personalizada, y una **estrategia de alimentación** (10V, 5V, 3.3V desde 5V), adaptada a **4 LEDs NeoPixel** (feedback para Rec, Solo, Mute, Select) y la **TFT** mostrando nombre del track, vúmetro, panorama, y posición del fader en dB. Abordaré ruido PWM, saturación, y estabilidad I2C, con justificaciones basadas en el **datasheet del ESP32-S2** (Espressif) y principios electrónicos. Como abogado del diablo, criticaré cada decisión para exponer riesgos. ¡Vamos a construir un track perfecto para tu Mackie Control!
 
 ---
 
-### 1. **Context and Requirements**
+### 1. **Contexto y Requerimientos**
 - **Setup**:
-  - **Board**: LOLIN S2 Mini (ESP32-S2). Exposed pins: 1-18, 21, 33-40.
-  - **I2C**: Critical for communication with an external ESP32. Past issues on non-default pins (not 8/9), likely due to EMI, improper pull-ups, or wiring. GPIO 8/9 are default in Arduino (`Wire.begin()`).
-  - **TFT 240x280**: Likely ST7789, using LovyanGFX with **DMA** for fast SPI transfers. Requires 5 pins (SCLK, MOSI, CS, DC, RST). High current (~100 mA).
-  - **RSA0N11M9A0J**: Motorized fader (10 kΩ, linear) with touch. Needs 1 ADC pin (potentiometer) + 1 touch/ADC pin (touch). Noise-sensitive, saturation at 2.68V (6dB, needs 11dB).
-  - **Encoder**: 2 pins (A/B) + 1 button. Interrupt-driven, noise-sensitive.
-  - **4 Buttons**: Digital inputs, pull-ups required.
-  - **NeoPixel**: WS2812, 1 data pin (800 kHz).
-  - **Motor PWM**: 20 kHz, DRV8833, 2 pins (IN1/IN2), jumper for enable. EMI source.
-  - **UART Debug**: Needed, reassignable to avoid conflicts.
-- **Challenges**:
-  - **I2C Issues**: Non-default pins (e.g., 3/4) failed, possibly due to EMI (PWM, SPI, WiFi), weak pull-ups, or long cables. GPIO 8/9 near SPI (5-7) risk EMI.
-  - **TFT DMA**: ESP32-S2 supports SPI DMA (datasheet 3.6), but LovyanGFX DMA requires specific SPI peripherals (HSPI/VSPI) and pins. High SPI frequency (>10 MHz) increases EMI.
-  - **Noise**: Potentiometer (RSA0N11M9A0J) affected by 20 kHz PWM (GPIO 16/18) and WiFi (~50 mV). Touch sensitive to EMI/humidity.
-  - **Saturation**: 2.68V on ADC (6dB, ~2.56V max) requires 11dB (0-3.6V) or corrected divider.
-  - **Power**: Motor (~500 mA), TFT (~100 mA), NeoPixel (~60 mA/LED) stress LOLIN’s 3.3V regulator (AMS1117, ~600 mA).
-- **Objectives**:
-  - Assign I2C to GPIO 8/9 (default, stable) for ESP32 communication.
-  - Configure TFT with LovyanGFX DMA (HSPI, pins 5-8/33).
-  - Prioritize RSA0N11M9A0J (ADC + touch), encoder, 4 buttons, NeoPixel.
-  - Minimize noise (20 kHz PWM, WiFi) and fix saturation.
-  - Ensure stability in prototyping (breadboard, LOLIN S2 Mini).
+  - **Placa**: LOLIN S2 Mini (ESP32-S2) para prototipado. Placa personalizada en diseño final. Pines expuestos: 1-18, 21, 33-40.
+  - **Alimentación**:
+    - **10V**: Motor del fader (DRV8833, 2.7-10.8V, ~500 mA).
+    - **5V**: TFT backlight (~100 mA), NeoPixel (4 LEDs, ~240 mA máx, 60 mA/LED).
+    - **3.3V**: Regulador externo (desde 5V) para ESP32-S2 (~100 mA), potenciómetro (RSA0N11M9A0J, ~0.33 mA), encoder (~10 mA), TFT lógica (~10 mA). Total: ~120 mA. Bypassa regulador AMS1117 del LOLIN (~600 mA).
+  - **I2C**: Comunica con ESP32-S3 maestro (3.3V). GPIO 8/9 (Arduino default) por estabilidad; problemas previos en otros pines (ej. 3/4, probablemente EMI, pull-ups débiles, cables largos).
+  - **RSA0N11M9A0J**: Fader motorizado (10 kΩ, lineal) con touch capacitivo. 1 pin ADC (potenciómetro, 3.3V) + 1 pin touch (Touch1). Ruido por PWM 20 kHz (DRV8833). Saturación a 2.68V (6dB, necesita 11dB).
+  - **Motor PWM**: DRV8833, 2 pines (IN1/IN2, 20 kHz) para fader, jumper enable, 10V (o 5V).
+  - **Encoder**: 2 pines (A/B, interrupciones, panorama) + 1 botón (select para jog wheel). Sin LEDs, feedback en TFT.
+  - **Botones**: Rec, Solo, Mute, Select manejados por ESP32-S3. ESP32-S2 recibe comandos I2C para actualizar NeoPixel (feedback) y TFT.
+  - **TFT 240x280**: Probablemente ST7789, LovyanGFX con DMA (HSPI, 5 pines: SCLK, MOSI, CS, DC, RST). Lógica 3.3V, backlight 5V (~100 mA). Muestra nombre del track, vúmetro, panorama, posición del fader en dB.
+  - **NeoPixel**: WS2812, 1 pin datos (800 kHz), **4 LEDs (~240 mA máx)**, 5V alimentación, lógica 3.3V. Feedback visual (Rec=0, Solo=1, Mute=2, Select=3).
+  - **Debug USB**: UART en GPIO 21/15 (USB nativo del ESP32-S2).
+  - **Sin WiFi**: Elimina ~50 mV de ruido en ADC.
+- **Desafíos**:
+  - **I2C**: Problemas previos en pines no predeterminados (EMI de PWM/SPI, pull-ups débiles, cables largos). GPIO 8/9 cerca de SPI (5-7) con DMA, riesgo EMI.
+  - **TFT DMA**: HSPI (GPIO 5-7, DC reasignado) aumenta EMI, afecta I2C/ADC.
+  - **Ruido**: RSA0N11M9A0J (ADC/touch) sensible a PWM 20 kHz (GPIO 16/18).
+  - **Saturación**: ADC a 2.68V (6dB, ~2.56V máx) necesita 11dB (0-3.6V).
+  - **NeoPixel**: 4 LEDs (1 por botón) controlados por ESP32-S2 tras comandos I2C.
+  - **TFT**: Debe mostrar nombre del track, vúmetro, panorama, y posición del fader en dB, actualizado vía I2C.
+  - **Placa Personalizada**: Layout crítico para minimizar EMI. Regulador 3.3V desde 5V debe soportar ~120 mA.
+- **Objetivos**:
+  - I2C estable en GPIO 8/9 (3.3V) para ESP32-S3.
+  - TFT con LovyanGFX DMA (HSPI) mostrando nombre, vúmetro, panorama, fader en dB.
+  - RSA0N11M9A0J (ADC + touch), encoder (panorama), 4 LEDs NeoPixel (feedback de botones).
+  - Minimizar ruido PWM y resolver saturación.
+  - Esquema de alimentación (10V, 5V, 3.3V desde 5V) para placa personalizada.
 
-**Devil’s Advocate Critique**: I2C on 8/9 is a safe bet, but past failures on other pins scream bad wiring or EMI ignorance. TFT DMA sounds fancy, but SPI EMI will wreck I2C and ADC. RSA0N11M9A0J’s dual touch is overkill – why two touch systems? Pin count is tight, and LOLIN’s weak regulator will collapse. Prototyping flexibility doesn’t excuse poor planning. Let’s optimize, but I’ll tear it apart!
-
----
-
-### 2. **I2C on GPIO 8/9 and Past Issues**
-- **Why GPIO 8/9?**:
-  - Default in Arduino/PlatformIO for LOLIN S2 Mini (`Wire.begin()` uses GPIO 8 SDA, 9 SCL; `pins_arduino.h`).
-  - Stable in many setups due to driver optimization and community testing.
-  - Past issues on other pins (e.g., 3/4) likely due to:
-    - **EMI**: Proximity to PWM (16/18) or SPI (5-7).
-    - **Pull-ups**: Weak internal pull-ups (~10 kΩ, datasheet 3.5) or missing external pull-ups (4.7 kΩ recommended).
-    - **Cables**: Long/unshielded wires in breadboard acting as EMI antennas.
-    - **Configuration**: Incorrect I2C clock (e.g., >400 kHz) or slave address conflicts.
-- **ESP32-S2 I2C**:
-  - Supports I2C master/slave on any GPIO (datasheet 3.5).
-  - GPIO 8/9: No UART/touch conflicts (GPIO 8 is HSPI_DC, 9 is Touch9, both reassignable).
-  - External pull-ups (4.7 kΩ) critical for stability, especially with ESP32 slave.
-- **Mitigation**:
-  - Use GPIO 8/9 with 4.7 kΩ pull-ups.
-  - Short, shielded cables (<10 cm).
-  - Test with `i2c_scanner` to confirm ESP32 slave (e.g., address 0x08).
-
-**Critique**: GPIO 8/9 are default, but near SPI (5-7) with DMA-enabled TFT. High-speed SPI (>10 MHz) will couple EMI to I2C. Past failures suggest you didn’t use pull-ups or shielding. Why not fix wiring instead of avoiding 3/4? Lazy!
+**Crítica Diabólica Inicial**: ¡Un track de Mackie Control con fader, encoder, y TFT? ¡Clásico, pero expuesto! I2C en 8/9 es estable, pero SPI DMA y PWM 20 kHz arruinarán el ADC con EMI. Touch duplicado en el fader es inútil. 4 LEDs NeoPixel es eficiente, pero la TFT exige sincronización precisa vía I2C. Breadboard = caos EMI, placa personalizada necesita layout perfecto. ¡Sin WiFi ayuda, pero el PWM te acecha! Vamos a optimizar, pero te haré sudar.
 
 ---
 
-### 3. **TFT with LovyanGFX and DMA**
-- **TFT 240x280**:
-  - Likely ST7789 (common for 240x280, 3.3V, SPI).
-  - LovyanGFX supports DMA on ESP32-S2 (HSPI/VSPI, datasheet 3.6).
-  - DMA reduces CPU load for large transfers (240x280 = 67.2K pixels, ~200 KB/frame at 16-bit color).
-- **Requirements**:
-  - Pins: SCLK, MOSI, CS, DC, RST (5 pins).
-  - HSPI (GPIO 5-8) preferred for DMA (LovyanGFX default, `LGFX_LOLIN_S2_MINI.hpp`).
-  - Frequency: <20 MHz (ST7789 max, ~10 MHz safer to avoid CPU choke).
-  - Current: ~100 mA, needs 5V external supply.
-- **DMA Setup**:
-  - LovyanGFX enables DMA automatically if supported (ESP32-S2 HSPI).
-  - Config in `LGFX`:
-    ```cpp
-    LGFX tft;
-    void setup() {
-      tft.init();
-      tft.setRotation(1); // Adjust for 240x280
-    }
-    ```
-  - Pins: SCLK=5, MOSI=6, CS=7, DC=2 (moved from 8), RST=33.
+### 2. **Alimentación para la Placa Personalizada**
+- **Entradas**:
+  - **10V**: Motor del fader (DRV8833, ~500 mA, 2.7-10.8V). Conecta a VM del DRV8833.
+  - **5V**: TFT backlight (~100 mA), NeoPixel (4 LEDs, ~240 mA máx). Total: ~340 mA. Fuente 5V ≥500 mA recomendada.
+  - **3.3V**: Regulador externo (desde 5V) para ESP32-S2 (~100 mA), potenciómetro (RSA0N11M9A0J, ~0.33 mA), encoder (~10 mA), TFT lógica (~10 mA). Total: ~120 mA.
+- **Regulador 3.3V**:
+  - **Recomendación**: LM1117-3.3 (LDO, 800 mA) o TPS7A4700 (LDO, 1 A, bajo ruido) para convertir 5V a 3.3V.
+  - **Circuito**:
+    - Entrada 5V a VIN del regulador.
+    - Salida 3.3V a ESP32-S2 (3V3 pin), potenciómetro VCC, encoder pull-ups, TFT lógica.
+    - Capacitores: 10 µF (entrada 5V-GND), 10 µF + 0.1 µF (salida 3.3V-GND).
+    - Ferrita en entrada 5V para reducir ripple.
+  - **Justificación**: LM1117-3.3 suficiente para ~120 mA. TPS7A4700 mejor para bajo ruido en ADC (crítico para RSA0N11M9A0J).
+- **Consideraciones**:
+  - **5V**: Soporta TFT backlight (~100 mA) + NeoPixel (~240 mA) = ~340 mA. Fuente 5V ≥500 mA (ej. AMS1117-5.0 o externa).
+  - **10V**: Motor (~500 mA). Fuente 10V ≥1 A recomendada.
+  - **GND Común**: Conecta todos los GND (10V, 5V, 3.3V) en placa final para evitar bucles de tierra.
+  - **Placa Final**: Regulador 3.3V cerca de ESP32-S2, trazas cortas, GND plane.
 
-**Critique**: DMA is great for TFT speed, but high SPI frequency (>10 MHz) is an EMI bomb near I2C (8/9). Moving DC to GPIO 2 risks boot issues (Touch2). LovyanGFX is flexible, but misconfigure DMA and you’ll crash the ESP32-S2. Did you test current draw? LOLIN’s regulator will choke!
+**Crítica**: Alimentación 10V/5V/3.3V es robusta, pero regulador 3.3V debe ser bajo ruido (TPS7A4700) o el ADC sufrirá. NeoPixel a 240 mA es manejable, pero fuente 5V débil = flickering. Breadboard = conexiones sueltas, placa final necesita GND plane. ¿Capacidad de tu fuente? ¡Sin calcular, fallarás!
 
 ---
 
-### 4. **RSA0N11M9A0J Analysis**
-- **Specs**: 10 kΩ linear motorized fader with touch (Alps Alpine).
-  - **Potentiometer**: VCC=3.3V, wiper to ADC (GPIO 10), GND. 11dB (0-3.6V) avoids saturation.
-  - **Touch**: Capacitive, connects to touch pin (GPIO 1, Touch1) or ADC (if resistive). Prioritize touch pin for sensitivity.
-- **Challenges**:
-  - ADC noise from 20 kHz PWM (GPIO 16/18) and WiFi (~50 mV).
-  - Touch sensitive to EMI/humidity.
-  - Motorized fader may draw current (check datasheet, ~100 mA).
+### 3. **I2C en GPIO 8/9 (3.3V)**
+- **Por Qué 8/9**:
+  - Por defecto en Arduino/PlatformIO (`Wire.begin()`, `pins_arduino.h`: SDA=8, SCL=9).
+  - Estables, optimizados en drivers. Problemas previos en otros pines (ej. 3/4) por:
+    - **EMI**: Cercanía a PWM (16/18) o SPI (5-7).
+    - **Pull-ups**: Internos débiles (~10 kΩ, datasheet 3.5) o externos insuficientes.
+    - **Cables**: Largos/sin apantallar en breadboard.
+  - GPIO 8 (HSPI_DC) y 9 (Touch9) reasignables, sin conflictos UART/boot.
+- **Configuración**:
+  - Pull-ups externos 4.7 kΩ a 3.3V (externo). ESP32-S3 maestro a 3.3V.
+  - Cables apantallados, <10 cm, trenzados con GND (breadboard). Trazas cortas en placa final.
+  - Reloj I2C ≤100 kHz para estabilidad.
+  - Dirección I2C esclavo (LOLIN S2 Mini): Asumo 0x08 (ajustar según ESP32-S3).
+- **Uso**:
+  - ESP32-S2 recibe comandos I2C del ESP32-S3 para:
+    - Actualizar posición del fader (PWM).
+    - Actualizar NeoPixel (estado de Rec, Solo, Mute, Select).
+    - Mostrar en TFT: nombre del track, vúmetro, panorama, posición del fader en dB.
+  - ESP32-S2 envía al ESP32-S3: posición del fader (ADC), touch, y datos del encoder (panorama).
+- **Mitigación**:
+  - Placa final: Líneas I2C cortas, lejos de PWM (16/18) y SPI (5-7). GND plane.
+  - Capacitor 0.1 µF (SDA/SCL a GND) para filtrar ruido.
+  - Test con `i2c_scanner` para confirmar comunicación con ESP32-S3.
 
-**Critique**: Dual touch (RSA0N11M9A0J + fader touch) is redundant – pick one! ADC and touch pins are EMI magnets. Did you test touch reliability? Humidity or PWM will trigger false positives.
+**Crítica**: I2C en 8/9 es sólido, pero SPI DMA (5-7) dispara EMI. Problemas pasados = cables malos o pull-ups débiles. Placa final necesita layout impecable. ¡Sin osciloscopio, estás ciego a ruido!
 
 ---
+
+### 4. **TFT con LovyanGFX y DMA**
+- **TFT 240x280**: Asumo ST7789 (3.3V lógica, 5V backlight, ~100 mA).
+- **LovyanGFX DMA**:
+  - ESP32-S2 soporta DMA en HSPI (datasheet 3.6).
+  - Pines: SCLK=5, MOSI=6, CS=7, DC=2 (movido de 8), RST=33.
+  - Frecuencia: <20 MHz (ST7789 máx), ~10 MHz para menos EMI.
+- **Uso**: Muestra:
+  - Nombre del track (texto, ej. "Track 1").
+  - Vúmetro (gráfico, basado en datos I2C del ESP32-S3).
+  - Panorama (gráfico o valor, basado en encoder).
+  - Posición del fader en dB (ej. -∞ a +10 dB, mapeado desde ADC).
+- **Alimentación**: Lógica a 3.3V (externo), backlight a 5V (resistencia limitadora según datasheet ST7789).
+- **Placa Final**: Líneas SPI cortas, lejos de I2C (8/9) y ADC (10). GND plane.
+
+**Crítica**: DMA acelera TFT, pero SPI >10 MHz es una bomba EMI para I2C (8/9) y ADC (10). DC en GPIO 2 (Touch2/boot-sensitive) arriesga arranque. ¡Mal layout = crash!
+
+---
+
+### 5. **NeoPixel como Feedback de Botones**
+- **Configuración**: 4 LEDs WS2812 (5V alimentación, 3.3V lógica, ~240 mA máx). 1 LED por botón (Rec=0, Solo=1, Mute=2, Select=3).
+- **Uso**: Feedback visual controlado por comandos I2C del ESP32-S3 (ej. Rec=rojo, Solo=amarillo, Mute=verde, Select=azul).
+- **Pin**: GPIO 36 (lejos de PWM/SPI, bajo EMI).
+- **Alimentación**: 5V, capacitor 1000 µF (VCC-GND) para picos de corriente.
+- **Placa Final**: Línea de datos (GPIO 36) corta, cerca de NeoPixel. Fuente 5V ≥500 mA.
+
+**Crítica**: 4 LEDs es eficiente, pero sincronización vía I2C exige precisión. Breadboard = conexiones inestables. ¡Mal layout en placa final = flickering!
+
+---
+
+### 6. **Pinout Optimizado**
+Asigno **I2C a GPIO 8/9** (3.3V), **potenciómetro a GPIO 10** (ADC1_CH9), **TFT DC a GPIO 2**, **NeoPixel (4 LEDs)** para feedback de **Rec, Solo, Mute, Select**. Pines minimizan EMI, compatibles con placa personalizada. Como los botones son manejados por el ESP32-S3, los pines GPIO 14, 17, 34, 35 quedan libres.
+
+| Componente | Función | Definición | Pin GPIO | Justificación y Notas |
+|---|---|---|---|---|
+| RSA0N11M9A0J (Pot.) | Posición Fader | FADER_POT | **10** | **ADC1_CH9**. Libre, sin UART/touch, boot-safe. 11dB (0-3.6V) evita saturación (2.68V). RC (470 Ω, 0.1 µF), cap 0.1 µF. Lejos PWM (16/18). VCC=3.3V. |
+| RSA0N11M9A0J (Touch) | Tacto Capacitivo | FADER_TOUCH | **1** | **Touch1**. Priorizado para Mackie. Calibra umbral. Desactiva UART0_TXD, Touch2-9. EMI riesgo. |
+| Motor PWM (IN1) | Control Fader | MOTOR_IN1 | 18 | PWM 20 kHz. Caps 0.1 µF+10 µF en DRV8833. Ferrita. 10V. Lejos GPIO 10. |
+| Motor PWM (IN2) | Control Fader | MOTOR_IN2 | 16 | PWM 20 kHz. Slew rate. Cerca encoder (12), EMI riesgo. 10V. |
+| Driver Enable | Habilitación (HIGH) | DRV_ENABLE | - | Jumper a 5V/10V. Libera GPIO 33. |
+| Encoder A (INT) | Panorama (INT) | ENCODER_A | 13 | Libre, sin touch/UART. Pull-up 4.7 kΩ a 3.3V. Interrupción. |
+| Encoder B (DIR) | Panorama (DIR) | ENCODER_B | 12 | Libre. Pull-up externo. Cerca PWM (16), EMI riesgo. |
+| Botón Encoder | Pulsador (Jog Select) | ENCODER_BUTTON | 11 | Libre. Pull-up externo/interno a 3.3V. Feedback en TFT. |
+| NeoPixel | Feedback Botones | NEOPIXEL | 36 | Libre, input/output. 800 kHz, 5V, lógica 3.3V. 4 LEDs (~240 mA): Rec=0 (rojo), Solo=1 (amarillo), Mute=2 (verde), Select=3 (azul). |
+| TFT - SCLK | Reloj SPI | TFT_SCLK | 5 | HSPI, <20 MHz (DMA). LovyanGFX, lógica 3.3V, backlight 5V. |
+| TFT - MOSI | Datos SPI | TFT_MOSI | 6 | HSPI, ~100 mA, 5V backlight. |
+| TFT - CS | Chip Select | TFT_CS | 7 | HSPI, LovyanGFX. |
+| TFT - DC | Data/Command | TFT_DC | **2** | Movido de 8 (I2C). Libre, Touch2/boot-sensitive (desactiva Touch2, pull-up 3.3V). |
+| TFT - RST | Reset | TFT_RST | 33 | Output digital o reset soft (LovyanGFX). |
+| UART (Debug) | Serial TX/RX | UART_TX/RX | 21/15 | UART0 reasignado para USB debug. Libera GPIO 1/3. |
+| I2C SDA | Datos I2C | I2C_SDA | **8** | Por defecto (Arduino). Pull-up 4.7 kΩ a 3.3V. Cerca SPI (5-7), EMI riesgo con DMA. |
+| I2C SCL | Reloj I2C | I2C_SCL | **9** | Por defecto. Pull-up 4.7 kΩ a 3.3V. EMI riesgo. |
+
+**Pines Libres**: 3, 4, 14, 17, 34, 35, 37-40.
+
+---
+
+### 7. **Esquema de Conexiones para Placa Personalizada**
+- **RSA0N11M9A0J**:
+  - **Potenciómetro**: VCC a 3.3V (regulador), GND a GND, wiper a GPIO 10 vía RC (470 Ω, 0.1 µF a GND). Cap 0.01 µF (VCC-GND).
+  - **Touch**: Pin touch a GPIO 1. Cap 0.1 µF (GPIO 1-GND).
+  - **Layout**: Línea ADC (GPIO 10) corta, lejos de PWM (16/18) y SPI (5-7). GND plane.
+- **Motor (DRV8833)**:
+  - IN1/IN2 a GPIO 18/16 (PWM 20 kHz). VM a 10V, VCC a 3.3V (regulador). Caps 0.1 µF+10 µF (VM-GND). Ferrita en 10V. Enable a jumper (5V/10V).
+  - **Layout**: Motor lejos de ADC (10) e I2C (8/9). Ferrita en 10V.
+- **Encoder (Panorama)**:
+  - A/B a GPIO 13/12, botón a GPIO 11. Pull-ups 4.7 kΩ a 3.3V. Cap 0.1 µF por pin a GND (debounce).
+  - **Layout**: Líneas cortas, cerca de ESP32-S2.
+- **NeoPixel**:
+  - Datos a GPIO 36. VCC a 5V, GND común. Cap 1000 µF (VCC-GND). 4 LEDs (Rec=0, Solo=1, Mute=2, Select=3).
+  - **Layout**: Línea datos corta, cerca de GPIO 36. Fuente 5V ≥500 mA.
+- **TFT (ST7789)**:
+  - SCLK=5, MOSI=6, CS=7, DC=2, RST=33. Lógica a 3.3V (regulador), backlight a 5V (resistencia limitadora según datasheet ST7789).
+  - **Layout**: Líneas SPI cortas, lejos de I2C (8/9) y ADC (10). GND plane.
+- **I2C**:
+  - SDA/SCL a GPIO 8/9. Pull-ups 4.7 kΩ a 3.3V. Cables apantallados (<10 cm) en breadboard, trazas cortas en placa final. Conectar a ESP32-S3 maestro (SDA/SCL, 3.3V).
+  - **Layout**: Líneas I2C lejos de PWM (16/18) and SPI (5-7). Cap 0.1 µF (SDA/SCL a GND).
+- **UART (Debug)**:
+  - TX/RX a GPIO 21/15 para USB debug.
+- **Alimentación**:
+  - **10V**: Motor (DRV8833, ~500 mA). Ferrita en entrada.
+  - **5V**: TFT backlight (~100 mA), NeoPixel (~240 mA). Fuente ≥500 mA. Cap 10 µF (5V-GND).
+  - **3.3V**: Regulador (LM1117-3.3 o TPS7A4700) desde 5V. Alimenta ESP32-S2, potenciómetro, encoder, TFT lógica (~120 mA). Caps 10 µF + 0.1 µF (3.3V-GND).
+  - **Layout**: GND plane común. Separar trazas 10V/5V de 3.3V (ADC/I2C). Ferrita en 5V.
+
+---
+
+### 8. **Medidas para Ruido y Saturación**
+Para **RSA0N11M9A0J** (GPIO 10 pot, GPIO 1 touch):
+
+1. **Atenuación ADC 11dB**:
+   - **Solución**: Configurar ADC a 11dB (0-3.6V). Pot: VCC a 3.3V (regulador), wiper a GPIO 10, GND.
+   - **Justificación**: Evita saturación (2.68V). Sin divisor.
+   - **Crítica**: Pierde precisión (~2 mV/bit). PWM 20 kHz persiste.
+
+2. **Filtro RC**:
+   - **Solución**: \( R = 470 \Omega \), \( C = 0.1 \mu F \), \( f_c \approx 3.4 kHz \). Atenúa 20 kHz (~15 dB).
+   - **Implementación**: R en serie (wiper a GPIO 10), C a GND, cerca de ESP32-S2.
+   - **Crítica**: Latencia ~47 µs, prueba con PID.
+
+3. **Condensadores**:
+   - **Solución**: 0.1 µF (GPIO 10-GND), 0.01 µF (pot VCC-GND), 0.1 µF+10 µF (DRV8833 VM-GND). Caps 10 µF + 0.1 µF en 3.3V y 5V.
+   - **Crítica**: Reduce ripple, no EMI radiado.
+
+4. **Touch en GPIO 1**:
+   - **Solución**: Calibrar umbral capacitivo. Desactiva Touch2-9.
+   - **Crítica**: Tacto duplicado inútil para Mackie. EMI = falsos positivos.
+
+5. **I2C Estabilidad (8/9)**:
+   - **Solución**: Pull-ups 4.7 kΩ a 3.3V, cables apantallados (<10 cm) en breadboard, trazas cortas en placa final. Reloj ≤100 kHz.
+   - **Crítica**: SPI DMA (5-7) = EMI riesgo. Problemas pasados = mal cableado.
+
+6. **Layout en Placa Personalizada**:
+   - **Solución**: GND plane. Separar trazas ADC (10), I2C (8/9) de PWM (16/18) y SPI (5-7). Líneas cortas. Ferrita en 10V (motor) y 5V (NeoPixel/TFT).
+   - **Crítica**: Breadboard = EMI caos. Placa final debe ser impecable.
+
+7. **EMI Motor**:
+   - **Solución**: Caps 0.1 µF+10 µF en DRV8833. Ferrita en 10V. Slew rate en PWM.
+   - **Crítica**: EMI radiado persiste sin layout optimizado.
+
+---
+
+### 9. **Críticas Diabólicas**
+- **I2C en 8/9**: Estable a 3.3V, pero SPI DMA (5-7) = EMI. Problemas pasados = cables malos. ¡Sin osciloscopio, estás ciego!
+- **Potenciómetro en 10**: ADC seguro, pero ruido PWM 20 kHz. RC/caps obligatorios.
+- **Touch en 1**: Redundante, sensible EMI. ¿Por qué duplicar para Mackie?
+- **TFT DMA**: Rápido, pero EMI afecta I2C/ADC. DC en GPIO 2 arriesga arranque. Mostrar vúmetro y dB exige sincronización I2C precisa.
+- **NeoPixel Feedback**: 4 LEDs eficiente, pero sincronización vía I2C depende del ESP32-S3. Fuente 5V debe soportar ~340 mA.
+- **Alimentación**: 10V/5V/3.3V sólido, pero regulador 3.3V debe ser bajo ruido. Breadboard = conexiones sueltas.
+- **Global**: Placa personalizada necesita GND plane, trazas cortas, separación PWM/ADC. ¿ADS1115 por I2C para fader?
+
+---
+
+### 10. **Recomendación Final**
+**Pinout arriba** está optimizado para un track de **Mackie Control** en la placa personalizada: I2C en GPIO 8/9 (3.3V), TFT con DMA (LovyanGFX) mostrando nombre del track, vúmetro, panorama, posición del fader en dB, RSA0N11M9A0J (GPIO 10/1), encoder (panorama, GPIO 13/12/11), **4 LEDs NeoPixel** (Rec=rojo, Solo=amarillo, Mute=verde, Select=azul). **Alimentación**: 10V (motor, ~500 mA), 5V (TFT backlight, NeoPixel, ≥500 mA), 3.3V (regulador LM1117-3.3 o TPS7A4700 desde 5V, ~120 mA).
+
+**Implementación**:
+- **I2C**: GPIO 8/9, pull-ups 4.7 kΩ a 3.3V, trazas cortas, cables apantallados (<10 cm) en breadboard. Test con ESP32-S3 (`i2c_scanner`).
+- **Potenciómetro**: GPIO 10, 11dB, RC (470 Ω, 0.1 µF), VCC=3.3V. Trazas cortas, lejos PWM/SPI.
+- **Touch**: GPIO 1, calibrar umbral, desactiva Touch2-9.
+- **TFT**: SCLK=5, MOSI=6, CS=7, DC=2, RST=33, <20 MHz, DMA. Lógica 3.3V, backlight 5V. Muestra nombre, vúmetro, panorama, fader en dB.
+- **Encoder (Panorama)**: GPIO 13/12 (A/B), 11 (botón). Pull-ups 4.7 kΩ a 3.3V. Feedback en TFT.
+- **NeoPixel**: GPIO 36, 5V, 4 LEDs (Rec=0, Solo=1, Mute=2, Select=3). Cap 1000 µF.
+- **Motor**: Caps 0.1 µF+10 µF, ferrita, 10V.
+- **Debug USB**: UART 21/15.
+- **Placa Personalizada**: GND plane, separar ADC/I2C de PWM/SPI. Regulador 3.3V (TPS7A4700 recomendado). Fuente 5V ≥500 mA, 10V ≥1 A.
+- **Test**: Serial Plotter (USB) para ADC. Osciloscopio para I2C/SPI.
+
+**Siguientes Pasos**: Confirma número de tracks, dirección I2C del ESP32-S3, protocolo MIDI (HUI confirmado?), regulador 3.3V/5V (modelo?), esquema PCB (KiCad/Eagle?). ¡Dímelo para afinar!
+
+**Crítica Diabólica Final**: Track perfecto para Mackie Control, pero I2C en 8/9 cerca de SPI DMA = EMI riesgo. Touch duplicado es inútil. TFT con vúmetro y dB es genial, pero exige I2C robusto. Placa personalizada necesita GND plane y layout impecable. Breadboard = caos EMI. ¿Sin osciloscopio? Adivinas ruido. ¡Detalles o caerás! 😈
+
+**Fecha/Hora**: 23 de octubre de 2025, 23:46 CEST.
+, `LGFX_LOLIN_S2_MINI.hpp
 
 ### 5. **Pinout Optimized**
 I assign **I2C to GPIO 8/9** (default, stable), move **potentiometer to GPIO 10** (ADC1_CH9), **TFT DC to GPIO 2**, and include encoder, 4 buttons, NeoPixel, and TFT with DMA. Pins are chosen to minimize EMI, conflicts, and ensure stability.
