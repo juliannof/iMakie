@@ -1,11 +1,6 @@
 # iMakie
 A Mackie Control interface with ESP32
-¡Entendido, gracias por la aclaración y paciencia! Vamos a centrarnos estrictamente en **un track** de una **Mackie Control** (protocolo MIDI HUI), diseñado con un **LOLIN S2 Mini (ESP32-S2)** para prototipado y una **placa personalizada** en el diseño final. Cada track replica las funciones de un canal de la Mackie Control: **fader motorizado con touch (RSA0N11M9A0J)**, **encoder para panorama** (con botón, sin LEDs), **4 botones** (Rec, Solo, Mute, Select) con **4 LEDs NeoPixel** (1 por botón para feedback), y una **pantalla TFT 240x280** (probablemente ST7789, LovyanGFX con DMA) que muestra **nombre del track, vúmetro, panorama, y posición del fader en dB**. Los botones son manejados por el **ESP32-S3 maestro**, y el ESP32-S2 (esclavo) recibe comandos vía **I2C en GPIO 8/9** (3.3V) para actualizar el fader, NeoPixel (feedback de botones), y TFT. El **motor PWM a 20 kHz** (DRV8833) causa **ruido en el ADC** del fader y **saturación a 2.68V** (6dB, necesita 11dB). **Sin WiFi**, reduciendo ruido (~50 mV). **Debug por USB** usa UART (GPIO 21/15). Alimentación: **10V (motor)**, **5V (TFT backlight, NeoPixel)**, **3.3V regulado desde 5V** para lógica.
-
-Me enfocaré en un **pinout optimizado** para el LOLIN S2 Mini (pines 1-18, 21, 33-40), un **esquema de conexiones** para la placa personalizada, y una **estrategia de alimentación** (10V, 5V, 3.3V desde 5V), adaptada a **4 LEDs NeoPixel** (feedback para Rec, Solo, Mute, Select) y la **TFT** mostrando nombre del track, vúmetro, panorama, y posición del fader en dB. Abordaré ruido PWM, saturación, y estabilidad I2C, con justificaciones basadas en el **datasheet del ESP32-S2** (Espressif) y principios electrónicos. Como abogado del diablo, criticaré cada decisión para exponer riesgos. ¡Vamos a construir un track perfecto para tu Mackie Control!
-
 ---
-
 ### 1. **Contexto y Requerimientos**
 - **Setup**:
   - **Placa**: LOLIN S2 Mini (ESP32-S2) para prototipado. Placa personalizada en diseño final. Pines expuestos: 1-18, 21, 33-40.
@@ -36,8 +31,6 @@ Me enfocaré en un **pinout optimizado** para el LOLIN S2 Mini (pines 1-18, 21, 
   - RSA0N11M9A0J (ADC + touch), encoder (panorama), 4 LEDs NeoPixel (feedback de botones).
   - Minimizar ruido PWM y resolver saturación.
   - Esquema de alimentación (10V, 5V, 3.3V desde 5V) para placa personalizada.
-
-**Crítica Diabólica Inicial**: ¡Un track de Mackie Control con fader, encoder, y TFT? ¡Clásico, pero expuesto! I2C en 8/9 es estable, pero SPI DMA y PWM 20 kHz arruinarán el ADC con EMI. Touch duplicado en el fader es inútil. 4 LEDs NeoPixel es eficiente, pero la TFT exige sincronización precisa vía I2C. Breadboard = caos EMI, placa personalizada necesita layout perfecto. ¡Sin WiFi ayuda, pero el PWM te acecha! Vamos a optimizar, pero te haré sudar.
 
 ---
 
