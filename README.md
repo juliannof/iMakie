@@ -123,7 +123,7 @@ Asigno **I2C a GPIO 8/9** (3.3V), **potenciómetro a GPIO 10** (ADC1_CH9), **TFT
 | RSA0N11M9A0J (Touch) | Tacto Capacitivo | FADER_TOUCH | **1** | **Touch1**. Priorizado para Mackie. Calibra umbral. Desactiva UART0_TXD, Touch2-9. EMI riesgo. |
 | Motor PWM (IN1) | Control Fader | MOTOR_IN1 | 18 | PWM 20 kHz. Caps 0.1 µF+10 µF en DRV8833. Ferrita. 10V. Lejos GPIO 10. |
 | Motor PWM (IN2) | Control Fader | MOTOR_IN2 | 16 | PWM 20 kHz. Slew rate. Cerca encoder (12), EMI riesgo. 10V. |
-| Driver Enable | Habilitación (HIGH) | DRV_ENABLE | - | Jumper a 5V/10V. Libera GPIO 33. |
+| Driver Enable | Habilitación (HIGH) | DRV_ENABLE | 34 | Jumper a 5V/10V. Libera GPIO 33. |
 | Encoder A (INT) | Panorama (INT) | ENCODER_A | 13 | Libre, sin touch/UART. Pull-up 4.7 kΩ a 3.3V. Interrupción. |
 | Encoder B (DIR) | Panorama (DIR) | ENCODER_B | 12 | Libre. Pull-up externo. Cerca PWM (16), EMI riesgo. |
 | Botón Encoder | Pulsador (Jog Select) | ENCODER_BUTTON | 11 | Libre. Pull-up externo/interno a 3.3V. Feedback en TFT. |
