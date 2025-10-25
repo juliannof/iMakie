@@ -19,8 +19,8 @@ A Mackie Control interface with ESP32
 | **TFT - MOSI** | Datos SPI | TFT_MOSI/SDA | **6** | HSPI, ~100 mA, 5V backlight. |
 | **TFT - RST** | Reset | TFT_RST | **33** | Output digital o reset soft (LovyanGFX). |
 | **TFT - DC** | Data/Command | TFT_DC | **4** | Movido a GPIO 3. Libre, Touch2/boot-sensitive (desactiva Touch2, pull-up 3.3V). |
-| **TFT - CS** | Chip Select | TFT_CS | **3** | HSPI, LovyanGFX. |
-| **TFT - BL** | BACKLIGHT (PWM) | TFT_BL | **35** | **LedC PWM**. Con driver MOSFET. Pin libre, lejos de pines SPI/PWM de motor. |
+| **TFT - CS** | Chip Select | TFT_CS | **5** | HSPI, LovyanGFX. |
+| **TFT - BL** | BACKLIGHT (PWM) | TFT_BL | **3** | **LedC PWM**. Con driver MOSFET. Pin libre, lejos de pines SPI/PWM de motor. |
 | I2C SDA | Datos I2C | I2C_SDA | 8 | Por defecto (Arduino). Pull-up 4.7 kΩ a 3.3V. Cerca SPI (5-7), EMI riesgo con DMA. |
 | I2C SCL | Reloj I2C | I2C_SCL | 9 | Por defecto. Pull-up 4.7 kΩ a 3.3V. EMI riesgo. |
 | **Botón 1** | Función de Control | BUTTON_1 | **37** | Pin de propósito general. Ideal para entrada. Pull-up externo/interno. |
