@@ -117,27 +117,70 @@ A Mackie Control interface with ESP32
 ### 6. **Pinout Optimizado**
 Asigno **I2C a GPIO 8/9** (3.3V), **potenciómetro a GPIO 10** (ADC1_CH9), **TFT DC a GPIO 2**, **NeoPixel (4 LEDs)** para feedback de **Rec, Solo, Mute, Select**. Pines minimizan EMI, compatibles con placa personalizada. Como los botones son manejados por el ESP32-S3, los pines GPIO 14, 17, 34, 35 quedan libres.
 
+
+
+¡Absolutamente! Mover los botones a pines GPIO más altos es una excelente idea. Los pines de numeración más alta en el ESP32-S2 (especialmente los >34, pero no los GPIOs de flash/PSRAM) son a menudo más "limpios" en términos de funciones multiplexadas y sensibilidades de arranque, lo que puede simplificar el desarrollo y evitar sorpresas.
+
+Además, libera algunos de los pines de numeración más baja (GPIO 2, 4, 15, 21) que podrían ser útiles para otros propósitos más adelante (aunque ahora mismo el 2 y 4 quedan como muy buenas opciones libres).
+
+Vamos a revisar los pines disponibles y reasignar los botones.
+
+### Pines Libres y Altamente Recomendados para Botones:
+
+Analizando tu tabla actual y los GPIOs del ESP32-S2, tenemos los siguientes pines de numeración alta que están actualmente libres:
+
+*   **GPIO 37, 38, 39, 40, 41, 42, 43, 44, 45, 47** (GPIO 46 no es de uso general y no se saca en el D1).
+
+Podemos elegir 4 de estos para los botones.
+
+### Tabla de Asignación de Pines Actualizada (Botones en Pines Altos)
+
 | Componente | Función | Definición | Pin GPIO | Justificación y Notas |
-|---|---|---|---|---|
+| :---------------- | :------------------ | :---------------------------- | :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | RSA0N11M9A0J (Pot.) | Posición Fader | FADER_POT | **10** | **ADC1_CH9**. Libre, sin UART/touch, boot-safe. 11dB (0-3.6V) evita saturación (2.68V). RC (470 Ω, 0.1 µF), cap 0.1 µF. Lejos PWM (16/18). VCC=3.3V. |
 | RSA0N11M9A0J (Touch) | Tacto Capacitivo | FADER_TOUCH | **1** | **Touch1**. Priorizado para Mackie. Calibra umbral. Desactiva UART0_TXD, Touch2-9. EMI riesgo. |
-| Motor PWM (IN1) | Control Fader | MOTOR_IN1 | 18 | PWM 20 kHz. Caps 0.1 µF+10 µF en DRV8833. Ferrita. 10V. Lejos GPIO 10. |
-| Motor PWM (IN2) | Control Fader | MOTOR_IN2 | 16 | PWM 20 kHz. Slew rate. Cerca encoder (12), EMI riesgo. 10V. |
-| Driver Enable | Habilitación (HIGH) | DRV_ENABLE | 34 | Jumper a 5V/10V. Libera GPIO 33. |
+| Motor PWM (IN1) | Control Fader | MOTOR_IN1 | 18 | PWM 20 kHz. Caps 0.1 µF+10 µF en DRV8833. Ferrita. 10V. Lejos FADER_POT (10). |
+| Motor PWM (IN2) | Control Fader | MOTOR_IN2 | 16 | PWM 20 kHz. Slew rate. Cerca ENCODER_B (12), EMI riesgo. 10V. |
+| Driver Enable | Habilitación (HIGH) | DRV_ENABLE | 34 | Conectado a 5V/10V. |
 | Encoder A (INT) | Panorama (INT) | ENCODER_A | 13 | Libre, sin touch/UART. Pull-up 4.7 kΩ a 3.3V. Interrupción. |
 | Encoder B (DIR) | Panorama (DIR) | ENCODER_B | 12 | Libre. Pull-up externo. Cerca PWM (16), EMI riesgo. |
 | Botón Encoder | Pulsador (Jog Select) | ENCODER_BUTTON | 11 | Libre. Pull-up externo/interno a 3.3V. Feedback en TFT. |
 | NeoPixel | Feedback Botones | NEOPIXEL | 36 | Libre, input/output. 800 kHz, 5V, lógica 3.3V. 4 LEDs (~240 mA): Rec=0 (rojo), Solo=1 (amarillo), Mute=2 (verde), Select=3 (azul). |
-| TFT - SCLK | Reloj SPI | TFT_SCLK | 5 | HSPI, <20 MHz (DMA). LovyanGFX, lógica 3.3V, backlight 5V. |
-| TFT - MOSI | Datos SPI | TFT_MOSI | 6 | HSPI, ~100 mA, 5V backlight. |
-| TFT - CS | Chip Select | TFT_CS | 7 | HSPI, LovyanGFX. |
-| TFT - DC | Data/Command | TFT_DC | **3** | Movido de 8 (I2C). Libre, Touch2/boot-sensitive (desactiva Touch2, pull-up 3.3V). |
-| TFT - RST | Reset | TFT_RST | 33 | Output digital o reset soft (LovyanGFX). |
-| TFT - BL | BACKLIGHT | TFT_BL | 35 | Output digital o reset soft (LovyanGFX). |
+| **TFT - SCLK** | Reloj SPI | TFT_SCLK | **5** | HSPI, <20 MHz (DMA). LovyanGFX, lógica 3.3V, backlight 5V. |
+| **TFT - MOSI** | Datos SPI | TFT_MOSI | **6** | HSPI, ~100 mA, 5V backlight. |
+| **TFT - CS** | Chip Select | TFT_CS | **7** | HSPI, LovyanGFX. |
+| **TFT - DC** | Data/Command | TFT_DC | **3** | Movido a GPIO 3. Libre, Touch2/boot-sensitive (desactiva Touch2, pull-up 3.3V). |
+| **TFT - RST** | Reset | TFT_RST | **33** | Output digital o reset soft (LovyanGFX). |
+| **TFT - BL** | BACKLIGHT (PWM) | TFT_BL | **35** | **LedC PWM**. Con driver MOSFET. Pin libre, lejos de pines SPI/PWM de motor. |
 | I2C SDA | Datos I2C | I2C_SDA | **8** | Por defecto (Arduino). Pull-up 4.7 kΩ a 3.3V. Cerca SPI (5-7), EMI riesgo con DMA. |
 | I2C SCL | Reloj I2C | I2C_SCL | **9** | Por defecto. Pull-up 4.7 kΩ a 3.3V. EMI riesgo. |
+| **Botón 1** | Función de Control | BUTTON_1 | **37** | Pin de propósito general. Ideal para entrada. Pull-up externo/interno. |
+| **Botón 2** | Función de Control | BUTTON_2 | **38** | Pin de propósito general. Ideal para entrada. Pull-up externo/interno. |
+| **Botón 3** | Función de Control | BUTTON_3 | **39** | Pin de propósito general. Ideal para entrada. Pull-up externo/interno. |
+| **Botón 4** | Función de Control | BUTTON_4 | **40** | Pin de propósito general. Ideal para entrada. Pull-up externo/interno. |
 
-**Pines Libres**: 3, 4, 14, 17, 34, 35, 37-40.
+---
+
+### Cambios y Justificaciones:
+
+1.  **Botones Reubicados:**
+    *   `BUTTON_1`: **GPIO 2** -> **GPIO 37**
+    *   `BUTTON_2`: **GPIO 4** -> **GPIO 38**
+    *   `BUTTON_3`: **GPIO 15** -> **GPIO 39**
+    *   `BUTTON_4`: **GPIO 21** -> **GPIO 40**
+
+    Estos pines (37, 38, 39, 40) son GPIOs de propósito general excelentes para entradas digitales y no tienen funciones sensibles durante el arranque.
+
+2.  **Pines Liberados para Otros Usos:**
+    *   **GPIO 2**
+    *   **GPIO 4**
+    *   **GPIO 15**
+    *   **GPIO 21**
+
+    Estos pines quedan ahora completamente libres. El **GPIO 2** y **GPIO 4** son especialmente valiosos por su versatilidad. **GPIO 15** y **GPIO 21** siguen siendo las TX/RX del UART0, por lo que si más tarde necesitas un UART físico, ya los tienes disponibles (o dos GPIOs de propósito general adicionales).
+
+Esta configuración es aún más robusta y te proporciona mayor flexibilidad para futuras expansiones o para evitar posibles conflictos que a veces surgen con pines de numeración más baja.
+
 
 ---
 
