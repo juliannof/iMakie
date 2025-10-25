@@ -146,8 +146,8 @@ Podemos elegir 4 de estos para los botones.
 | Encoder B (DIR) | Panorama (DIR) | ENCODER_B | 12 | Libre. Pull-up externo. Cerca PWM (16), EMI riesgo. |
 | Botón Encoder | Pulsador (Jog Select) | ENCODER_BUTTON | 11 | Libre. Pull-up externo/interno a 3.3V. Feedback en TFT. |
 | NeoPixel | Feedback Botones | NEOPIXEL | 36 | Libre, input/output. 800 kHz, 5V, lógica 3.3V. 4 LEDs (~240 mA): Rec=0 (rojo), Solo=1 (amarillo), Mute=2 (verde), Select=3 (azul). |
-| **TFT - SCLK** | Reloj SPI | TFT_SCLK | **5** | HSPI, <20 MHz (DMA). LovyanGFX, lógica 3.3V, backlight 5V. |
-| **TFT - MOSI** | Datos SPI | TFT_MOSI | **6** | HSPI, ~100 mA, 5V backlight. |
+| **TFT - SCLK** | Reloj SPI | TFT_SCLK/SCL | **5** | HSPI, <20 MHz (DMA). LovyanGFX, lógica 3.3V, backlight 5V. |
+| **TFT - MOSI** | Datos SPI | TFT_MOSI/SDA | **6** | HSPI, ~100 mA, 5V backlight. |
 | **TFT - CS** | Chip Select | TFT_CS | **7** | HSPI, LovyanGFX. |
 | **TFT - DC** | Data/Command | TFT_DC | **3** | Movido a GPIO 3. Libre, Touch2/boot-sensitive (desactiva Touch2, pull-up 3.3V). |
 | **TFT - RST** | Reset | TFT_RST | **33** | Output digital o reset soft (LovyanGFX). |
