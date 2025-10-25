@@ -131,9 +131,9 @@ Asigno **I2C a GPIO 8/9** (3.3V), **potenciómetro a GPIO 10** (ADC1_CH9), **TFT
 | TFT - SCLK | Reloj SPI | TFT_SCLK | 5 | HSPI, <20 MHz (DMA). LovyanGFX, lógica 3.3V, backlight 5V. |
 | TFT - MOSI | Datos SPI | TFT_MOSI | 6 | HSPI, ~100 mA, 5V backlight. |
 | TFT - CS | Chip Select | TFT_CS | 7 | HSPI, LovyanGFX. |
-| TFT - DC | Data/Command | TFT_DC | **2** | Movido de 8 (I2C). Libre, Touch2/boot-sensitive (desactiva Touch2, pull-up 3.3V). |
+| TFT - DC | Data/Command | TFT_DC | **3** | Movido de 8 (I2C). Libre, Touch2/boot-sensitive (desactiva Touch2, pull-up 3.3V). |
 | TFT - RST | Reset | TFT_RST | 33 | Output digital o reset soft (LovyanGFX). |
-| TFT - BL | BACKLIGHT | TFT_BL | PWR | Output digital o reset soft (LovyanGFX). |
+| TFT - BL | BACKLIGHT | TFT_BL | 35 | Output digital o reset soft (LovyanGFX). |
 | UART (Debug) | Serial TX/RX | UART_TX/RX | 21/15 | UART0 reasignado para USB debug. Libera GPIO 1/3. |
 | I2C SDA | Datos I2C | I2C_SDA | **8** | Por defecto (Arduino). Pull-up 4.7 kΩ a 3.3V. Cerca SPI (5-7), EMI riesgo con DMA. |
 | I2C SCL | Reloj I2C | I2C_SCL | **9** | Por defecto. Pull-up 4.7 kΩ a 3.3V. EMI riesgo. |
