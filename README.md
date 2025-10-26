@@ -1,6 +1,7 @@
 # iMakie
 A Mackie Control interface with ESP32
 ---
+<img alt="https://www.wemos.cc/en/latest/_static/boards/s2_mini_v1.0.0_4_16x9.jpg" src="https://www.wemos.cc/en/latest/_static/boards/s2_mini_v1.0.0_4_16x9.jpg">
 
 ### Tabla de Asignación de Pines Actualizada (Botones en Pines Altos)
 
