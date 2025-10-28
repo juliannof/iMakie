@@ -38,7 +38,8 @@ A Mackie Control interface with ESP32
     - **3.3V**: Regulador externo (desde 5V) para ESP32-S2 (~100 mA), potenciómetro (RSA0N11M9A0J, ~0.33 mA), encoder (~10 mA), TFT lógica (~10 mA). Total: ~120 mA. Bypassa regulador AMS1117 del LOLIN (~600 mA).
   - **I2C**: Comunica con ESP32-S3 maestro (3.3V). GPIO 8/9 (Arduino default) por estabilidad; problemas previos en otros pines (ej. 3/4, probablemente EMI, pull-ups débiles, cables largos).
   - **RSA0N11M9A0J**: Fader motorizado (10 kΩ, lineal) con touch capacitivo. 1 pin ADC (potenciómetro, 3.3V) + 1 pin touch (Touch1). Ruido por PWM 20 kHz (DRV8833). Saturación a 2.68V (6dB, necesita 11dB).
-  - **Motor PWM**: DRV8833, 2 pines (IN1/IN2, 20 kHz) para fader, jumper enable, 10V (o 5V).
+  - **Motor PWM**: DRV8833, 2 pines (IN1/IN2, 20 kHz) para fader, jumper enable, 10V.
+  <img loading="lazy" decoding="async" width="616" height="436" src="https://www.build-electronic-circuits.com/wp-content/uploads/2023/12/image.png" alt="Suggested filter circuit for debouncing" class="wp-image-21820" srcset="https://www.build-electronic-circuits.com/wp-content/uploads/2023/12/image.png 616w, https://www.build-electronic-circuits.com/wp-content/uploads/2023/12/image-500x354.png 500w" sizes="auto, (max-width: 616px) 100vw, 616px">
   - **Encoder**: 2 pines (A/B, interrupciones, panorama) + 1 botón (select para jog wheel). Sin LEDs, feedback en TFT.
   - **Botones**: Rec, Solo, Mute, Select manejados por ESP32-S3. ESP32-S2 recibe comandos I2C para actualizar NeoPixel (feedback) y TFT.
   - **TFT 240x280**: Probablemente ST7789, LovyanGFX con DMA (HSPI, 5 pines: SCLK, MOSI, CS, DC, RST). Lógica 3.3V, backlight 5V (~100 mA). Muestra nombre del track, vúmetro, panorama, posición del fader en dB.
