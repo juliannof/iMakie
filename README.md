@@ -293,32 +293,6 @@ Para **RSA0N11M9A0J** (GPIO 10 pot, GPIO 1 touch):
 ### 5. **Pinout Optimized**
 I assign **I2C to GPIO 8/9** (default, stable), move **potentiometer to GPIO 10** (ADC1_CH9), **TFT DC to GPIO 2**, and include encoder, 4 buttons, NeoPixel, and TFT with DMA. Pins are chosen to minimize EMI, conflicts, and ensure stability.
 
-| Component | Function | Definition | Pin GPIO | Justification and Notes |
-|---|---|---|---|---|
-| RSA0N11M9A0J (Pot.) | Position | FADER_POT | **10** | **ADC1_CH9**. Free, no UART/touch, boot-safe. 11dB (0-3.6V) avoids saturation (2.68V). RC (470 Ω, 0.1 µF), cap 0.1 µF. Far from PWM (16/18), less EMI. VCC=3.3V, 10 kΩ. |
-| RSA0N11M9A0J (Touch) | Capacitive Touch | FADER_TOUCH | **1** | **Touch1**. Prioritized for touch. Calibrate threshold (`touchRead(1)`). Disable UART0_TXD, Touch2-9. EMI/humidity risk. |
-| Motor PWM (IN1) | PWM Control | MOTOR_IN1 | 18 | PWM 20 kHz. Caps 0.1 µF+10 µF on DRV8833. Ferrite. Far from GPIO 10. |
-| Motor PWM (IN2) | PWM Control | MOTOR_IN2 | 16 | PWM 20 kHz. Slew rate (`ledc_set_fade`). Near encoder (12), EMI risk. |
-| Driver Enable | Enable (HIGH) | DRV_ENABLE | - | Jumper 3.3V. Frees GPIO 33. |
-| Encoder A (INT) | Interrupt | ENCODER_A | 13 | Free, no touch/UART. Pull-up external (4.7 kΩ). |
-| Encoder B (DIR) | Direction | ENCODER_B | 12 | Free. Pull-up external. Near PWM (16), EMI risk. |
-| Encoder Button | Push | ENCODER_BUTTON | 11 | Free. Pull-up external/internal. |
-| Button 1 | Digital Input | BUTTON_1 | 14 | Free, no touch/UART. Pull-up external (4.7 kΩ). |
-| Button 2 | Digital Input | BUTTON_2 | 17 | Free. Pull-up external. Near PWM (16), EMI risk. |
-| Button 3 | Digital Input | BUTTON_3 | 34 | Free, input-only. Pull-up external mandatory. Far from PWM/SPI. |
-| Button 4 | Digital Input | BUTTON_4 | 35 | Input-only. Pull-up external. Near crystal (noise risk). |
-| NeoPixel | LED Data | NEOPIXEL | 36 | Free, input/output. 800 kHz. Far from PWM/SPI. High current (~60 mA/LED). |
-| TFT - SCLK | SPI Clock | TFT_SCLK | 5 | HSPI, <20 MHz (DMA-enabled). LovyanGFX. |
-| TFT - MOSI | SPI Data | TFT_MOSI | 6 | HSPI, high current (~100 mA), 5V external. |
-| TFT - CS | Chip Select | TFT_CS | 7 | HSPI, LovyanGFX. |
-| TFT - DC | Data/Command | TFT_DC | **2** | Moved from 8 (I2C). Free, Touch2/boot-sensitive (disable Touch2, pull-up external). |
-| TFT - RST | Reset | TFT_RST | 33 | Output digital or soft reset (LovyanGFX). |
-| UART (Debug) | Serial TX/RX | UART_TX/RX | 21/15 | UART0 reassigned. Frees GPIO 1/3. |
-| I2C SDA | I2C Data | I2C_SDA | **8** | Default (Arduino). Pull-up 4.7 kΩ. Near SPI (5-7), EMI risk with DMA. |
-| I2C SCL | I2C Clock | I2C_SCL | **9** | Default. Pull-up 4.7 kΩ. EMI risk from SPI DMA. |
-
-**Free Pins**: 3, 4, 37-40.
-
 ---
 
 ### 6. **PlatformIO Configuration**
