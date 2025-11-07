@@ -2,7 +2,118 @@
 A Mackie Control interface with ESP32
 ---
 <img alt="https://www.wemos.cc/en/latest/_static/boards/s2_mini_v1.0.0_4_16x9.jpg" src="https://www.wemos.cc/en/latest/_static/boards/s2_mini_v1.0.0_4_16x9.jpg">
+```markdown
+# 📋 BOM COMPLETO DEFINITIVO - PLACA TRACK (PTPxx)
 
+Este documento detalla el Bill of Materials (BOM) completo y final para la placa Track (PTPxx), optimizado para robustez y facilidad de soldadura manual/reflow casero. Incluye precios estimados y Part Numbers (PNs) de ejemplo para facilitar la compra en distribuidores como Farnell/RS/LCSC.
+
+**Número de unidades a fabricar: 25 placas completas (incluye margen para testeo y fallos).**
+
+---
+
+## 📦 Bill of Materials (BOM) Detallado
+
+| Tipo | ID | RefDes | Componente | Valor / Función | Footprint | Fabricante | Part Number | Costo Unit (€) | Cantidad (x25) | Total (x25) (€) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **CONECTORES** | | | | | | | | | | |
+| Conector | 1 | J1 | JST-XH Header 5P | Entrada Alimentación e I2C | PTH | JST | B5B-XH-A | 0.20 | 25 | 5.00 |
+| Conector | 2 | J2 | Header Hembra 2x8 | Para Módulo DRV8833 | PTH | Molex | 87831-1620 | 0.50 | 25 | 12.50 |
+| Conector | 3 | J3 | Conector GH Header 7P | Para Placa P4NEO | SMD | JST | SM07B-GHS-TB(LF)(SN) | 0.25 | 25 | 6.25 |
+| Conector | 4 | J4 | JST-XH Header 8P | Para Pantalla TFT | PTH | JST | B8B-XH-A | 0.25 | 25 | 6.25 |
+| Conector | 5 | J5 | JST-XH Header 5P | Para Encoder Rotatorio | PTH | JST | B5B-XH-A | 0.15 | 25 | 3.75 |
+| **ICs (CIRCUITOS INTEGRADOS)** | | | | | | | | | | |
+| IC | 6 | U2 | LDO Ultra-Low Noise | TPS7A4700 (config. 3.3V) | SOT-223 | TI | TPS7A4700RGWR | 1.50 | 25 | 37.50 |
+| IC | 7 | U3 | LDO Ultra-Low Noise | TPS7A4700 (config. 2.6V) | SOT-223 | TI | TPS7A4700RGWR | 1.50 | 25 | 37.50 |
+| IC | 8 | U4 | Módulo Lolin ESP32 S2 | Mini | Header 2x13 | Lolin | Lolin-D32-Mini | 3.00 | 25 | 75.00 |
+| IC | 9 | U5 | Op-Amp (Buffer) | MCP6001 (SOT-23-5) | SOT-23-5 | Microchip | MCP6001-I/OT | 0.30 | 25 | 7.50 |
+| **DIODOS Y LEDS** | | | | | | | | | | |
+| Diodo | 10 | D1 | TVS Diode | SMBJ15A (15V) | SMB (DO-214AA) | Littelfuse | SMBJ15A-TR | 0.25 | 25 | 6.25 |
+| Diodo | 11 | D2 | Schottky Diode | MBRS340 40V 3A | SMC (DO-214AB) | ON Semi | MBRS340T3G | 0.45 | 25 | 11.25 |
+| Diodo | 12 | D3 | TVS Diode | SMAJ13A (13V) | SMA (DO-214AC) | Littelfuse | SMAJ13A-TR | 0.25 | 25 | 6.25 |
+| Diodo | 13 | D4 | TVS Diode | SMAJ6.5A (6.5V) | SMA (DO-214AC) | Littelfuse | SMAJ6.5A-TR | 0.20 | 25 | 5.00 |
+| Diodo | 14 | D5 | TVS Bidi | SMBJ13CA | SMB (DO-214AA) | Littelfuse | SMBJ13CA-TR | 0.30 | 25 | 7.50 |
+| Diodo | 15 | D6 | TVS Bidi | SMBJ13CA | SMB (DO-214AA) | Littelfuse | SMBJ13CA-TR | 0.30 | 25 | 7.50 |
+| Diodo | 16 | D10 | LED Rojo (Fault) | 0805 | 0805 | Würth | 150085RS75000 | 0.10 | 25 | 2.50 |
+| Diodo | 17 | D11 | TVS Diode (Low Cap.) | PESD5V0L1BA, 5V | SOD-323 | Nexperia | PESD5V0L1BA | 0.15 | 25 | 3.75 |
+| Diodo | 18 | D12 | TVS Diode (Low Cap.) | PESD5V0L1BA, 5V | SOD-323 | Nexperia | PESD5V0L1BA | 0.15 | 25 | 3.75 |
+| **RESISTORES** | | | | | | | | | | |
+| Resistor | 19 | R1 | Resistor | 10Ω 1/2W | 1206 | Yageo | RC1206FR-0710RL | 0.10 | 25 | 2.50 |
+| Resistor | 20 | R2 | Resistor | 10Ω 1/2W | 1206 | Yageo | RC1206FR-0710RL | 0.10 | 25 | 2.50 |
+| Resistor | 21 | R8 | Resistor | 100Ω | 0805 | Yageo | RC0805FR-07100RL | 0.05 | 25 | 1.25 |
+| Resistor | 22 | R10 | Resistor para D10 | 1kΩ | 0805 | Yageo | RC0805FR-071KL | 0.05 | 25 | 1.25 |
+| Resistor | 23 | RP1 | Resistor (Opcional) | 4.7kΩ (I2C Pull-up) | 0805 | Yageo | RC0805FR-074K7L | 0.05 | 25 | 1.25 |
+| Resistor | 24 | RP2 | Resistor (Opcional) | 4.7kΩ (I2C Pull-up) | 0805 | Yageo | RC0805FR-074K7L | 0.05 | 25 | 1.25 |
+| Resistor | 25 | R_DOWN_2V6 | Resistor 0.1% | 4.42kΩ | 0805 | Yageo | RT0805FR-074K42CT-L | 0.10 | 25 | 2.50 |
+| Resistor | 26 | R_DOWN_3V3 | Resistor 0.1% | 5.9kΩ | 0805 | Yageo | RT0805FR-075K90CT-L | 0.10 | 25 | 2.50 |
+| Resistor | 27 | R_SERIE | Resistor (Serie Fader) | 47Ω | 0603 | Yageo | RC0603FR-0747RL | 0.02 | 25 | 0.50 |
+| Resistor | 28 | R_UP_2V6 | Resistor 0.1% | 9.95kΩ | 0805 | Yageo | RT0805FR-079K95CTL-E | 0.10 | 25 | 2.50 |
+| Resistor | 29 | R_UP_3V3 | Resistor 0.1% | 12.4kΩ | 0805 | Yageo | RT0805FR-0712K4L | 0.10 | 25 | 2.50 |
+| **CAPACITORES** | | | | | | | | | | |
+| Capacitor | 30 | C1 | Cap. Electrolítico | 1000µF/25V | Radial (10mm) | Panasonic | EEUFR1E102 | 0.55 | 25 | 13.75 |
+| Capacitor | 31 | C12 | Cap. Cerámico | 100nF/10V | 0603 | Murata | GRM188R71A104KA01D | 0.05 | 25 | 1.25 |
+| Capacitor | 32 | C13 | Cap. Cerámico | 10µF/10V | 0805 | Murata | GRM21BR71A106KA01D | 0.10 | 25 | 2.50 |
+| Capacitor | 33 | C14 | Cap. Cerámico | 100nF/50V | 0805 | Murata | GRM21BR71H104KA01L | 0.05 | 25 | 1.25 |
+| Capacitor | 34 | C16 | Cap. Cerámico | 1µF/16V | 0603 | Murata | GRM188R71C105KA01D | 0.05 | 25 | 1.25 |
+| Capacitor | 35 | C21 | Cap. Electrolítico | 100µF/10V | Radial (6.3mm) | Nichicon | UCM1A101MCL1GS | 0.18 | 25 | 4.50 |
+| Capacitor | 36 | C6 | Cap. Cerámico | 100nF/50V | 0805 | TDK | C2012X7R1H104K | 0.10 | 25 | 2.50 |
+| Capacitor | 37 | C7 | Cap. Cerámico | 100nF/50V | 0805 | TDK | C2012X7R1H104K | 0.10 | 25 | 2.50 |
+| Capacitor | 38 | C_BYP_2V6 | Cap. Cerámico (Bypass) | 100nF/16V | 0603 | Murata | GRM188R71C104KA01D | 0.05 | 25 | 1.25 |
+| Capacitor | 39 | C_BYP_3V3 | Cap. Cerámico (Bypass) | 100nF/16V | 0603 | Murata | GRM188R71C104KA01D | 0.05 | 25 | 1.25 |
+| Capacitor | 40 | C_DEC1 | Cap. Cerámico (Decop Op-Amp) | 100nF/16V | 0603 | Murata | GRM188R71C104KA01D | 0.05 | 25 | 1.25 |
+| Capacitor | 41 | C_IN_2V6 | Cap. Cerámico | 10µF/10V | 0805 | Murata | GRM21BR71A106KA01D | 0.10 | 25 | 2.50 |
+| Capacitor | 42 | C_IN_3V3 | Cap. Cerámico | 10µF/10V | 0805 | Murata | GRM21BR71A106KA01D | 0.10 | 25 | 2.50 |
+| Capacitor | 43 | C_OUT_2V6 | Cap. Cerámico | 10µF/10V | 0805 | Murata | GRM21BR71A106KA01D | 0.10 | 25 | 2.50 |
+| Capacitor | 44 | C_OUT_3V3 | Cap. Cerámico | 10µF/10V | 0805 | Murata | GRM21BR71A106KA01D | 0.10 | 25 | 2.50 |
+| **FUSIBLES** | | | | | | | | | | |
+| Fusible | 45 | F1 | Fusible PPTC | 2A 15V | 1812 | Bourns | MF-R200 | 0.20 | 25 | 5.00 |
+| Fusible | 46 | F2 | Fusible PPTC | 500mA 15V | 1206 | Bourns | MF-MSMF050X | 0.15 | 25 | 3.75 |
+| **INDUCTORES / FERRITAS** | | | | | | | | | | |
+| Inductor | 47 | FB1 | Ferrite Bead | 600Ω@100MHz | 0805 | Murata | BLM21PG221SN1D | 0.15 | 25 | 3.75 |
+| **MÓDULOS / ELECTRO MECÁNICOS (montaje manual)** | | | | | | | | | | |
+| Módulo | 48 | U1_MOD | Módulo Driver DRV8833 | Clon Pololu | --- | Genérico AliExpress | ------------ | 1.07 | 25 | 26.75 |
+| Módulo | 49 | FADER | Fader Motorizado ALPS | RSA0N11M9A0J | --- | ALPS (Clon) | RSA0N11M9A0J | 10.00 | 25 | 250.00 |
+
+---
+
+## 💰 Resumen de Costos
+
+| Categoría | Subtotal (€) |
+|---|---|
+| Conectores | 40.00 |
+| ICs | 157.50 |
+| Diodos y LEDs | 53.75 |
+| Resistores | 20.50 |
+| Capacitores | 41.75 |
+| Fusibles | 8.75 |
+| Inductores/Ferritas | 3.75 |
+| Módulos | 276.75 |
+| **TOTAL (25 unidades)** | **602.75 €** |
+| **Costo por unidad** | **~24.11 €** |
+
+---
+
+## 📝 Notas Importantes
+
+1. **Precios orientativos**: Los costos son estimados y pueden variar según distribuidor, cantidad y disponibilidad.
+2. **Part Numbers**: Los PN listados son de referencia. Verificar disponibilidad antes de ordenar.
+3. **Tolerancias**: Los resistores de precisión (0.1%) son críticos para los LDOs.
+4. **Alternativas**: Se pueden usar equivalentes de otros fabricantes manteniendo las especificaciones.
+5. **Stock de seguridad**: Considerar ordenar 10-15% extra de componentes SMD críticos.
+
+---
+
+## 🔧 Componentes Críticos a Verificar
+
+- **TPS7A4700**: Disponibilidad limitada, considerar alternativas (LP5907, TLV717P)
+- **Fader ALPS RSA0N11M9A0J**: Componente más costoso, verificar compatibilidad de clones
+- **TVS Diodes**: Asegurar voltajes de clamp correctos según diseño
+- **Módulo ESP32-S2**: Verificar pinout del modelo Lolin específico
+
+---
+
+**Última actualización**: 2024
+**Versión BOM**: v1.0
+```
 
 ¡Absolutamente! Aquí tienes el BOM completo, formateado para copiar y pegar directamente en GitHub (o cualquier editor Markdown), eliminando las líneas de comentario y la tabla resumen para que sea un bloque de código markdown limpio.
 
