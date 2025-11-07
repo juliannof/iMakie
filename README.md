@@ -76,7 +76,89 @@ A Mackie Control interface with ESP32
 
 **TOTAL ESTIMADO: 528.75 €** (para 25 unidades)
 
+¡Absolutamente! Aquí tienes el BOM en formato Markdown, perfectamente formateado para pegar directamente en un archivo README.md, un issue, o cualquier documento en GitHub.
 
+```markdown
+# 📋 BOM COMPLETO DEFINITIVO - PLACA TRACK (PTPxx)
+
+Este documento detalla el Bill of Materials (BOM) completo para la placa Track (PTPxx), optimizado para robustez y facilidad de soldadura manual/reflow casero. Incluye precios estimados y Part Numbers (PNs) de ejemplo para facilitar la compra en distribuidores como Farnell/RS/LCSC.
+
+**Número de unidades a fabricar: 25 placas completas (incluye margen para testeo y fallos).**
+
+---
+
+## 📊 Resumen de Componentes por Tipo
+
+| Tipo                    | Cantidad Total | Costo Estimado (€) |
+| :---------------------- | :------------- | :----------------- |
+| **Conectores**          | 125            | 34.00              |
+| **ICs**                 | 75             | 120.00             |
+| **Diodos y LEDs**       | 250            | 65.75              |
+| **Resistores**          | 225            | 13.00              |
+| **Capacitores**         | 300            | 37.00              |
+| **Fusibles**            | 50             | 8.75               |
+| **Inductores/Ferritas** | 25             | 3.75               |
+| **Módulos Externos**    | 50             | 276.75             |
+| **TOTAL**               | **1100**       | **539.00**         |
+
+---
+
+## 📦 Bill of Materials (BOM) Detallado
+
+| ID | RefDes | Componente               | Valor / Función                  | Footprint       | Fabricante       | Part Number             | Costo Unit (€) | Cantidad (x25) | Total (x25) (€) |
+| -- | ------ | ------------------------ | -------------------------------- | --------------- | ---------------- | ----------------------- | -------------- | -------------- | --------------- |
+| **CONECTORES**                                                                                                                                                                                                   |
+| 1  | J1     | JST-XH Header 5P         | Entrada Alimentación e I2C       | PTH             | JST              | B5B-XH-A                | 0.20           | 25             | 5.00            |
+| 2  | J2     | Header Hembra 2x8        | Para Módulo DRV8833              | PTH             | Molex            | 87831-1620              | 0.50           | 25             | 12.50           |
+| 3  | J3     | Conector GH Header 7P    | Para Placa P4NEO                 | SMD             | JST              | SM07B-GHS-TB(LF)(SN)    | 0.25           | 25             | 6.25            |
+| 4  | J4     | JST-XH Header 8P         | Para Pantalla TFT                | PTH             | JST              | B8B-XH-A                | 0.25           | 25             | 6.25            |
+| 5  | J5     | JST-XH Header 5P         | Para Encoder Rotatorio           | PTH             | JST              | B5B-XH-A                | 0.15           | 25             | 3.75            |
+| **ICs (CIRCUITOS INTEGRADOS)**                                                                                                                                                                                   |
+| 6  | U3     | LDO Ultra-Low Noise      | TPS7A4700 (config. 2.6V)         | SOT-223         | TI               | TPS7A4700RGWR           | 1.50           | 25             | 37.50           |
+| 7  | U4     | Módulo Lolin ESP32 S2    | Mini                             | Header 2x13     | Lolin            | Lolin-D32-Mini          | 3.00           | 25             | 75.00           |
+| 8  | U5     | Op-Amp (Buffer)          | MCP6001 (SOT-23-5)               | SOT-23-5        | Microchip        | MCP6001-I/OT            | 0.30           | 25             | 7.50            |
+| **DIODOS Y LEDS**                                                                                                                                                                                                |
+| 9  | D1     | TVS Diode                | SMBJ15A (15V)                    | SMB (DO-214AA)  | Littelfuse       | SMBJ15A-TR              | 0.25           | 25             | 6.25            |
+| 10 | D2     | Schottky Diode           | MBRS340 40V 3A                   | SMC (DO-214AB)  | ON Semi          | MBRS340T3G              | 0.45           | 25             | 11.25           |
+| 11 | D3     | TVS Diode                | SMAJ13A (13V)                    | SMA (DO-214AC)  | Littelfuse       | SMAJ13A-TR              | 0.25           | 25             | 6.25            |
+| 12 | D4     | TVS Diode                | SMAJ6.5A (6.5V)                  | SMA (DO-214AC)  | Littelfuse       | SMAJ6.5A-TR             | 0.20           | 25             | 5.00            |
+| 13 | D5     | TVS Bidi                 | SMBJ13CA                         | SMB (DO-214AA)  | Littelfuse       | SMBJ13CA-TR             | 0.30           | 25             | 7.50            |
+| 14 | D6     | TVS Bidi                 | SMBJ13CA                         | SMB (DO-214AA)  | Littelfuse       | SMBJ13CA-TR             | 0.30           | 25             | 7.50            |
+| 15 | D10    | LED Rojo (Fault)         | 0805                             | 0805            | Würth            | 150085RS75000           | 0.10           | 25             | 2.50            |
+| 16 | D11    | TVS Diode (Low Cap.)     | PESD5V0L1BA, 5V                  | SOD-323         | Nexperia         | PESD5V0L1BA             | 0.15           | 25             | 3.75            |
+| 17 | D12    | TVS Diode (Low Cap.)     | PESD5V0L1BA, 5V                  | SOD-323         | Nexperia         | PESD5V0L1BA             | 0.15           | 25             | 3.75            |
+| **RESISTORES**                                                                                                                                                                                           |
+| 18 | R1     | Resistor                 | 10Ω 1/2W                         | 1206            | Yageo            | RC1206FR-0710RL         | 0.10           | 25             | 2.50            |
+| 19 | R2     | Resistor                 | 10Ω 1/2W                         | 1206            | Yageo            | RC1206FR-0710RL         | 0.10           | 25             | 2.50            |
+| 20 | R8     | Resistor                 | 100Ω                             | 0805            | Yageo            | RC0805FR-07100RL        | 0.05           | 25             | 1.25            |
+| 21 | R10    | Resistor para D10        | 1kΩ                              | 0805            | Yageo            | RC0805FR-071KL          | 0.05           | 25             | 1.25            |
+| 22 | R_DOWN | Resistor 0.1%            | 4.42kΩ                           | 0805            | Yageo            | RT0805FR-074K42CT-L     | 0.10           | 25             | 2.50            |
+| 23 | R_SERIE| Resistor (Serie Fader)   | 47Ω                              | 0603            | Yageo            | RC0603FR-0747RL         | 0.02           | 25             | 0.50            |
+| 24 | R_UP   | Resistor 0.1%            | 9.95kΩ                           | 0805            | Yageo            | RT0805FR-079K95CTL-E    | 0.10           | 25             | 2.50            |
+| 25 | RP1    | Resistor (Opcional)      | 4.7kΩ (I2C Pull-up)              | 0805            | Yageo            | RC0805FR-074K7L         | 0.05           | 25             | 1.25            |
+| 26 | RP2    | Resistor (Opcional)      | 4.7kΩ (I2C Pull-up)              | 0805            | Yageo            | RC0805FR-074K7L         | 0.05           | 25             | 1.25            |
+| **CAPACITORES**                                                                                                                                                                                           |
+| 27 | C1     | Cap. Electrolítico       | 1000µF/25V                       | Radial (10mm)   | Panasonic        | EEUFR1E102              | 0.55           | 25             | 13.75           |
+| 28 | C12    | Cap. Cerámico            | 100nF/10V                        | 0603            | Murata           | GRM188R71A104KA01D      | 0.05           | 25             | 1.25            |
+| 29 | C13    | Cap. Cerámico            | 10µF/10V                         | 0805            | Murata           | GRM21BR71A106KA01D      | 0.10           | 25             | 2.50            |
+| 30 | C14    | Cap. Cerámico            | 100nF/50V                        | 0805            | Murata           | GRM21BR71H104KA01L      | 0.05           | 25             | 1.25            |
+| 31 | C16    | Cap. Cerámico            | 1µF/16V                          | 0603            | Murata           | GRM188R71C105KA01D      | 0.05           | 25             | 1.25            |
+| 32 | C21    | Cap. Electrolítico       | 100µF/10V                        | Radial (6.3mm)  | Nichicon         | UCM1A101MCL1GS          | 0.18           | 25             | 4.50            |
+| 33 | C6     | Cap. Cerámico            | 100nF/50V                        | 0805            | TDK              | C2012X7R1H104K          | 0.10           | 25             | 2.50            |
+| 34 | C7     | Cap. Cerámico            | 100nF/50V                        | 0805            | TDK              | C2012X7R1H104K          | 0.10           | 25             | 2.50            |
+| 35 | C_BYP  | Cap. Cerámico (Bypass)   | 100nF/16V                        | 0603            | Murata           | GRM188R71C104KA01D      | 0.05           | 25             | 1.25            |
+| 36 | C_DEC1 | Cap. Cerámico (Decop Op-Amp)| 100nF/16V                    | 0603            | Murata           | GRM188R71C104KA01D      | 0.05           | 25             | 1.25            |
+| 37 | C_IN   | Cap. Cerámico            | 10µF/10V                         | 0805            | Murata           | GRM21BR71A106KA01D      | 0.10           | 25             | 2.50            |
+| 38 | C_OUT  | Cap. Cerámico            | 10µF/10V                         | 0805            | Murata           | GRM21BR71A106KA01D      | 0.10           | 25             | 2.50            |
+| **FUSIBLES**                                                                                                                                                                                             |
+| 39 | F1     | Fusible PPTC             | 2A 15V                           | 1812            | Bourns           | MF-R200                 | 0.20           | 25             | 5.00            |
+| 40 | F2     | Fusible PPTC             | 500mA 15V                        | 1206            | Bourns           | MF-MSMF050X             | 0.15           | 25             | 3.75            |
+| **INDUCTORES / FERRITAS**                                                                                                                                                                                |
+| 41 | FB1    | Ferrite Bead             | 600Ω@100MHz                      | 0805            | Murata           | BLM21PG221SN1D          | 0.15           | 25             | 3.75            |
+| **MÓDULOS / ELECTRO MECÁNICOS (montaje manual)**                                                                                                                                                         |
+| 42 | U1_MOD | Módulo Driver DRV8833    | Clon Pololu                      | ---             | Genérico AliExpress | ------------            | 1.07           | 25             | 26.75           |
+| 43 | FADER  | Fader Motorizado ALPS    | RSA0N11M9A0J                     | ---             | ALPS (Clon)      | RSA0N11M9A0J            | 10.00          | 25             | 250.00          |
+```
 
 
 ### 1. **Contexto y Requerimientos**
