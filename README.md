@@ -29,6 +29,56 @@ A Mackie Control interface with ESP32
 | **Botón 3** | Función de Control | BUTTON_3 | **39** | Pin de propósito general. Ideal para entrada. Pull-up externo/interno. |
 | **Botón 4** | Función de Control | BUTTON_4 | **40** | Pin de propósito general. Ideal para entrada. Pull-up externo/interno. |
 
+
+# BOM COMPLETO - PLACA TRACK (PTPxx)
+# Actualizado para robustez y sin duplicidad de 3.3V (aprovecha ESP32S2)
+
+| ID | Cantidad | Referencia Designador | Componente | Valor | Footprint | Fabricante | Part Number | Costo Unit (€) | Costo Total (€) |
+|----|----------|----------------------|------------|-------|-----------|------------|-------------|----------------|-----------------|
+| 1 | 25 | J1 | JST-XH Header 5P | 2.5mm | PTH | JST | B5B-XH-A | 0.20 | 5.00 |
+| 2 | 25 | D2 | Schottky Diode | MBRS340 40V 3A | SMC (DO-214AB) | ON Semi | MBRS340T3G | 0.45 | 11.25 |
+| 3 | 25 | F1 | Fusible PPTC | 2A 15V | 1812 | Bourns | MF-R200 | 0.20 | 5.00 |
+| 4 | 25 | D1 | TVS Diode | SMBJ15A (15V) | SMB (DO-214AA) | Littelfuse | SMBJ15A-TR | 0.25 | 6.25 |
+| 5 | 25 | FB1 | Ferrite Bead | 600Ω@100MHz | 0805 | Murata | BLM21PG221SN1D | 0.15 | 3.75 |
+| 6 | 25 | D3 | TVS Diode | SMAJ13A (13V) | SMA (DO-214AC) | Littelfuse | SMAJ13A-TR | 0.25 | 6.25 |
+| 7 | 25 | C1 | Cap. Electrolítico | 1000µF/25V | Radial | Panasonic | EEUFR1E102 | 0.55 | 13.75 |
+| 8 | 25 | F2 | Fusible PPTC | 500mA 15V | 1206 | Bourns | MF-MSMF050X | 0.15 | 3.75 |
+| 9 | 25 | D4 | TVS Diode | SMAJ6.5A (6.5V) | SMA (DO-214AC) | Littelfuse | SMAJ6.5A-TR | 0.20 | 5.00 |
+| 10 | 25 | C21 | Cap. Electrolítico | 100µF/10V | Radial | Nichicon | UCM1A101MCL1GS | 0.18 | 4.50 |
+| 11 | 25 | U3 | LDO Ultra-Low Noise | TPS7A4700 (config. 2.6V) | SOT-223 | TI | TPS7A4700RGWR | 1.50 | 37.50 |
+| 12 | 25 | R_UP | Resistor 0.1% | 9.95kΩ | 0805 | Yageo | RT0805FR-079K95CTL-E | 0.10 | 2.50 |
+| 13 | 25 | R_DOWN | Resistor 0.1% | 4.42kΩ | 0805 | Yageo | RT0805FR-074K42CT-L | 0.10 | 2.50 |
+| 14 | 25 | C_IN | Cap. Cerámico | 10µF/10V | 0805 | Murata | GRM21BR71A106KA01D | 0.10 | 2.50 |
+| 15 | 25 | C_OUT | Cap. Cerámico | 10µF/10V | 0805 | Murata | GRM21BR71A106KA01D | 0.10 | 2.50 |
+| 16 | 25 | C_BYP | Cap. Cerámico (Bypass) | 100nF/16V | 0603 | Murata | GRM188R71C104KA01D | 0.05 | 1.25 |
+| 17 | 25 | C16 | Cap. Cerámico (Filtro) | 1µF/16V | 0603 | Murata | GRM188R71C105KA01D | 0.05 | 1.25 |
+| 18 | 25 | R8 | Resistor | 100Ω | 0805 | Yageo | RC0805FR-07100RL | 0.05 | 1.25 |
+| 19 | 25 | C14 | Cap. Cerámico | 100nF/50V | 0805 | Murata | GRM21BR71H104KA01L | 0.05 | 1.25 |
+| 20 | 25 | J2 | Header Hembra 2x8 | 2.54mm | PTH | Molex | 87831-1620 | 0.50 | 12.50 |
+| 21 | 25 | R1 | Resistor | 10Ω 1/2W | 1206 | Yageo | RC1206FR-0710RL | 0.10 | 2.50 |
+| 22 | 25 | R2 | Resistor | 10Ω 1/2W | 1206 | Yageo | RC1206FR-0710RL | 0.10 | 2.50 |
+| 23 | 25 | C6 | Cap. Cerámico | 100nF/50V | 0805 | TDK | C2012X7R1H104K | 0.10 | 2.50 |
+| 24 | 25 | C7 | Cap. Cerámico | 100nF/50V | 0805 | TDK | C2012X7R1H104K | 0.10 | 2.50 |
+| 25 | 25 | D5 | TVS Bidi | SMBJ13CA | SMB (DO-214AA) | Littelfuse | SMBJ13CA-TR | 0.30 | 7.50 |
+| 26 | 25 | D6 | TVS Bidi | SMBJ13CA | SMB (DO-214AA) | Littelfuse | SMBJ13CA-TR | 0.30 | 7.50 |
+| 27 | 25 | U4 | Módulo Lolin ESP32 S2 | Mini | Header 2x13 | Lolin | Lolin-D32-Mini | 3.00 | 75.00 |
+| 28 | 50 | D11, D12 | TVS Diode (Low Cap.) | PESD5V0L1BA, 5V | SOD-323 | Nexperia | PESD5V0L1BA | 0.15 | 7.50 |
+| 29 | 25 | RP1 | Resistor (Opcional) | 4.7kΩ | 0805 | Yageo | RC0805FR-074K7L | 0.05 | 1.25 |
+| 30 | 25 | RP2 | Resistor (Opcional) | 4.7kΩ | 0805 | Yageo | RC0805FR-074K7L | 0.05 | 1.25 |
+| 31 | 25 | D10 | LED Rojo (Fault) | 0805 | 0805 | Würth | 150085RS75000 | 0.10 | 2.50 |
+| 32 | 25 | R10 | Resistor para D10 | 1kΩ | 0805 | Yageo | RC0805FR-071KL | 0.05 | 1.25 |
+| 33 | 25 | J3 | Conector GH Header 7P | 1.25mm | SMD | JST | SM07B-GHS-TB(LF)(SN) | 0.25 | 6.25 |
+| 34 | 25 | U5 | Op-Amp (Buffer) | MCP6001 (SOT-23-5) | SOT-23-5 | Microchip | MCP6001-I/OT | 0.30 | 7.50 |
+| 35 | 25 | C_DEC1 | Cap. Cerámico (Decop) | 100nF/16V | 0603 | Murata | GRM188R71C104KA01D | 0.05 | 1.25 |
+| 36 | 25 | R_SERIE | Resistor (Serie Fader) | 47Ω | 0603 | Yageo | RC0603FR-0747RL | 0.02 | 0.50 |
+| 37 | 25 | U1_MOD | Módulo Driver DRV8833 | Clon Pololu | ---------- | Genérico AliExpress | ------------ | 1.07 | 26.75 |
+| 38 | 25 | FADER | Fader Motorizado ALPS | RSA0N11M9A0J | ------------ | ALPS (Clon) | RSA0N11M9A0J | 10.00 | 250.00 |
+
+**TOTAL ESTIMADO: 528.75 €** (para 25 unidades)
+
+
+
+
 ### 1. **Contexto y Requerimientos**
 - **Setup**:
   - **Placa**: LOLIN S2 Mini (ESP32-S2) para prototipado. Placa personalizada en diseño final. Pines expuestos: 1-18, 21, 33-40.
