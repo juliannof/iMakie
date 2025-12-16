@@ -30,3 +30,12 @@ A Mackie Control interface with ESP32
 | **Botón 4** | Función de Control | BUTTON_4 | **40** | Pin de propósito general. Ideal para entrada. Pull-up externo/interno. |
 
 
+
+
+
+
+
+
+
+
+
