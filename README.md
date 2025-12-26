@@ -1,7 +1,7 @@
 # iMakie
 A Mackie Control interface with ESP32
 ---
-<img alt="https://www.wemos.cc/en/latest/_static/boards/s2_mini_v1.0.0_4_16x9.jpg" src="https://www.wemos.cc/en/latest/_static/boards/s2_mini_v1.0.0_4_16x9.jpg">
+<img alt="ESP32 S2" src="https://www.wemos.cc/en/latest/_static/boards/s2_mini_v1.0.0_4_16x9.jpg">
 
 ### Tabla de Asignación de Pines Actualizada (Botones en Pines Altos)
 
@@ -31,7 +31,7 @@ A Mackie Control interface with ESP32
 
 
 
-<img alt="https://www.mouser.es/images/marketingid/2021/microsites/0/ESP32-S3-DevKitC-1%20Pin%20Layout.png" src="https://www.mouser.es/images/marketingid/2021/microsites/0/ESP32-S3-DevKitC-1%20Pin%20Layout.png">
+<img alt="ESP32 S3" src="https://naylampmechatronics.com/img/cms/001206/Pinout%20ESP32-S3-DevKitC-1.jpg">
 
 | GPIO | Función asignada                 | Dispositivo/Nota                  | Comentarios                           |
 |------|---------------------------------|----------------------------------|---------------------------------------|
