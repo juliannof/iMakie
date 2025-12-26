@@ -28,6 +28,11 @@ A Mackie Control interface with ESP32
 | **Botón 2** | Función de Control | BUTTON_2 | **38** | Pin de propósito general. Ideal para entrada. Pull-up externo/interno. |
 | **Botón 3** | Función de Control | BUTTON_3 | **39** | Pin de propósito general. Ideal para entrada. Pull-up externo/interno. |
 | **Botón 4** | Función de Control | BUTTON_4 | **40** | Pin de propósito general. Ideal para entrada. Pull-up externo/interno. || GPIO | Función asignada                 | Dispositivo/Nota                  | Comentarios                           |
+
+
+<img alt="https://www.mouser.es/images/marketingid/2021/microsites/0/ESP32-S3-DevKitC-1%20Pin%20Layout.png" src="https://www.mouser.es/images/marketingid/2021/microsites/0/ESP32-S3-DevKitC-1%20Pin%20Layout.png">
+
+
 |------|---------------------------------|----------------------------------|---------------------------------------|
 | 0    | Libre                           | -                                | Expansión / futuro                     |
 | 1    | Libre                           | -                                | Expansión / futuro                     |
