@@ -48,8 +48,8 @@ A Mackie Control interface with ESP32
 | **12** | **DC Pantalla** | Pantalla | **FIJO (Tu elección)** |
 | **13** | **RST Pantalla** | Pantalla | **FIJO (Tu elección)** |
 | **14** | **CS Pantalla** | Pantalla | **FIJO (Tu elección)** |
-| **15** | **TX UART** | RP2040 | OK |
-| **16** | **RX UART** | RP2040 | OK |
+| **15** | **TX UART** GPIO 15 (TX) ────► GPIO 1 (RX) ESP envía, Pico recibe | RP2040 | OK |
+| **16** | **RX UART** GPIO 16 (RX) ◄──── GPIO 0 (TX) Pico envía, ESP recibe | RP2040 | OK |
 | **17** | **Botón 3** | Input | OK |
 | **18** | **Backlight** | Pantalla | **FIJO (Tu elección)** |
 | **19** | USB D- | USB Nativo | Reservado |
