@@ -37,19 +37,19 @@ A Mackie Control interface with ESP32
 |------|---------------------------------|----------------------------------|---------------------------------------|
 | 0    | Libre                           | -                                | Expansión / futuro                     |
 | 1    | Libre                           | -                                | Expansión / futuro                     |
-| 2    | DC pantalla                     | SPI Pantalla                     | Data/Command                            |
+| 2    |                    | SPI Pantalla                     | Data/Command                            |
 | 3    | Libre                           | -                                | Expansión / futuro                     |
-| 4    | RESET pantalla                  | SPI Pantalla                     | Reset pantalla                          |
+| 4    |                                 | SPI Pantalla                     | Reset pantalla                          |
 | 5    | Libre                           | -                                | Expansión / futuro                     |
 | 6    | No usar                        | Flash QSPI                       | Flash interna                           |
 | 7    | No usar                        | Flash QSPI                       | Flash interna                           |
 | 8    | SDA I²C NetTrellis              | NetTrellis                        | Pull-up externa 4.7kΩ                  |
 | 9    | SCL I²C NetTrellis              | NetTrellis                        | Pull-up externa 4.7kΩ                  |
-| 10   | No usar                        | Flash QSPI                       | Flash interna                           |
-| 11   | No usar                        | Flash QSPI                       | Flash interna                           |
-| 12   | MISO SPI pantalla               | SPI Pantalla                     | Entrada pantalla                        |
-| 13   | MOSI SPI pantalla               | SPI Pantalla                     | Salida pantalla                         |
-| 14   | SCK SPI pantalla                | SPI Pantalla                     | Clock                                   |
+| 10   | SCK SPI pantalla                         | Flash QSPI                       | Flash interna                           |
+| 11   | MOSI SPI pantalla                         | Flash QSPI                       | Flash interna                           |
+| 12   | DC pantalla               | SPI Pantalla                     | Entrada pantalla                        |
+| 13   | RESET pantalla                | SPI Pantalla                     | Salida pantalla                         |
+| 14   | CS SPI pantalla               | SPI Pantalla                     | Clock                                   |
 | 15   | CS SPI pantalla                 | SPI Pantalla                     | Chip select                             |
 | 16   | TX UART → RP2040 Zero           | UART MIDI                        | Nivel lógico 3.3V                       |
 | 17   | RX UART ← RP2040 Zero           | UART MIDI                        | Nivel lógico 3.3V                       |
