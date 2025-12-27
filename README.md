@@ -33,62 +33,31 @@ A Mackie Control interface with ESP32
 
 <img alt="ESP32 S3" src="https://naylampmechatronics.com/img/cms/001206/Pinout%20ESP32-S3-DevKitC-1.jpg">
 
-| GPIO | Función asignada                 | Dispositivo/Nota                  | Comentarios                           |
-|------|---------------------------------|----------------------------------|---------------------------------------|
-| 0    | Libre                           | -                                | Expansión / futuro                     |
-| 1    | Libre                           | -                                | Expansión / futuro                     |
-| 2    |                    | SPI Pantalla                     | Data/Command                            |
-| 3    | Libre                           | -                                | Expansión / futuro                     |
-| 4    |                                 | SPI Pantalla                     | Reset pantalla                          |
-| 5    | Libre                           | -                                | Expansión / futuro                     |
-| 6    | No usar                        | Flash QSPI                       | Flash interna                           |
-| 7    | No usar                        | Flash QSPI                       | Flash interna                           |
-| 8    | SDA I²C NetTrellis              | NetTrellis                        | Pull-up externa 4.7kΩ                  |
-| 9    | SCL I²C NetTrellis              | NetTrellis                        | Pull-up externa 4.7kΩ                  |
-| 10   | SCK SPI pantalla                         | Flash QSPI                       | Flash interna                           |
-| 11   | MOSI SPI pantalla                         | Flash QSPI                       | Flash interna                           |
-| 12   | DC pantalla               | SPI Pantalla                     | Entrada pantalla                        |
-| 13   | RESET pantalla                | SPI Pantalla                     | Salida pantalla                         |
-| 14   | CS SPI pantalla               | SPI Pantalla                     | Clock                                   |
-| 15   | CS SPI pantalla                 | SPI Pantalla                     | Chip select                             |
-| 16   | TX UART → RP2040 Zero           | UART MIDI                        | Nivel lógico 3.3V                       |
-| 17   | RX UART ← RP2040 Zero           | UART MIDI                        | Nivel lógico 3.3V                       |
-| 18   | SDA I²C S2 esclavos             | 9 × ESP32-S2                     | Pull-up externa 4.7kΩ, 100 kHz         |
-| 19   | SCL I²C S2 esclavos             | 9 × ESP32-S2                     | Pull-up externa 4.7kΩ, 100 kHz         |
-| 20   | Libre                           | -                                | Expansión / futuro                     |
-| 21   | Libre                           | -                                | Expansión / futuro                     |
-| 22   | Libre                           | -                                | Expansión / futuro                     |
-| 23   | Libre                           | -                                | Expansión / futuro                     |
-| 24   | Libre                           | -                                | Expansión / futuro                     |
-| 25   | Botón 1                         | Botones físicos                  | Entrada con pull-up interno            |
-| 26   | Botón 2                         | Botones físicos                  | Entrada con pull-up interno            |
-| 27   | Botón 3                         | Botones físicos                  | Entrada con pull-up interno            |
-| 28   | Botón 4                         | Botones físicos                  | Entrada con pull-up interno            |
-| 29   | Botón 5                         | Botones físicos                  | Entrada con pull-up interno            |
-| 30   | Libre                           | -                                | Expansión / futuro                     |
-| 31   | Libre                           | -                                | Expansión / futuro                     |
-| 32   | LED 1                            | LEDs asociados a botones         | Salida digital                           |
-| 33   | LED 2                            | LEDs asociados a botones         | Salida digital                           |
-| 34   | LED 3                            | LEDs asociados a botones         | Salida digital                           |
-| 35   | LED 4                            | LEDs asociados a botones         | Salida digital                           |
-| 36   | LED 5                            | LEDs asociados a botones         | Salida digital                           |
-| 37   | Libre                           | -                                | Expansión / futuro                     |
-| 38   | Libre                           | -                                | Expansión / futuro                     |
-| 39   | Libre                           | -                                | Expansión / futuro                     |
-| 40   | Libre                           | -                                | Expansión / futuro                     |
-| 41   | Libre                           | -                                | Expansión / futuro                     |
-| 42   | Libre                           | -                                | Expansión / futuro                     |
-| 43   | Libre                           | -                                | Expansión / futuro                     |
-
-
-
-
-
-
-
-
-
-
-
-
-
+| **GPIO** | **Función Asignada** | **Dispositivo** | **Estado** |
+| :--- | :--- | :--- | :--- |
+| **0** | (Libre) | - | Boot |
+| **1** | **SDA I²C (Bus S2)** | Esclavos S2 | **Nuevo sitio (antes era 18)** |
+| **2** | **SCL I²C (Bus S2)** | Esclavos S2 | **Nuevo sitio (antes era 19)** |
+| **3** | **Botón 5** | Input | Movido aquí |
+| **4** | **Botón 1** | Input | OK |
+| **5** | **Botón 2** | Input | OK |
+| **8** | SDA I²C (Trellis) | NetTrellis | OK |
+| **9** | SCL I²C (Trellis) | NetTrellis | OK |
+| **10** | **SCK Pantalla** | Pantalla | **FIJO (Tu elección)** |
+| **11** | **MOSI Pantalla** | Pantalla | **FIJO (Tu elección)** |
+| **12** | **DC Pantalla** | Pantalla | **FIJO (Tu elección)** |
+| **13** | **RST Pantalla** | Pantalla | **FIJO (Tu elección)** |
+| **14** | **CS Pantalla** | Pantalla | **FIJO (Tu elección)** |
+| **15** | **TX UART** | RP2040 | OK |
+| **16** | **RX UART** | RP2040 | OK |
+| **17** | **Botón 3** | Input | OK |
+| **18** | **Backlight** | Pantalla | **FIJO (Tu elección)** |
+| **19** | USB D- | USB Nativo | Reservado |
+| **20** | USB D+ | USB Nativo | Reservado |
+| **21** | **Botón 4** | Input | OK |
+| **33-37**| ⛔ **PROHIBIDO** | **PSRAM N16R8** | **NO TOCAR** |
+| **38** | **LED 1** | Salida | OK |
+| **39** | **LED 2** | Salida | OK |
+| **40** | **LED 3** | Salida | OK |
+| **41** | **LED 4** | Salida | OK |
+| **42** | **LED 5** | Salida | OK |
