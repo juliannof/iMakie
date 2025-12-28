@@ -36,8 +36,8 @@ A Mackie Control interface with ESP32
 | **GPIO** | **Función Asignada** | **Dispositivo** | **Estado** |
 | :--- | :--- | :--- | :--- |
 | **0** | (Libre) | - | Boot |
-| **1** | **SDA I²C (Bus S2)** | Esclavos S2 | **Nuevo sitio (antes era 18)** |
-| **2** | **SCL I²C (Bus S2)** | Esclavos S2 | **Nuevo sitio (antes era 19)** |
+| **1** | **SDA I²C (Bus S3)** | A esclavos S2 |   |
+| **2** | **SCL I²C (Bus S3)** | A esclavos S2 |   |
 | **3** | **Botón 5** | Input | Movido aquí |
 | **4** | **Botón 1** | Input | OK |
 | **5** | **Botón 2** | Input | OK |
