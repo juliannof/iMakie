@@ -36,8 +36,8 @@ A Mackie Control interface with ESP32
 | **GPIO** | **Función Asignada** | **Dispositivo** | **Estado** |
 | :--- | :--- | :--- | :--- |
 | **0** | (Libre) | - | Boot |
-| **1** | **SDA I²C (Bus S3)** | A esclavos S2 |   |
-| **2** | **SCL I²C (Bus S3)** | A esclavos S2 |   |
+| **1** | -| - |   |
+| **2** | - | - |   |
 | **3** | **Botón 5** | Input | Movido aquí |
 | **4** | **Botón 1** | Input | OK |
 | **5** | **Botón 2** | Input | OK |
@@ -48,8 +48,8 @@ A Mackie Control interface with ESP32
 | **12** | **DC Pantalla** | Pantalla | **FIJO (Tu elección)** |
 | **13** | **RST Pantalla** | Pantalla | **FIJO (Tu elección)** |
 | **14** | **CS Pantalla** | Pantalla | **FIJO (Tu elección)** |
-| **15** | **TX UART** GPIO 15 (TX) ────► GPIO 1 (RX) ESP envía, Pico recibe | RP2040 | OK |
-| **16** | **RX UART** GPIO 16 (RX) ◄──── GPIO 0 (TX) Pico envía, ESP recibe | RP2040 | OK |
+| **15** | RS485 ────► GPIO 15 (RX) ESP envía, Pico recibe | RP2040 | OK |
+| **16** | RS485 GPIO 16 (RX) ◄──── GPIO 0 (TX) Pico envía, ESP recibe | RP2040 | OK |
 | **17** | **Botón 3** | Input | OK |
 | **18** | **Backlight** | Pantalla | **FIJO (Tu elección)** |
 | **19** | USB D- | USB Nativo | Reservado |
