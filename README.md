@@ -64,9 +64,6 @@ A Mackie Control interface with ESP32
 | **41** | - | - |   |
 | **42** | - | - |   |
 
-Aquí tienes la tabla formateada en **Markdown**, lista para copiar y pegar directamente en tu archivo `README.md` de GitHub o Wiki.
-
-He organizado los pines lógicamente y añadido las notas técnicas sobre conflictos y funciones MIDI.
 
 ***
 
