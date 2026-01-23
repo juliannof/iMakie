@@ -38,9 +38,9 @@ A Mackie Control interface with ESP32
 | **0** | (Libre) | - | Boot |
 | **1** | -| - |   |
 | **2** | - | - |   |
-| **3** | **Botón 5** | Input | Movido aquí |
-| **4** | **Botón 1** | Input | OK |
-| **5** | **Botón 2** | Input | OK |
+| **3** | - | - |   |
+| **4** | - | - |   |
+| **5** | - | - |   |
 | **8** | SDA I²C (Trellis) | NetTrellis | OK |
 | **9** | SCL I²C (Trellis) | NetTrellis | OK |
 | **10** | **SCK Pantalla** | Pantalla | **FIJO (Tu elección)** |
@@ -56,11 +56,11 @@ A Mackie Control interface with ESP32
 | **20** | USB D+ | USB Nativo | Reservado |
 | **21** | **Botón 4** | Input | OK |
 | **33-37**| ⛔ **PROHIBIDO** | **PSRAM N16R8** | **NO TOCAR** |
-| **38** | **LED 1** | Salida | OK |
-| **39** | **LED 2** | Salida | OK |
-| **40** | **LED 3** | Salida | OK |
-| **41** | **LED 4** | Salida | OK |
-| **42** | **LED 5** | Salida | OK |
+| **38** | - | - |   |
+| **39** | - | - |   |
+| **40** | - | - |   |
+| **41** | - | - |   |
+| **42** | - | - |   |
 
 Aquí tienes la tabla formateada en **Markdown**, lista para copiar y pegar directamente en tu archivo `README.md` de GitHub o Wiki.
 
