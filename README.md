@@ -41,6 +41,8 @@ A Mackie Control interface with ESP32
 | **3** | - | - |   |
 | **4** | - | - |   |
 | **5** | - | - |   |
+| **6** | - | - |   |
+| **7** | - | - |   |
 | **8** | SDA I²C (Trellis) | NetTrellis | OK |
 | **9** | SCL I²C (Trellis) | NetTrellis | OK |
 | **10** | **SCK Pantalla** | Pantalla | **FIJO (Tu elección)** |
