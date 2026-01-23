@@ -52,7 +52,7 @@ A Mackie Control interface with ESP32
 | **14** | **CS Pantalla** | Pantalla | **FIJO (Tu elección)** |
 | **15** | RS485 ────► GPIO 15 (RX) ESP envía, Pico recibe | RP2040 | OK |
 | **16** | RS485 GPIO 16 (RX) ◄──── GPIO 0 (TX) Pico envía, ESP recibe | RP2040 | OK |
-| **17** | **Botón 3** | Input | OK |
+| **17** |  - | - |   |
 | **18** | **Backlight** | Pantalla | **FIJO (Tu elección)** |
 | **19** | USB D- | USB Nativo | Reservado |
 | **20** | USB D+ | USB Nativo | Reservado |
