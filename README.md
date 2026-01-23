@@ -56,7 +56,7 @@ A Mackie Control interface with ESP32
 | **18** | **Backlight** | Pantalla | **FIJO (Tu elección)** |
 | **19** | USB D- | USB Nativo | Reservado |
 | **20** | USB D+ | USB Nativo | Reservado |
-| **21** | **Botón 4** | Input | OK |
+| **21** | - | - |   |
 | **33-37**| ⛔ **PROHIBIDO** | **PSRAM N16R8** | **NO TOCAR** |
 | **38** | - | - |   |
 | **39** | - | - |   |
