@@ -43,13 +43,13 @@ A Mackie Control interface with ESP32
 | **5** | - | - |   |
 | **6** | - | - |   |
 | **7** | - | - |   |
-| **8** | SDA I²C (Trellis) | NetTrellis | OK |
-| **9** | SCL I²C (Trellis) | NetTrellis | OK |
-| **10** | **SCK Pantalla** | Pantalla | **FIJO (Tu elección)** |
-| **11** | **MOSI Pantalla** | Pantalla | **FIJO (Tu elección)** |
-| **12** | **DC Pantalla** | Pantalla | **FIJO (Tu elección)** |
-| **13** | **RST Pantalla** | Pantalla | **FIJO (Tu elección)** |
-| **14** | **CS Pantalla** | Pantalla | **FIJO (Tu elección)** |
+| **8** | SDA I²C (Trellis) | NeoTrellis | OK |
+| **9** | SCL I²C (Trellis) | NeoTrellis | OK |
+| **10** | **SCK Pantalla** | Pantalla | |
+| **11** | **MOSI Pantalla** | Pantalla | |
+| **12** | **DC Pantalla** | Pantalla | |
+| **13** | **RST Pantalla** | Pantalla |  |
+| **14** | **CS Pantalla** | Pantalla | |
 | **15** | RS485 ────► GPIO 15 (RX) ESP envía, Pico recibe | RP2040 | OK |
 | **16** | RS485 GPIO 16 (RX) ◄──── GPIO 0 (TX) Pico envía, ESP recibe | RP2040 | OK |
 | **17** |  - | - |   |
