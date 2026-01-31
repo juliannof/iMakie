@@ -36,22 +36,22 @@ A Mackie Control interface with ESP32
 | **GPIO** | **Función Asignada** | **Dispositivo** | **Estado** |
 | :--- | :--- | :--- | :--- |
 | **0** | (Libre) | - | Boot |
-| **1** | ENABLE RS485| - |   |
+| **1** | ENABLE RS485| RS485 |   |
 | **2** | - | - |   |
 | **3** | - | - |   |
 | **4** | - | - |   |
 | **5** | - | - |   |
 | **6** | - | - |   |
 | **7** | - | - |   |
-| **8** | SDA I²C (Trellis) | NeoTrellis | OK |
-| **9** | SCL I²C (Trellis) | NeoTrellis | OK |
+| **8** | SDA I²C (Trellis) | NeoTrellis |  |
+| **9** | SCL I²C (Trellis) | NeoTrellis |  |
 | **10** | **SCK Pantalla** | Pantalla | |
 | **11** | **MOSI Pantalla** | Pantalla | |
 | **12** | **DC Pantalla** | Pantalla | |
 | **13** | **RST Pantalla** | Pantalla |  |
 | **14** | **CS Pantalla** | Pantalla | |
-| **15** | RS485 ────► GPIO 15 (RX) ESP envía, Pico recibe | RP2040 | OK |
-| **16** | RS485 GPIO 16 (RX) ◄──── GPIO 0 (TX) Pico envía, ESP recibe | RP2040 | OK |
+| **15** | RS485 ────► GPIO 15 (RX) ESP envía, Pico recibe | RS485 |  |
+| **16** | RS485 GPIO 16 (RX) ◄──── GPIO 0 (TX) Pico envía, ESP recibe | RS485 |  |
 | **17** |  - | - |   |
 | **18** | **Backlight** | Pantalla | **FIJO (Tu elección)** |
 | **19** | USB D- | USB Nativo | Reservado |
