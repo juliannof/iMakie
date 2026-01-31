@@ -101,8 +101,10 @@ Este mapa de pines está optimizado para **ESP32-S3 (N16R8)**, evitando pines re
 | **40** | - | - |   |
 | **41** | - | - |   |
 | **42** | - | - |   |
-### ⚠️ Notas de Hardware
-*   **Encoders:** Conectar pines A y B a los GPIOs. El pin común (C) del encoder va a GND. Habilitar Pull-ups internos en el código.
-*   **Botones:** Conectar un lado a GPIO y el otro a GND. Lógica invertida (LOW = Pulsado).
-*   **LEDs:** Conectar vía resistencia (220Ω - 1kΩ) a GND. Lógica positiva (HIGH = Encendido).
-*   **GPIO 48:** En algunos DevKits, este pin tiene un LED RGB soldado. Si interfiere visualmente, usar GPIO 38 o desoldar el LED de la placa.
+| **43** | - | - |   |
+| **44** | - | - |   |
+| **45** | - | - |   |
+| **46** | - | - |   |
+| **47** | - | - |   |
+
+
