@@ -36,7 +36,7 @@ A Mackie Control interface with ESP32
 | **GPIO** | **Función Asignada** | **Dispositivo** | **Estado** |
 | :--- | :--- | :--- | :--- |
 | **0** | (Libre) | - | Boot |
-| **1** | -| - |   |
+| **1** | ENABLE RS485| - |   |
 | **2** | - | - |   |
 | **3** | - | - |   |
 | **4** | - | - |   |
@@ -71,32 +71,36 @@ A Mackie Control interface with ESP32
 
 Este mapa de pines está optimizado para **ESP32-S3 (N16R8)**, evitando pines reservados por la PSRAM Octal (33-37), USB Nativo (19-20) y Strapping Pins críticos.
 
-| GPIO | Categoría | Componente | Función | Notas Técnicas |
-| :--- | :--- | :--- | :--- | :--- |
-| **4** | Encoder | ENC 1 | **Jog Wheel (A)** | |
-| **5** | Encoder | ENC 1 | **Jog Wheel (B)** | CC 60 (`0x3C`) |
-| **6** | Encoder | ENC 2 | **Zoom H (A)** | |
-| **7** | Encoder | ENC 2 | **Zoom H (B)** | Asignable (CC Genérico) |
-| **15** | Encoder | ENC 3 | **Zoom V (A)** | |
-| **16** | Encoder | ENC 3 | **Zoom V (B)** | Asignable (CC Genérico) |
-| **17** | Encoder | ENC 4 | **Nudge (A)** | |
-| **18** | Encoder | ENC 4 | **Nudge (B)** | Asignable (CC Genérico) |
-| **8** | Botón | BTN 1 | **REWIND (<<)** | Nota MIDI 91 |
-| **9** | Botón | BTN 2 | **FFWD (>>)** | Nota MIDI 92 |
-| **10** | Botón | BTN 3 | **STOP** | Nota MIDI 93 |
-| **11** | Botón | BTN 4 | **PLAY** | Nota MIDI 94 |
-| **12** | Botón | BTN 5 | **RECORD** | Nota MIDI 95 |
-| **13** | LED | LED 1 | **Feedback RW** | PWM Activo |
-| **14** | LED | LED 2 | **Feedback FF** | PWM Activo |
-| **21** | LED | LED 3 | **Feedback STOP** | PWM Activo |
-| **47** | LED | LED 4 | **Feedback PLAY** | PWM Activo |
-| **48** | LED | LED 5 | **Feedback REC** | *Precaución: Puede tener LED RGB on-board* |
-| **43** | Comms | UART (HW) | **TX -> Pico** | Conectar a Pico RX |
-| **44** | Comms | UART (HW) | **RX <- Pico** | Conectar a Pico TX |
-| **1** | Comms | RS-485 | **RX (Bus)** | |
-| **2** | Comms | RS-485 | **TX (Bus)** | |
-| **42** | Comms | RS-485 | **DE / RE** | Control de Dirección |
-
+| **GPIO** | **Función Asignada** | **Dispositivo** | **Estado** |
+| :--- | :--- | :--- | :--- |
+| **0** | (Libre) | - | Boot |
+| **1** | -| - |   |
+| **2** | - | - |   |
+| **3** | - | - |   |
+| **4** | - | - |   |
+| **5** | - | - |   |
+| **6** | - | - |   |
+| **7** | - | - |   |
+| **8** | SDA I²C (Trellis) | NetTrellis | OK |
+| **9** | SCL I²C (Trellis) | NetTrellis | OK |
+| **10** | **SCK Pantalla** | Pantalla | **FIJO (Tu elección)** |
+| **11** | **MOSI Pantalla** | Pantalla | **FIJO (Tu elección)** |
+| **12** | **DC Pantalla** | Pantalla | **FIJO (Tu elección)** |
+| **13** | **RST Pantalla** | Pantalla | **FIJO (Tu elección)** |
+| **14** | **CS Pantalla** | Pantalla | **FIJO (Tu elección)** |
+| **15** | RS485 ────► GPIO 15 (RX) ESP envía, Pico recibe | RP2040 | OK |
+| **16** | RS485 GPIO 16 (RX) ◄──── GPIO 0 (TX) Pico envía, ESP recibe | RP2040 | OK |
+| **17** |  - | - |   |
+| **18** | **Backlight** | Pantalla | **FIJO (Tu elección)** |
+| **19** | USB D- | USB Nativo | Reservado |
+| **20** | USB D+ | USB Nativo | Reservado |
+| **21** | - | - |   |
+| **33-37**| ⛔ **PROHIBIDO** | **PSRAM N16R8** | **NO TOCAR** |
+| **38** | - | - |   |
+| **39** | - | - |   |
+| **40** | - | - |   |
+| **41** | - | - |   |
+| **42** | - | - |   |
 ### ⚠️ Notas de Hardware
 *   **Encoders:** Conectar pines A y B a los GPIOs. El pin común (C) del encoder va a GND. Habilitar Pull-ups internos en el código.
 *   **Botones:** Conectar un lado a GPIO y el otro a GND. Lógica invertida (LOW = Pulsado).
