@@ -74,24 +74,24 @@ Este mapa de pines está optimizado para **ESP32-S3 (N16R8)**, evitando pines re
 | **GPIO** | **Función Asignada** | **Dispositivo** | **Estado** |
 | :--- | :--- | :--- | :--- |
 | **0** | (Libre) | - | Boot |
-| **1** | -| - |   |
-| **2** | - | - |   |
-| **3** | - | - |   |
-| **4** | - | - |   |
-| **5** | - | - |   |
-| **6** | - | - |   |
-| **7** | - | - |   |
-| **8** | SDA I²C (Trellis) | NetTrellis | OK |
-| **9** | SCL I²C (Trellis) | NetTrellis | OK |
-| **10** | **SCK Pantalla** | Pantalla | **FIJO (Tu elección)** |
-| **11** | **MOSI Pantalla** | Pantalla | **FIJO (Tu elección)** |
-| **12** | **DC Pantalla** | Pantalla | **FIJO (Tu elección)** |
-| **13** | **RST Pantalla** | Pantalla | **FIJO (Tu elección)** |
-| **14** | **CS Pantalla** | Pantalla | **FIJO (Tu elección)** |
-| **15** | RS485 ────► GPIO 15 (RX) ESP envía, Pico recibe | RP2040 | OK |
-| **16** | RS485 GPIO 16 (RX) ◄──── GPIO 0 (TX) Pico envía, ESP recibe | RP2040 | OK |
+| **1** | ENABLE RS485| - |   |
+| **2** |  (Libre) | - |   |
+| **3** | LED 1 TRANSPORTE | - |   |
+| **4** | LED 2 TRANSPORTE | - |   |
+| **5** | LED 3 TRANSPORTE | - |   |
+| **6** | LED 4 TRANSPORTE | - |   |
+| **7** | LED 5 TRANSPORTE | - |   |
+| **8** | BOTON 1 TRANSPORTE  | - |  |
+| **9** | BOTON 2 TRANSPORTE | - |  |
+| **10** |  BOTON 3 TRANSPORTE | - | |
+| **11** |   BOTON 4 TRANSPORTE | - | |
+| **12** |   BOTON 5 TRANSPORTE | - | |
+| **13** | ENCODER 1 PIN3 | | |
+| **14** | ENCODER 1 PIN1 | | |
+| **15** | RS485 ────► GPIO 15 (RX) ESP envía, Pico recibe | RP2040 |  |
+| **16** | RS485 GPIO 16 (RX) ◄──── GPIO 0 (TX) Pico envía, ESP recibe | RP2040 |  |
 | **17** |  - | - |   |
-| **18** | **Backlight** | Pantalla | **FIJO (Tu elección)** |
+| **18** | **Backlight** | Pantalla | **FIJO** |
 | **19** | USB D- | USB Nativo | Reservado |
 | **20** | USB D+ | USB Nativo | Reservado |
 | **21** | - | - |   |
