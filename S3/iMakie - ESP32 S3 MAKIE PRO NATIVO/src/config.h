@@ -109,7 +109,7 @@ extern Adafruit_MultiTrellis trellis;
 
 // --- VARIABLES DE ESTADO DE CANAL ---
 extern String trackNames[9];
-extern bool recStates[9], soloStates[8], muteStates[8], selectStates[8];
+extern bool recStates[8], soloStates[8], muteStates[8], selectStates[8];
 extern float vuLevels[9];
 extern bool vuClipState[9];
 extern unsigned long vuLastUpdateTime[9];
@@ -154,7 +154,7 @@ const char MACKIE_CHAR_MAP[64] = {
 };
 
 // --- ESTADO GLOBAL DE LA INTERFAZ ---
-extern bool btnState[32];
+extern bool btnState[128];
 extern bool globalShiftPressed;
 extern int currentPage;
 
@@ -177,7 +177,7 @@ extern int currentMeterValue;
 #define C_WHITE   0x444444
 #define C_ORANGE  0x662200
 
-static const uint32_t PALETTE[8] = {
+static const uint32_t PALETTE[9] = {
     C_OFF,      // 0
     C_RED,      // 1
     C_GREEN,    // 2
@@ -185,7 +185,8 @@ static const uint32_t PALETTE[8] = {
     C_YELLOW,   // 4
     C_CYAN,     // 5
     C_MAGENTA,  // 6
-    C_WHITE     // 7
+    C_WHITE,     // 7
+    C_ORANGE   // 8
 };
 
 
@@ -195,7 +196,7 @@ static const uint32_t PALETTE[8] = {
 
 static const byte LED_COLORS_PG1[32] = {
     5, 5, 5, 5, 5, 5, 6, 6,  // Fila 1 — Asignación encoders
-    1, 1, 1, 1, 1, 2, 2, 2,  // Fila 2 — Automatización
+    2, 6, 4, 8, 8, 2, 2, 2,  // Fila 2 — Automatización
     3, 3, 3, 3, 4, 4, 4, 4,  // Fila 3 — Navegación
     6, 2, 7, 7, 7, 7, 2, 1   // Fila 4 — Utilidades
 };
@@ -227,10 +228,21 @@ static const char* labels_PG1[32] = {
 };
 
 static const byte MIDI_NOTES_PG1[32] = {
-    0x28, 0x2A, 0x2C, 0x2B, 0x2D, 0x2E, 0x32, 0x33,
-    0x4A, 0x4B, 0x4D, 0x4E, 0x4C, 0x4F, 0x57, 0x58,
-    0x2E, 0x2F, 0x30, 0x31, 0x64, 0x65, 0x66, 0x54,
-    0x4C, 0x50, 0x46, 0x47, 0x48, 0x49, 0x52, 0x00
+    // FILA 1 — Assign Section
+    // TRACK  PAN    EQ     SEND   PLUG   INST   FLIP   GLOB
+    0x28,  0x2A,  0x2C,  0x29,  0x2B,  0x2D,  0x32,  0x33,
+
+    // FILA 2 — Automation
+    // READ   WRITE  TOUCH  LATCH  TRIM   GROUP  CLRSOL CLRMUT
+    0x4A,  0x4B,  0x4D,  0x4E,  0x4C,  0x4F,  0x57,  0x58,
+
+    // FILA 3 — Navigation (sin cambios, estaba correcto)
+    // BANK<  BANK>  CHAN<  CHAN>  ZOOM   SCRUB  NUDGE  MARK
+    0x2E,  0x2F,  0x30,  0x31,  0x64,  0x65,  0x66,  0x54,
+
+    // FILA 4 — Utilities
+    // UNDO   SAVE   SHIFT  CTRL   OPT    CMD    ENTER  >>PG2
+    0x51,  0x50,  0x46,  0x47,  0x48,  0x49,  0x53,  0x00
 };
 
 static const char* labels_PG2[32] = {

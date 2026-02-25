@@ -7,13 +7,14 @@
 
 // --- VARIABLES "PRIVADAS" DE ESTE MÓDULO ---
 namespace {
-    uint8_t trellisBrightness = 5; // Valor de brillo por defecto
+    uint8_t trellisBrightness = 7; // Valor de brillo por defecto
     const uint32_t baseColors[4] = {0xFF0000, 0xFFFF00, 0xFF0000, 0xFFFFFF};
 }
 
 // --- PROTOTIPO DE LA FUNCIÓN DE CALLBACK (necesario porque initHardware la usa) ---
 TrellisCallback onTrellisEvent(keyEvent evt); 
 uint32_t applyBrightness(uint32_t color);
+uint32_t applyMidBrightness(uint32_t color);  // ← añadir
 
 // ====================================================================
 // --- IMPLEMENTACIÓN DE FUNCIONES PÚBLICAS ---
@@ -62,7 +63,6 @@ void handleHardwareInputs() {
   trellis.read();
 }
 
-// src/hardware/Hardware.cpp (ubicada en su archivo .cpp)
 
 // ****************************************************************************
 // Lógica de decaimiento de los vúmetros y retención de picos
@@ -134,15 +134,24 @@ void updateLeds() {
     const byte* colorIndexMap;
     if      (currentPage == 1) colorIndexMap = LED_COLORS_PG1;
     else if (currentPage == 2) colorIndexMap = LED_COLORS_PG2;
-    else                       colorIndexMap = LED_COLORS_PG3; // PG3: mismo mapa base que PG1
+    else                       colorIndexMap = LED_COLORS_PG3;
+
+    const byte* currentMap;
+    if      (currentPage == 1) currentMap = MIDI_NOTES_PG1;
+    else if (currentPage == 2) currentMap = MIDI_NOTES_PG2;
+    else                       currentMap = MIDI_NOTES_PG1; // ajustar si PG3 tiene mapa propio
 
     for (int i = 0; i < 32; i++) {
         uint32_t colorFinal = 0;
         uint32_t baseColor  = PALETTE[colorIndexMap[i]];
 
-        if (btnState[i]) {
+        // Estado según feedback de Logic (nota MIDI → btnState)
+        byte nota = currentMap[i];
+        bool estadoLogic = (nota != 0x00) && btnState[nota];
+
+        if (estadoLogic) {
             if (baseColor == C_OFF) baseColor = C_WHITE;
-            colorFinal = baseColor;
+            colorFinal = applyMidBrightness(baseColor);
         } else {
             colorFinal = applyBrightness(baseColor);
         }
@@ -150,7 +159,6 @@ void updateLeds() {
         // Overrides locales
         if (i == 26 && globalShiftPressed) colorFinal = C_YELLOW;
 
-        // Botón de página: color distinto por página
         if (i == 31) {
             if      (currentPage == 1) colorFinal = applyBrightness(C_BLUE);
             else if (currentPage == 2) colorFinal = applyBrightness(C_GREEN);
@@ -162,7 +170,6 @@ void updateLeds() {
 
     trellis.show();
 }
-
 
 // ****************************************************************************
 // Set Trellis Brightness
@@ -244,16 +251,15 @@ uint32_t applyBrightness(uint32_t color) {
   return (uint32_t)(r << 16) | (uint32_t)(g << 8) | b;
 }
 
-static uint16_t midColor(uint16_t color) {
-    uint8_t r = (color >> 11) & 0x1F;
-    uint8_t g = (color >> 5)  & 0x3F;
-    uint8_t b =  color        & 0x1F;
-
-    r = r / 4;  // 4 = 25%
-    g = g / 4;
-    b = b / 4;
-
-    return (r << 11) | (g << 5) | b;
+uint32_t applyMidBrightness(uint32_t color) {
+    uint8_t r = (color >> 16) & 0xFF;
+    uint8_t g = (color >>  8) & 0xFF;
+    uint8_t b =  color        & 0xFF;
+    // El doble de applyBrightness — activos más vivos que inactivos, sin deslumbrar
+    r = (r * min((uint16_t)(trellisBrightness * 6), (uint16_t)255)) / 255;
+    g = (g * min((uint16_t)(trellisBrightness * 6), (uint16_t)255)) / 255;
+    b = (b * min((uint16_t)(trellisBrightness * 6), (uint16_t)255)) / 255;
+    return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
 }
 
 
@@ -307,7 +313,7 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
         sendMIDIBytes(midiMsg, 3);            // ← CORREGIDO: antes estaba comentado
 
         // Estado para la pantalla TFT
-        btnState[key] = isPress;
+        btnState[noteToSend] = isPress;
         needsMainAreaRedraw = true;
 
         // Feedback visual en los LEDs del Trellis
@@ -317,7 +323,7 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
 
             // ← CORREGIDO: applyBrightness trabaja en RGB888 directamente
             //   NO pasar por tft.color565() — setPixelColor espera RGB888
-            uint32_t dimColor = applyBrightness(rgb888);
+            uint32_t dimColor = applyMidBrightness(rgb888);
             trellis.setPixelColor(key, dimColor);
             trellis.show();
         } else {

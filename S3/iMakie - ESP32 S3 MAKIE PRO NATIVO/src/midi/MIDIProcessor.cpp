@@ -130,7 +130,7 @@ void processMidiByte(byte b) {
         if (midi_idx < sizeof(midi_buffer)) {
             midi_buffer[midi_idx++] = b;
         } else {
-            log_e("processMidiByte: Buffer SysEx desbordado. Descartando.");
+            log_v("processMidiByte: Buffer SysEx desbordado. Descartando.");
             in_sysex = false;
             midi_idx = 0;
         }
@@ -471,27 +471,37 @@ void processMackieSysEx(byte* payload, int len) {
 // Note On/Off — Botones REC/SOLO/MUTE/SELECT
 // ****************************************************************************
 void processNote(byte status, byte note, byte velocity) {
-    if (note > 31) return;
-
-    int group = note / 8;
-    int track_idx = note % 8;
     bool is_on = ((status & 0xF0) == 0x90 && velocity > 0);
-    bool stateChanged = false;
 
-    switch(group) {
-        case 0: if (recStates[track_idx]    != is_on) { recStates[track_idx]    = is_on; stateChanged = true; } break;
-        case 1: if (soloStates[track_idx]   != is_on) { soloStates[track_idx]   = is_on; stateChanged = true; } break;
-        case 2: if (muteStates[track_idx]   != is_on) { muteStates[track_idx]   = is_on; stateChanged = true; } break;
-        case 3: if (selectStates[track_idx] != is_on) { selectStates[track_idx] = is_on; stateChanged = true; } break;
+    // Rango 0-31: REC/SOLO/MUTE/SELECT — lógica de estado por grupo
+    if (note <= 31) {
+        int group = note / 8;
+        int track_idx = note % 8;
+        bool stateChanged = false;
+
+        switch(group) {
+            case 0: if (recStates[track_idx]    != is_on) { recStates[track_idx]    = is_on; stateChanged = true; } break;
+            case 1: if (soloStates[track_idx]   != is_on) { soloStates[track_idx]   = is_on; stateChanged = true; } break;
+            case 2: if (muteStates[track_idx]   != is_on) { muteStates[track_idx]   = is_on; stateChanged = true; } break;
+            case 3: if (selectStates[track_idx] != is_on) { selectStates[track_idx] = is_on; stateChanged = true; } break;
+        }
+
+        if (stateChanged) {
+            needsMainAreaRedraw = true;
+            const char* g = (group==0)?"REC":(group==1)?"SOLO":(group==2)?"MUTE":"SELECT";
+            log_i("<<< BOTÓN: Pista %d - %s -> %s", track_idx+1, g, is_on?"ON":"OFF");
+        }
+        return;
     }
 
-    if (stateChanged) {
+    // Rango 32-127: botones globales (transport, automation, función)
+    // Logic manda feedback de LED — almacenamos estado para updateLeds()
+    if (note < 128 && btnState[note] != is_on) {
+        btnState[note] = is_on;
         needsMainAreaRedraw = true;
-        const char* group_name = (group==0)?"REC":(group==1)?"SOLO":(group==2)?"MUTE":"SELECT";
-        log_i("<<< BOTÓN: Pista %d - %s -> %s", track_idx + 1, group_name, is_on ? "ON" : "OFF");
+        log_i("<<< BOTÓN GLOBAL: nota=%d -> %s", note, is_on?"ON":"OFF");
     }
 }
-
 
 // ****************************************************************************
 // Pitch Bend — Faders

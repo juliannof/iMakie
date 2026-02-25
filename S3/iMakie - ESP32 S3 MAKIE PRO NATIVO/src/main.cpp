@@ -21,7 +21,7 @@ Adafruit_MultiTrellis trellis((Adafruit_NeoTrellis *)t_array, Y_DIM / 4, X_DIM /
 
 // Arrays de estado para los botones de las pistas
 String trackNames[9];
-bool recStates[9]={false}, soloStates[8]={false}, muteStates[8]={false}, selectStates[8]={false};
+bool recStates[8]={false}, soloStates[8]={false}, muteStates[8]={false}, selectStates[8]={false};
 
 // Variables para los vúmetros
 float vuLevels[9] = {0.0f};
@@ -65,7 +65,7 @@ char timeCodeChars_clean[13];
 char beatsChars_clean[13];
 
 // Estado de botones y UI
-bool btnState[32] = {false};
+bool btnState[128] = {false};
 bool globalShiftPressed = false;
 int currentPage = 1;
 int currentMasterFader = 0;
