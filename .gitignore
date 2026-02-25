@@ -1,11 +1,9 @@
-.pio/
-.vscode/
-*.pyc
-__pycache__/
-*.bin
-*.elf
-*.hex
-*.map
-build/
 .DS_Store
 **/.DS_Store
+.pio/
+**/.pio/
+_Old_/
+i2c/
+Mesa ESP32 C3 1/
+pi pico/
+TEST RS485/
