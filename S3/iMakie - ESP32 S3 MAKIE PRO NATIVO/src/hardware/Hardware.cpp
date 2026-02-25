@@ -2,7 +2,8 @@
 
 #include "Hardware.h"                      // Incluye su propia cabecera
 #include "../config.h"                     // Para acceder a los objetos (trellis) y estados (recStates, etc.)
-#include "../comUA/UARTHandler.h"  // Para poder llamar a sendToPico
+#include "../midi/MIDIProcessor.h"     // ← AÑADIR
+
 
 // --- VARIABLES "PRIVADAS" DE ESTE MÓDULO ---
 namespace {
@@ -261,78 +262,66 @@ static uint16_t midColor(uint16_t color) {
 // NUEVO CALLBACK MAESTRO (Soporta Páginas y Mapas)
 // ---------------------------------------------------------
 TrellisCallback onTrellisEvent(keyEvent evt) {
-    int key = evt.bit.NUM; // Índice del botón (0 a 31)
+    int key = evt.bit.NUM;
     bool isPress = (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_RISING);
 
     // ============================================================
-    // 1. GESTIÓN LOCAL (Botones que cambian el comportamiento)
+    // 1. BOTONES DE GESTIÓN LOCAL
     // ============================================================
 
-    // BOTÓN DE PÁGINA (Índice 31: Esquina inferior derecha)
-    // Cambia entre "Mixer Mode" y "Function Mode"
+    // BOTÓN DE PÁGINA (índice 31 — esquina inferior derecha)
     if (key == 31 && isPress) {
-        log_e("ANTES: currentPage=%d", currentPage);  // ← debug temporal
-        currentPage = (currentPage % 3) + 1; 
-        log_e("DESPUÉS: currentPage=%d", currentPage);
-        updateLeds();          // Cambia los colores de la rejilla física
-        log_e("TRAS updateLeds: currentPage=%d", currentPage);  // ← ¿cambia aquí?
-        needsMainAreaRedraw = true; // Avisa al loop para repintar la pantalla TFT
-        
-        return 0; // Este botón NO envía MIDI a la Pico
+        currentPage = (currentPage % 3) + 1;
+        updateLeds();
+        needsMainAreaRedraw = true;
+        return 0;
     }
 
-    // BOTÓN SHIFT (Índice 26: Fila 4, Columna 3)
+    // BOTÓN SHIFT (índice 26)
     if (key == 26) {
-        globalShiftPressed = isPress; // True mientras mantengas pulsado
-        
-        // Si el estado cambia, redibujamos la pantalla (textos amarillos)
-        if (evt.bit.EDGE != SEESAW_KEYPAD_EDGE_HIGH && evt.bit.EDGE != SEESAW_KEYPAD_EDGE_LOW) {
-             needsMainAreaRedraw = true;
-             updateLeds(); // Para poner el botón en Amarillo
+        globalShiftPressed = isPress;
+        if (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_RISING ||
+            evt.bit.EDGE == SEESAW_KEYPAD_EDGE_FALLING) {
+            needsMainAreaRedraw = true;
+            updateLeds();
         }
-        
-        // OJO: Además de ser local, SHIFT suele enviar nota MIDI (0x46)
-        // Dejamos que el código de abajo envíe la nota también.
+        // Shift también envía su nota MIDI → sigue al bloque de abajo
     }
 
     // ============================================================
-    // 2. BUSCAR QUÉ NOTA MIDI TOCA ENVIAR
+    // 2. BUSCAR LA NOTA MIDI SEGÚN PÁGINA ACTUAL
     // ============================================================
-    
-    // Elegimos el mapa de notas según la página en la que estemos
     const byte* currentMap = (currentPage == 1) ? MIDI_NOTES_PG1 : MIDI_NOTES_PG2;
     byte noteToSend = currentMap[key];
 
     // ============================================================
-    // 3. ENVIAR A LA PICO (SI HAY NOTA ASIGNADA)
+    // 3. ENVIAR MIDI + FEEDBACK VISUAL
     // ============================================================
     if (noteToSend != 0x00) {
-        
+
+        // Envío MIDI real (Note On con velocity 127 para press, 0 para release)
         byte midiMsg[3];
-        midiMsg[0] = isPress ? 0x90 : 0x90;
+        midiMsg[0] = 0x90;                    // Note On en canal 1 (velocity 0 = Note Off implícito)
         midiMsg[1] = noteToSend;
         midiMsg[2] = isPress ? 127 : 0;
+        sendMIDIBytes(midiMsg, 3);            // ← CORREGIDO: antes estaba comentado
 
-        //sendToPico(midiMsg, 3);
-
-        // ← ACTUALIZAR ESTADO VISUAL TFT
+        // Estado para la pantalla TFT
         btnState[key] = isPress;
         needsMainAreaRedraw = true;
 
-        // --- FEEDBACK VISUAL INSTANTÁNEO LED ---
+        // Feedback visual en los LEDs del Trellis
         if (isPress) {
             const byte* colorIndexMap = (currentPage == 1) ? LED_COLORS_PG1 : LED_COLORS_PG2;
             uint32_t rgb888 = PALETTE[colorIndexMap[key]];
-            // Convertir RGB888 → RGB565
-            uint16_t rgb565 = tft.color565(
-                (rgb888 >> 16) & 0xFF,
-                (rgb888 >> 8)  & 0xFF,
-                rgb888        & 0xFF
-            );
-            trellis.setPixelColor(key, midColor(rgb565)); // 50% — ajusta el divisor a gusto
+
+            // ← CORREGIDO: applyBrightness trabaja en RGB888 directamente
+            //   NO pasar por tft.color565() — setPixelColor espera RGB888
+            uint32_t dimColor = applyBrightness(rgb888);
+            trellis.setPixelColor(key, dimColor);
             trellis.show();
         } else {
-            updateLeds();
+            updateLeds(); // Restaura el color base de la página
         }
     }
 

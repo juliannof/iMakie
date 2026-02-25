@@ -14,9 +14,34 @@ extern USBMIDI MIDI;
    Para SysEx: envía byte a byte (único método válido en Core 3.1.1)
    ========================================================= */
 void sendMIDIBytes(const byte* data, size_t len) {
-    for (size_t i = 0; i < len; i++) {
-        MIDI.write(data[i]);
+    log_e("[MIDI OUT] Enviando %d bytes: 0x%02X 0x%02X 0x%02X", len, data[0], data[1], data[2]);
+
+    if (len == 3) {
+        byte status  = data[0] & 0xF0;
+        byte channel = (data[0] & 0x0F) + 1;
+        byte byte1   = data[1];
+        byte byte2   = data[2];
+
+        switch (status) {
+            case 0x90:
+                if (byte2 > 0)
+                    MIDI.noteOn(byte1, byte2, channel);
+                else
+                    MIDI.noteOff(byte1, 0, channel);
+                break;
+            case 0x80:
+                MIDI.noteOff(byte1, byte2, channel);
+                break;
+            case 0xB0:
+                MIDI.controlChange(byte1, byte2, channel);
+                break;
+            default:
+                log_e("[MIDI OUT] Mensaje no soportado: 0x%02X", status);
+                break;
+        }
     }
+
+    log_e("[MIDI OUT] Enviado OK");
 }
 
 // --- Variables internas del parser MIDI ---
@@ -59,6 +84,8 @@ unsigned long masterMeterDecayTimer = 0;
 // Procesar byte MIDI entrante
 // ****************************************************************************
 void processMidiByte(byte b) {
+
+
     if (b >= 0xF8) return; // RealTime
 
     if (in_sysex && (b & 0x80) && b != 0xF7) {

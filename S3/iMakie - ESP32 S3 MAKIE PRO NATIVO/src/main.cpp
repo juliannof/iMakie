@@ -125,6 +125,12 @@ void loop() {
     {
         uint8_t rx_buf[64];
         uint32_t count = tud_midi_stream_read(rx_buf, sizeof(rx_buf));
+        if (count > 0) {
+        log_e("[MIDI IN] %d bytes", count); // Solo el resumen, sin logar cada byte
+        for (uint32_t i = 0; i < count; i++) {
+            processMidiByte(rx_buf[i]);
+        }
+        }
         for (uint32_t i = 0; i < count; i++) {
             processMidiByte(rx_buf[i]);
         }
