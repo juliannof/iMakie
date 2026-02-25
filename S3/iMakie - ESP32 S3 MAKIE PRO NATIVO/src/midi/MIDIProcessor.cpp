@@ -14,7 +14,7 @@ extern USBMIDI MIDI;
    Para SysEx: envía byte a byte (único método válido en Core 3.1.1)
    ========================================================= */
 void sendMIDIBytes(const byte* data, size_t len) {
-    log_e("[MIDI OUT] Enviando %d bytes: 0x%02X 0x%02X 0x%02X", len, data[0], data[1], data[2]);
+    log_v("[MIDI OUT] Enviando %d bytes: 0x%02X 0x%02X 0x%02X", len, data[0], data[1], data[2]);
 
     if (len == 3) {
         byte status  = data[0] & 0xF0;
@@ -41,7 +41,7 @@ void sendMIDIBytes(const byte* data, size_t len) {
         }
     }
 
-    log_e("[MIDI OUT] Enviado OK");
+    log_v("[MIDI OUT] Enviado OK");
 }
 
 // --- Variables internas del parser MIDI ---
@@ -176,7 +176,7 @@ void processMidiByte(byte b) {
             }
             midi_idx = 0;
         } else if (midi_idx >= msg_len_expected) {
-            log_e("processMidiByte: Mensaje malformado. Descartando.");
+            log_v("processMidiByte: Mensaje malformado. Descartando.");
             midi_idx = 0;
             last_status_byte = 0;
         }
@@ -294,7 +294,7 @@ String formatTimecodeString() {
 // Vúmetros — Channel Pressure
 // ****************************************************************************
 void processChannelPressure(byte channel, byte value) {
-    log_e(">> CP IN: Ch=%d, Val=%d", channel, value);
+    log_v(">> CP IN: Ch=%d, Val=%d", channel, value);
 
     float normalizedLevel = 0.0f;
     int targetChannel = -1;

@@ -240,16 +240,24 @@ static uint16_t dimColor(uint16_t color) {
 // MAIN2 → pads 16-31 (filas 3 y 4) → pushSprite en MAIN2_Y
 // ─────────────────────────────────────────────────────────────────────────────
 
+// 50% — color medio para pads inactivos (visible pero distinguible del activo)
+static uint16_t midColor(uint16_t color) {
+    uint8_t r = (color >> 11) & 0x1F;
+    uint8_t g = (color >> 5)  & 0x3F;
+    uint8_t b =  color        & 0x1F;
+    return ((r / 2) << 11) | ((g / 2) << 5) | (b / 2);
+}
+
 static void _drawPadsHalf(const char** labels, const byte* colors,
                            int startPad, int endPad) {
     int cellW   = MAIN_AREA_WIDTH / 8;
-    int cellH   = MAIN_AREA_HEIGHT / 2;  // 2 filas por mitad → 67px
+    int cellH   = MAIN_AREA_HEIGHT / 2;
     int btnSize = ((cellW < cellH) ? cellW : cellH) - 4;
 
     for (int i = startPad; i < endPad; i++) {
-        int local = i - startPad;   // índice local 0-15
-        int fila  = local / 8;      // 0 o 1
-        int col   = local % 8;      // 0-7
+        int local = i - startPad;
+        int fila  = local / 8;
+        int col   = local % 8;
 
         int x = (col  * cellW) + (cellW  - btnSize) / 2;
         int y = (fila * cellH) + (cellH  - btnSize) / 2;
@@ -266,16 +274,32 @@ static void _drawPadsHalf(const char** labels, const byte* colors,
             default: activeColor = TFT_LIGHTGREY; break;
         }
 
+        // Color inactivo: 50% del color activo
+        uint16_t inactiveColor = midColor(activeColor);
+
+        // Texto blanco por defecto, amarillo en SHIFT
         uint16_t txtColor = globalShiftPressed ? TFT_YELLOW : TFT_WHITE;
+
+        // Si el pad está ACTIVO y el fondo es muy claro → texto negro
         if (btnState[i] && (activeColor == TFT_WHITE  ||
                             activeColor == TFT_YELLOW ||
                             activeColor == TFT_CYAN)) {
             txtColor = TFT_BLACK;
         }
 
+        // Si el pad está INACTIVO y el midColor también es claro → texto negro
+        if (!btnState[i] && (activeColor == TFT_WHITE  ||
+                             activeColor == TFT_YELLOW ||
+                             activeColor == TFT_CYAN)) {
+            txtColor = TFT_BLACK;
+        }
+
+        log_d("PAD %d: state=%d active=%04X inactive=%04X",
+              i, btnState[i], activeColor, inactiveColor);
+
         drawButton(mainArea, x, y, btnSize, btnSize,
                    labels[i], btnState[i],
-                   activeColor, txtColor, dimColor(activeColor));
+                   activeColor, txtColor, inactiveColor);
     }
 }
 
