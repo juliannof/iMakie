@@ -1,8 +1,0 @@
-{
-    "CodeGPT.apiKey": "Ollama",
-    "files.associations": {
-        "*.tcc": "cpp",
-        "fstream": "cpp",
-        "cstdint": "cpp"
-    }
-}

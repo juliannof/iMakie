@@ -1,1 +1,11 @@
 .pio/
+.vscode/
+*.pyc
+__pycache__/
+*.bin
+*.elf
+*.hex
+*.map
+build/
+.DS_Store
+**/.DS_Store
