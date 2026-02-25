@@ -1,6 +1,5 @@
 // src/main.cpp
 #include "config.h"
-// ❌ ELIMINADO: #include "comUA/UARTHandler.h"
 #include <USB.h>           // ✅ USB stack nativo S3
 #include <USBMIDI.h>       // ✅ USB MIDI nativo S3
 #include <class/midi/midi_device.h>  // ✅ TinyUSB MIDI para tud_midi_stream_read()
@@ -131,7 +130,7 @@ void loop() {
         }
     }
 
-    // ❌ ELIMINADO: handleUART();
+    
 
     if (logicConnectionState == ConnectionState::CONNECTED) {
         if (!wasConnected) {

@@ -2,7 +2,7 @@
 #pragma once
 #include <Arduino.h>
 
-// ✅ NUEVO: Reemplaza sendToPico() — envía bytes MIDI crudos por USB
+bool isLogicConnected();
 void sendMIDIBytes(const byte* data, size_t len);
 
 // Parser byte a byte (sin cambios)

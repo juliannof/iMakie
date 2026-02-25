@@ -1,7 +1,6 @@
 // src/midi/MIDIProcessor.cpp
 #include "MIDIProcessor.h"
 #include "../config.h"
-// ❌ ELIMINADO: #include "../comUA/UARTHandler.h"
 #include <USBMIDI.h>  // ✅ NUEVO: para sendMIDIBytes()
 
 /* =========================================================
@@ -268,7 +267,7 @@ String formatTimecodeString() {
 // Vúmetros — Channel Pressure
 // ****************************************************************************
 void processChannelPressure(byte channel, byte value) {
-    log_d(">> CP IN: Ch=%d, Val=%d", channel, value);
+    log_e(">> CP IN: Ch=%d, Val=%d", channel, value);
 
     float normalizedLevel = 0.0f;
     int targetChannel = -1;
@@ -485,4 +484,8 @@ void processPitchBend(byte channel, int bendValue) {
             needsMainAreaRedraw = true;
         }
     }
+}
+
+bool isLogicConnected() {
+    return (logicConnectionState == ConnectionState::CONNECTED);
 }
