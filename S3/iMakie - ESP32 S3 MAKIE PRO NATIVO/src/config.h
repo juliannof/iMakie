@@ -164,30 +164,33 @@ extern int currentMeterValue;
 
 
 // ====================================================================
-// --- 4. PALETA DE COLORES NEOPIXEL (RGB888) ---
+// --- PALETA UNIFICADA (RGB888 NeoTrellis + RGB565 TFT) ---
 // ====================================================================
 
-#define C_OFF     0x000000
-#define C_RED     0x640000
-#define C_GREEN   0x006400
-#define C_BLUE    0x000064
-#define C_YELLOW  0x555500
-#define C_CYAN    0x005555
-#define C_MAGENTA 0x550055
-#define C_WHITE   0x444444
-#define C_ORANGE  0x662200
-
-static const uint32_t PALETTE[9] = {
-    C_OFF,      // 0
-    C_RED,      // 1
-    C_GREEN,    // 2
-    C_BLUE,     // 3
-    C_YELLOW,   // 4
-    C_CYAN,     // 5
-    C_MAGENTA,  // 6
-    C_WHITE,     // 7
-    C_ORANGE   // 8
+struct PaletteEntry {
+    uint32_t rgb888;  // NeoTrellis
+    uint16_t rgb565;  // TFT
 };
+
+static const PaletteEntry PALETTE[9] = {
+    { 0x000000, 0x2104   },  // 0 — OFF
+    { 0x640000, TFT_RED      },  // 1 — RED
+    { 0x006400, TFT_GREEN    },  // 2 — GREEN
+    { 0x000064, 0x03FF       },  // 3 — BLUE
+    { 0x555500, TFT_YELLOW   },  // 4 — YELLOW
+    { 0x005555, TFT_CYAN     },  // 5 — CYAN
+    { 0x550055, TFT_MAGENTA  },  // 6 — MAGENTA
+    { 0x444444, TFT_WHITE    },  // 7 — WHITE
+    { 0x662200, TFT_ORANGE   },  // 8 — ORANGE
+};
+
+// Mantener defines individuales para los overrides directos en Hardware.cpp
+#define C_OFF     0x000000
+#define C_WHITE   0x444444
+#define C_YELLOW  0x555500
+#define C_BLUE    0x000064
+#define C_GREEN   0x006400
+#define C_RED     0x640000
 
 
 // ====================================================================
@@ -222,7 +225,7 @@ static const byte LED_COLORS_PG3[32] = {
 
 static const char* labels_PG1[32] = {
     "TRACK", "PAN",   "EQ",    "SEND",  "PLUG",  "INST",  "FLIP",  "GLOB",
-    "READ",  "WRIT",  "TCH",   "LTCH",  "TRIM",  "OFF",   "SOLO0", "MUTE0",
+    "READ",  "WRIT",  "TCH",   "LTCH",  "TRIM",  "OFF",   "SOLO0", "SMPT",
     "BANK<", "BANK>", "CHAN<", "CHAN>",  "ZOOM",  "SCRUB", "NUDGE", "MARK",
     "UNDO",  "SAVE",  "SHIFT", "CTRL",  "OPT",   "CMD",   "ENTER", ">>PG2"
 };
@@ -234,7 +237,7 @@ static const byte MIDI_NOTES_PG1[32] = {
 
     // FILA 2 — Automation
     // READ   WRITE  TOUCH  LATCH  TRIM   GROUP  CLRSOL CLRMUT
-    0x4A,  0x4B,  0x4D,  0x4E,  0x4C,  0x4F,  0x57,  0x58,
+    0x4A,  0x4B,  0x4D,  0x4E,  0x4C,  0x4F,  0x57,  0x35,
 
     // FILA 3 — Navigation (sin cambios, estaba correcto)
     // BANK<  BANK>  CHAN<  CHAN>  ZOOM   SCRUB  NUDGE  MARK

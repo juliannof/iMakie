@@ -262,22 +262,12 @@ static void _drawPadsHalf(const char** labels, const byte* colors,
         int x = (col  * cellW) + (cellW  - btnSize) / 2;
         int y = (fila * cellH) + (cellH  - btnSize) / 2;
 
-        uint16_t activeColor;
-        switch (colors[i]) {
-            case 1:  activeColor = TFT_RED;       break;
-            case 2:  activeColor = TFT_GREEN;     break;
-            case 3:  activeColor = 0x03FF;        break;
-            case 4:  activeColor = TFT_YELLOW;    break;
-            case 5:  activeColor = TFT_CYAN;      break;
-            case 6:  activeColor = TFT_MAGENTA;   break;
-            case 7:  activeColor = TFT_WHITE;     break;
-            default: activeColor = TFT_LIGHTGREY; break;
-        }
+        // ← lookup directo, sin switch
+        uint8_t colorIdx  = (colors[i] < 9) ? colors[i] : 0;
+        uint16_t activeColor = PALETTE[colorIdx].rgb565;  // ← .rgb565
 
-        // Inactivo = 25% — contraste máximo con activo (100%)
         uint16_t inactiveColor = dimColor(activeColor);
 
-        // Texto: amarillo en SHIFT; negro si fondo activo es muy claro
         uint16_t txtColor = globalShiftPressed ? TFT_YELLOW : TFT_WHITE;
         if (btnState[i] && (activeColor == TFT_WHITE  ||
                             activeColor == TFT_YELLOW ||

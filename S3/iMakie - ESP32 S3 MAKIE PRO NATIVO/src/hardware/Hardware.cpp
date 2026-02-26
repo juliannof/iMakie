@@ -136,12 +136,10 @@ void updateLeds() {
     else                       colorIndexMap = LED_COLORS_PG3;
 
     for (int i = 0; i < 32; i++) {
-        uint32_t baseColor = PALETTE[colorIndexMap[i]];
+        uint32_t baseColor = PALETTE[colorIndexMap[i]].rgb888;  // ← .rgb888
         bool active = false;
 
         if (currentPage == 3) {
-            // PG3: el estado viene de recStates/soloStates/muteStates
-            // según la nota MIDI que tiene asignada ese pad en PG1
             byte note = MIDI_NOTES_PG1[i];
             if (note <= 31) {
                 int group     = note / 8;
@@ -154,18 +152,16 @@ void updateLeds() {
                 }
             }
         } else {
-            // PG1/PG2: el estado viene de btnState[]
             active = btnState[i];
         }
 
         uint32_t colorFinal;
         if (active) {
-            colorFinal = (baseColor == C_OFF) ? C_WHITE : baseColor;
+            colorFinal = applyMidBrightness(baseColor);  // 50% — estado activo persistente
         } else {
-            colorFinal = applyBrightness(baseColor);
+            colorFinal = applyBrightness(baseColor);      // ~2% — inactivo
         }
 
-        // Overrides
         if (i == 26 && globalShiftPressed) colorFinal = C_YELLOW;
         if (i == 31) {
             if      (currentPage == 1) colorFinal = applyBrightness(C_BLUE);
@@ -175,7 +171,6 @@ void updateLeds() {
 
         trellis.setPixelColor(i, colorFinal);
     }
-
     trellis.show();
 }
 
@@ -183,12 +178,7 @@ void updateLeds() {
 // Set Trellis Brightness
 // ****************************************************************************
 
-void setTrellisBrightness(uint8_t newBrightness) {
-  trellisBrightness = newBrightness;
-  log_d("[HARDWARE] Brillo de Trellis ajustado a: %d\n", newBrightness);
-  // Al cambiar el brillo, forzamos una actualización de los LEDs para verlo al instante
-  updateLeds();
-}
+
 
 
 // ****************************************************************************
@@ -249,24 +239,33 @@ void resetToStandbyState() {
 // --- Manejo de respuesta de Neotrellis ---
 // ====================================================================
 
-uint32_t applyBrightness(uint32_t color) {
-  uint8_t r = (color >> 16) & 0xFF;
-  uint8_t g = (color >> 8) & 0xFF;
-  uint8_t b = color & 0xFF;
-  r = (r * trellisBrightness) / 255;
-  g = (g * trellisBrightness) / 255;
-  b = (b * trellisBrightness) / 255;
-  return (uint32_t)(r << 16) | (uint32_t)(g << 8) | b;
+void setTrellisBrightness(uint8_t newBrightness) {
+  trellisBrightness = newBrightness;
+  log_d("[HARDWARE] Brillo de Trellis ajustado a: %d\n", newBrightness);
+  // Al cambiar el brillo, forzamos una actualización de los LEDs para verlo al instante
+  updateLeds();
 }
 
+uint32_t applyBrightness(uint32_t color) {
+    uint8_t r = (color >> 16) & 0xFF;
+    uint8_t g = (color >>  8) & 0xFF;
+    uint8_t b =  color        & 0xFF;
+    r = (r * trellisBrightness) / 255;
+    g = (g * trellisBrightness) / 255;
+    b = (b * trellisBrightness) / 255;
+    return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
+}
+
+// Activo: más brillante que inactivo, sin deslumbrar
+// Multiplica trellisBrightness x6, clampeado a 255
 uint32_t applyMidBrightness(uint32_t color) {
     uint8_t r = (color >> 16) & 0xFF;
     uint8_t g = (color >>  8) & 0xFF;
     uint8_t b =  color        & 0xFF;
-    // El doble de applyBrightness — activos más vivos que inactivos, sin deslumbrar
-    r = (r * min((uint16_t)(trellisBrightness * 6), (uint16_t)255)) / 255;
-    g = (g * min((uint16_t)(trellisBrightness * 6), (uint16_t)255)) / 255;
-    b = (b * min((uint16_t)(trellisBrightness * 6), (uint16_t)255)) / 255;
+    uint16_t mid = min((uint16_t)(trellisBrightness * 8), (uint16_t)255);
+    r = (r * mid) / 255;
+    g = (g * mid) / 255;
+    b = (b * mid) / 255;
     return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
 }
 
@@ -296,6 +295,17 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
             needsMainAreaRedraw = true;
             updateLeds();
         }
+    }
+
+    // BOTÓN SMPTE/BEATS (Índice 15: Fila 2, Columna 8)
+    if (key == 15 && isPress) {
+        currentTimecodeMode = (currentTimecodeMode == MODE_BEATS)
+                                ? MODE_SMPTE
+                                : MODE_BEATS;
+        needsHeaderRedraw = true;
+        log_i("Hardware: Modo timecode → %s", 
+            currentTimecodeMode == MODE_BEATS ? "BEATS" : "SMPTE");
+        return 0; // no envía MIDI
     }
 
     // ============================================================
