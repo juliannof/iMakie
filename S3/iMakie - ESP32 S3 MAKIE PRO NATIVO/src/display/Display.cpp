@@ -274,28 +274,16 @@ static void _drawPadsHalf(const char** labels, const byte* colors,
             default: activeColor = TFT_LIGHTGREY; break;
         }
 
-        // Color inactivo: 50% del color activo
-        uint16_t inactiveColor = midColor(activeColor);
+        // Inactivo = 25% — contraste máximo con activo (100%)
+        uint16_t inactiveColor = dimColor(activeColor);
 
-        // Texto blanco por defecto, amarillo en SHIFT
+        // Texto: amarillo en SHIFT; negro si fondo activo es muy claro
         uint16_t txtColor = globalShiftPressed ? TFT_YELLOW : TFT_WHITE;
-
-        // Si el pad está ACTIVO y el fondo es muy claro → texto negro
         if (btnState[i] && (activeColor == TFT_WHITE  ||
                             activeColor == TFT_YELLOW ||
                             activeColor == TFT_CYAN)) {
             txtColor = TFT_BLACK;
         }
-
-        // Si el pad está INACTIVO y el midColor también es claro → texto negro
-        if (!btnState[i] && (activeColor == TFT_WHITE  ||
-                             activeColor == TFT_YELLOW ||
-                             activeColor == TFT_CYAN)) {
-            txtColor = TFT_BLACK;
-        }
-
-        log_d("PAD %d: state=%d active=%04X inactive=%04X",
-              i, btnState[i], activeColor, inactiveColor);
 
         drawButton(mainArea, x, y, btnSize, btnSize,
                    labels[i], btnState[i],

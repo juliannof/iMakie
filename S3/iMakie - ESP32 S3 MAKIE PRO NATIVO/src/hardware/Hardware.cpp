@@ -295,40 +295,32 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
     }
 
     // ============================================================
-    // 2. BUSCAR LA NOTA MIDI SEGÚN PÁGINA ACTUAL
+    // 2. FEEDBACK VISUAL — siempre, sea cual sea la nota
+    // ============================================================
+    btnState[key] = isPress;
+    needsMainAreaRedraw = true;
+
+    if (isPress) {
+        const byte* colorIndexMap = (currentPage == 1) ? LED_COLORS_PG1 : LED_COLORS_PG2;
+        uint32_t rgb888 = PALETTE[colorIndexMap[key]];
+        trellis.setPixelColor(key, rgb888);  // color completo en press
+        trellis.show();
+    } else {
+        updateLeds();  // restaurar al soltar
+    }
+
+    // ============================================================
+    // 3. ENVIAR MIDI — solo si tiene nota asignada
     // ============================================================
     const byte* currentMap = (currentPage == 1) ? MIDI_NOTES_PG1 : MIDI_NOTES_PG2;
     byte noteToSend = currentMap[key];
 
-    // ============================================================
-    // 3. ENVIAR MIDI + FEEDBACK VISUAL
-    // ============================================================
     if (noteToSend != 0x00) {
-
-        // Envío MIDI real (Note On con velocity 127 para press, 0 para release)
         byte midiMsg[3];
-        midiMsg[0] = 0x90;                    // Note On en canal 1 (velocity 0 = Note Off implícito)
+        midiMsg[0] = 0x90;
         midiMsg[1] = noteToSend;
         midiMsg[2] = isPress ? 127 : 0;
-        sendMIDIBytes(midiMsg, 3);            // ← CORREGIDO: antes estaba comentado
-
-        // Estado para la pantalla TFT
-        btnState[noteToSend] = isPress;
-        needsMainAreaRedraw = true;
-
-        // Feedback visual en los LEDs del Trellis
-        if (isPress) {
-            const byte* colorIndexMap = (currentPage == 1) ? LED_COLORS_PG1 : LED_COLORS_PG2;
-            uint32_t rgb888 = PALETTE[colorIndexMap[key]];
-
-            // ← CORREGIDO: applyBrightness trabaja en RGB888 directamente
-            //   NO pasar por tft.color565() — setPixelColor espera RGB888
-            uint32_t dimColor = applyMidBrightness(rgb888);
-            trellis.setPixelColor(key, dimColor);
-            trellis.show();
-        } else {
-            updateLeds(); // Restaura el color base de la página
-        }
+        sendMIDIBytes(midiMsg, 3);
     }
 
     return 0;

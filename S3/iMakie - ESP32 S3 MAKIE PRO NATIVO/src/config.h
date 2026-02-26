@@ -249,7 +249,7 @@ static const char* labels_PG2[32] = {
     "F1",    "F2",    "F3",    "F4",    "F5",    "F6",    "F7",    "F8",
     "F9",    "F10",   "F11",   "F12",   "F13",   "F14",   "F15",   "F16",
     "BANK<", "BANK>", "CHAN<", "CHAN>",  "ZOOM",  "SCRUB", "NUDGE", "MARK",
-    "UNDO",  "SAVE",  "SHIFT", "CTRL",  "OPT",   "CMD",   "ENTER", ">>"
+    "UNDO",  "SAVE",  "SHIFT", "CTRL",  "OPT",   "CMD",   "ENTER", ">>VU"
 };
 
 static const byte MIDI_NOTES_PG2[32] = {
