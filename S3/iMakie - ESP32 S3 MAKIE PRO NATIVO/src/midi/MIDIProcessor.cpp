@@ -8,6 +8,45 @@
    ========================================================= */
 extern USBMIDI MIDI;
 extern void updateLeds(); // definida en Hardware.cpp
+extern bool btnStatePG1[32];
+extern bool btnStatePG2[32];
+
+
+// --- Variables internas del parser MIDI ---
+namespace {
+    byte midi_buffer[256];
+    int midi_idx = 0;
+    bool in_sysex = false;
+    byte last_status_byte = 0;
+
+    enum class HandshakeState {
+        IDLE,
+        AWAITING_CHALLENGE_BYTES
+    };
+    HandshakeState handshakeState = HandshakeState::IDLE;
+    byte challenge_buffer[7];
+    int challenge_idx = 0;
+
+    unsigned long lastVersionReplyTime = 0;
+    const unsigned long VERSION_REPLY_COOLDOWN_MS = 200; // reducido: Logic reintenta rápido durante init
+}
+
+// --- Prototipos privados ---
+void processMidiByte(byte b);
+void onHostQueryDetected();
+void processMackieSysEx(byte* payload, int len);
+void processNote(byte status, byte note, byte velocity);
+void handleMcuHandshake(byte* challenge_code);
+void processChannelPressure(byte channel, byte value);
+void processControlChange(byte channel, byte controller, byte value);
+void processPitchBend(byte channel, int bendValue);
+void processMackieFader(byte channel, int value);
+
+float masterMeterLevel = 0.0f;
+float masterPeakLevel = 0.0f;
+bool masterClip = false;
+unsigned long masterMeterDecayTimer = 0;
+
 
 /* =========================================================
    sendMIDIBytes() — Reemplaza sendToPico() en todo el archivo
@@ -44,41 +83,6 @@ void sendMIDIBytes(const byte* data, size_t len) {
 
     log_v("[MIDI OUT] Enviado OK");
 }
-
-// --- Variables internas del parser MIDI ---
-namespace {
-    byte midi_buffer[256];
-    int midi_idx = 0;
-    bool in_sysex = false;
-    byte last_status_byte = 0;
-
-    enum class HandshakeState {
-        IDLE,
-        AWAITING_CHALLENGE_BYTES
-    };
-    HandshakeState handshakeState = HandshakeState::IDLE;
-    byte challenge_buffer[7];
-    int challenge_idx = 0;
-
-    unsigned long lastVersionReplyTime = 0;
-    const unsigned long VERSION_REPLY_COOLDOWN_MS = 200; // reducido: Logic reintenta rápido durante init
-}
-
-// --- Prototipos privados ---
-void processMidiByte(byte b);
-void onHostQueryDetected();
-void processMackieSysEx(byte* payload, int len);
-void processNote(byte status, byte note, byte velocity);
-void handleMcuHandshake(byte* challenge_code);
-void processChannelPressure(byte channel, byte value);
-void processControlChange(byte channel, byte controller, byte value);
-void processPitchBend(byte channel, int bendValue);
-void processMackieFader(byte channel, int value);
-
-float masterMeterLevel = 0.0f;
-float masterPeakLevel = 0.0f;
-bool masterClip = false;
-unsigned long masterMeterDecayTimer = 0;
 
 
 // ****************************************************************************
@@ -480,7 +484,7 @@ void processNote(byte status, byte note, byte velocity) {
         return;
     }
 
-    // --- PG3: notas Mackie 0-31 → recStates/soloStates/muteStates/selectStates ---
+    // --- PG3: notas Mackie 0-31 ---
     if (note <= 31) {
         int group     = note / 8;
         int track_idx = note % 8;
@@ -500,17 +504,31 @@ void processNote(byte status, byte note, byte velocity) {
         return;
     }
 
-    // --- PG1/PG2: buscar la nota en ambos mapas → actualizar btnState[] ---
+    // --- PG1 y PG2: cada mapa actualiza su propio array independientemente ---
+    // IMPORTANTE: una misma nota puede estar en AMBOS mapas (filas compartidas)
+    // por eso NO hacemos return al encontrarla en PG1, seguimos buscando en PG2
+    bool stateChanged = false;
+
     for (int key = 0; key < 32; key++) {
-        if (MIDI_NOTES_PG1[key] == note || MIDI_NOTES_PG2[key] == note) {
-            if (btnState[key] != is_on) {
-                btnState[key]       = is_on;
-                needsMainAreaRedraw = true;
-                updateLeds();
-                log_i("<<< PG1/2 key=%d note=%d -> %s", key, note, is_on ? "ON" : "OFF");
+        if (MIDI_NOTES_PG1[key] != 0x00 && MIDI_NOTES_PG1[key] == note) {
+            if (btnStatePG1[key] != is_on) {
+                btnStatePG1[key] = is_on;
+                stateChanged = true;
+                log_i("<<< PG1 key=%d note=0x%02X -> %s", key, note, is_on ? "ON" : "OFF");
             }
-            return;
         }
+        if (MIDI_NOTES_PG2[key] != 0x00 && MIDI_NOTES_PG2[key] == note) {
+            if (btnStatePG2[key] != is_on) {
+                btnStatePG2[key] = is_on;
+                stateChanged = true;
+                log_i("<<< PG2 key=%d note=0x%02X -> %s", key, note, is_on ? "ON" : "OFF");
+            }
+        }
+    }
+
+    if (stateChanged) {
+        needsMainAreaRedraw = true;
+        updateLeds();
     }
 }
 

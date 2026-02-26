@@ -154,7 +154,8 @@ const char MACKIE_CHAR_MAP[64] = {
 };
 
 // --- ESTADO GLOBAL DE LA INTERFAZ ---
-extern bool btnState[128];
+extern bool btnStatePG1[32];
+extern bool btnStatePG2[32];
 extern bool globalShiftPressed;
 extern int currentPage;
 

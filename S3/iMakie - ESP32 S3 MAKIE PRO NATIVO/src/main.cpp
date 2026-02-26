@@ -65,7 +65,8 @@ char timeCodeChars_clean[13];
 char beatsChars_clean[13];
 
 // Estado de botones y UI
-bool btnState[128] = {false};
+bool btnStatePG1[32] = {false};
+bool btnStatePG2[32] = {false};
 bool globalShiftPressed = false;
 int currentPage = 1;
 int currentMasterFader = 0;

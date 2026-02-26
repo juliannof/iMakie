@@ -136,7 +136,7 @@ void updateLeds() {
     else                       colorIndexMap = LED_COLORS_PG3;
 
     for (int i = 0; i < 32; i++) {
-        uint32_t baseColor = PALETTE[colorIndexMap[i]].rgb888;  // ← .rgb888
+        uint32_t baseColor = PALETTE[colorIndexMap[i]].rgb888;
         bool active = false;
 
         if (currentPage == 3) {
@@ -151,15 +151,17 @@ void updateLeds() {
                     case 3: active = selectStates[track_idx]; break;
                 }
             }
+        } else if (currentPage == 1) {
+            active = btnStatePG1[i];
         } else {
-            active = btnState[i];
+            active = btnStatePG2[i];
         }
 
         uint32_t colorFinal;
         if (active) {
-            colorFinal = applyMidBrightness(baseColor);  // 50% — estado activo persistente
+            colorFinal = applyMidBrightness(baseColor);
         } else {
-            colorFinal = applyBrightness(baseColor);      // ~2% — inactivo
+            colorFinal = applyBrightness(baseColor);
         }
 
         if (i == 26 && globalShiftPressed) colorFinal = C_YELLOW;

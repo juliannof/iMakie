@@ -254,29 +254,29 @@ static void _drawPadsHalf(const char** labels, const byte* colors,
     int cellH   = MAIN_AREA_HEIGHT / 2;
     int btnSize = ((cellW < cellH) ? cellW : cellH) - 4;
 
+    bool* stateArray = (currentPage == 1) ? btnStatePG1 : btnStatePG2;
+
     for (int i = startPad; i < endPad; i++) {
         int local = i - startPad;
-        int fila  = local / 8;
         int col   = local % 8;
+        int fila  = local / 8;
 
         int x = (col  * cellW) + (cellW  - btnSize) / 2;
         int y = (fila * cellH) + (cellH  - btnSize) / 2;
 
-        // ← lookup directo, sin switch
-        uint8_t colorIdx  = (colors[i] < 9) ? colors[i] : 0;
-        uint16_t activeColor = PALETTE[colorIdx].rgb565;  // ← .rgb565
-
+        uint8_t  colorIdx     = (colors[i] < 9) ? colors[i] : 0;
+        uint16_t activeColor  = PALETTE[colorIdx].rgb565;
         uint16_t inactiveColor = dimColor(activeColor);
 
         uint16_t txtColor = globalShiftPressed ? TFT_YELLOW : TFT_WHITE;
-        if (btnState[i] && (activeColor == TFT_WHITE  ||
-                            activeColor == TFT_YELLOW ||
-                            activeColor == TFT_CYAN)) {
+        if (stateArray[i] && (activeColor == TFT_WHITE  ||
+                              activeColor == TFT_YELLOW ||
+                              activeColor == TFT_CYAN)) {
             txtColor = TFT_BLACK;
         }
 
         drawButton(mainArea, x, y, btnSize, btnSize,
-                   labels[i], btnState[i],
+                   labels[i], stateArray[i],
                    activeColor, txtColor, inactiveColor);
     }
 }
