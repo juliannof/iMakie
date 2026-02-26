@@ -225,7 +225,8 @@ void handleMcuHandshake(byte* challenge_code) {
 // Control Change — Display de Timecode/Beats
 // *****************************************************************
 void processControlChange(byte channel, byte controller, byte value) {
-    log_d("processControlChange: CH=%d, CC=%d, Val=%d", channel, controller, value);
+    log_v("CC Mode=%s, controller=%d, value=0x%02X", 
+      (currentTimecodeMode == MODE_BEATS) ? "BEATS" : "SMPTE", controller, value);
 
     if ((channel != 0 && channel != 15) || (controller < 64 || controller > 73)) {
         log_w("processControlChange: CC ignorado. Channel=%d, Controller=%d.", channel, controller);
@@ -246,20 +247,17 @@ void processControlChange(byte channel, byte controller, byte value) {
         char_to_store |= 0x80;
     }
 
-    if (currentTimecodeMode == MODE_BEATS) {
-        beatsChars_clean[digit_index] = char_to_store;
-    } else {
-        timeCodeChars_clean[digit_index] = char_to_store;
-    }
+    beatsChars_clean[digit_index]    = char_to_store;
+    timeCodeChars_clean[digit_index] = char_to_store;
 
     needsHeaderRedraw = true;
 }
 
-// Formatear beat string
+// Formatear beat string — BAR.BEAT.SUB.TICK
 String formatBeatString() {
     char formatted[14];
     int pos = 0;
-    for (int i = 0; i < 12; i++) {
+    for (int i = 0; i < 10; i++) {   // ← de vuelta a 0→9
         byte char_with_dot = beatsChars_clean[i];
         char ascii_char = char_with_dot & 0x7F;
         if (ascii_char == 0 || ascii_char < 32) ascii_char = ' ';
@@ -269,14 +267,13 @@ String formatBeatString() {
     formatted[pos] = '\0';
     String result = String(formatted);
     result.trim();
-    return (result.length() == 0) ? "---.---" : result;
+    return (result.length() == 0) ? "---.---.---" : result;
 }
 
-// Formatear timecode string
 String formatTimecodeString() {
     char formatted[14];
     int pos = 0;
-    for (int i = 0; i < 12; i++) {
+    for (int i = 0; i < 10; i++) {   // ← de vuelta a 0→9
         byte char_with_dot = timeCodeChars_clean[i];
         char ascii_char = char_with_dot & 0x7F;
         if (ascii_char == 0 || ascii_char < 32) ascii_char = ' ';
@@ -288,7 +285,6 @@ String formatTimecodeString() {
     result.trim();
     return (result.length() == 0) ? "--:--:--:--" : result;
 }
-
 
 // ****************************************************************************
 // Vúmetros — Channel Pressure
@@ -473,34 +469,48 @@ void processMackieSysEx(byte* payload, int len) {
 void processNote(byte status, byte note, byte velocity) {
     bool is_on = ((status & 0xF0) == 0x90 && velocity > 0);
 
-    // ── PG3 Mixer: notas 0x00-0x1F → recStates/soloStates/muteStates/selectStates ──
-    if (note <= 31) {
-        int group     = note / 8;
-        int track_idx = note % 8;
-        bool stateChanged = false;
-        switch (group) {
-            case 0: if (recStates[track_idx]    != is_on) { recStates[track_idx]    = is_on; stateChanged = true; } break;
-            case 1: if (soloStates[track_idx]   != is_on) { soloStates[track_idx]   = is_on; stateChanged = true; } break;
-            case 2: if (muteStates[track_idx]   != is_on) { muteStates[track_idx]   = is_on; stateChanged = true; } break;
-            case 3: if (selectStates[track_idx] != is_on) { selectStates[track_idx] = is_on; stateChanged = true; } break;
+    // --- Notas de modo de display (enviadas por el DAW) ---
+    if (note == 113) { // SMPTE LED ON = el DAW está en modo SMPTE
+        if (is_on && currentTimecodeMode != MODE_SMPTE) {
+            currentTimecodeMode = MODE_SMPTE;
+            // Limpiar buffer SMPTE para no mostrar datos residuales
+            memset(timeCodeChars_clean, ' ', 10);
+            timeCodeChars_clean[10] = '\0';
+            needsHeaderRedraw = true;
+            log_i("Modo cambiado a: SMPTE");
         }
-        if (stateChanged) {
-            needsMainAreaRedraw = true;
-            log_i("<<< MIXER nota=0x%02X pista=%d -> %s", note, track_idx+1, is_on?"ON":"OFF");
+        return;
+    }
+    if (note == 114) { // BEATS LED ON = el DAW está en modo BEATS
+        if (is_on && currentTimecodeMode != MODE_BEATS) {
+            currentTimecodeMode = MODE_BEATS;
+            // Limpiar buffer BEATS
+            memset(beatsChars_clean, ' ', 10);
+            beatsChars_clean[10] = '\0';
+            needsHeaderRedraw = true;
+            log_i("Modo cambiado a: BEATS");
         }
         return;
     }
 
-    // ── PG1/PG2: reverse lookup → btnState[] ──
-    for (int i = 0; i < 32; i++) {
-        if (MIDI_NOTES_PG1[i] == note || MIDI_NOTES_PG2[i] == note) {
-            if (btnState[i] != is_on) {
-                btnState[i] = is_on;
-                needsMainAreaRedraw = true;
-                log_i("<<< PAD %d (nota=0x%02X) -> %s", i, note, is_on?"ON":"OFF");
-            }
-            return;
-        }
+    // --- El resto de notas (0-31) ---
+    if (note > 31) return;
+
+    int group = note / 8;
+    int track_idx = note % 8;
+    bool stateChanged = false;
+
+    switch(group) {
+        case 0: if (recStates[track_idx]    != is_on) { recStates[track_idx]    = is_on; stateChanged = true; } break;
+        case 1: if (soloStates[track_idx]   != is_on) { soloStates[track_idx]   = is_on; stateChanged = true; } break;
+        case 2: if (muteStates[track_idx]   != is_on) { muteStates[track_idx]   = is_on; stateChanged = true; } break;
+        case 3: if (selectStates[track_idx] != is_on) { selectStates[track_idx] = is_on; stateChanged = true; } break;
+    }
+
+    if (stateChanged) {
+        needsMainAreaRedraw = true;
+        const char* group_name = (group==0)?"REC":(group==1)?"SOLO":(group==2)?"MUTE":"SELECT";
+        log_i("<<< BOTÓN: Pista %d - %s -> %s", track_idx + 1, group_name, is_on ? "ON" : "OFF");
     }
 }
 
