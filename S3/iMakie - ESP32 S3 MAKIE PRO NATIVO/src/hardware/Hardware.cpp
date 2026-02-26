@@ -7,7 +7,7 @@
 
 // --- VARIABLES "PRIVADAS" DE ESTE MÓDULO ---
 namespace {
-    uint8_t trellisBrightness = 7; // Valor de brillo por defecto
+    uint8_t trellisBrightness = 8; // Valor de brillo por defecto
     const uint32_t baseColors[4] = {0xFF0000, 0xFFFF00, 0xFF0000, 0xFFFFFF};
 }
 
@@ -275,12 +275,10 @@ uint32_t applyMidBrightness(uint32_t color) {
 // NUEVO CALLBACK MAESTRO (Soporta Páginas y Mapas)
 // ---------------------------------------------------------
 TrellisCallback onTrellisEvent(keyEvent evt) {
-    int key = evt.bit.NUM;
+    int key      = evt.bit.NUM;
     bool isPress = (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_RISING);
 
-    // ============================================================
-    // 1. BOTONES DE GESTIÓN LOCAL
-    // ============================================================
+    // ── Botón de página ──────────────────────────────────────────
     if (key == 31 && isPress) {
         currentPage = (currentPage % 3) + 1;
         updateLeds();
@@ -288,6 +286,7 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
         return 0;
     }
 
+    // ── Botón SHIFT ──────────────────────────────────────────────
     if (key == 26) {
         globalShiftPressed = isPress;
         if (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_RISING ||
@@ -297,20 +296,18 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
         }
     }
 
-    // BOTÓN SMPTE/BEATS (Índice 15: Fila 2, Columna 8)
+    // ── Botón SMPTE/BEATS (key 15) ───────────────────────────────
     if (key == 15 && isPress) {
         currentTimecodeMode = (currentTimecodeMode == MODE_BEATS)
-                                ? MODE_SMPTE
-                                : MODE_BEATS;
+                               ? MODE_SMPTE
+                               : MODE_BEATS;
         needsHeaderRedraw = true;
-        log_i("Hardware: Modo timecode → %s", 
-            currentTimecodeMode == MODE_BEATS ? "BEATS" : "SMPTE");
-        return 0; // no envía MIDI
+        log_i("Hardware: Modo timecode → %s",
+              currentTimecodeMode == MODE_BEATS ? "BEATS" : "SMPTE");
+        return 0;
     }
 
-    // ============================================================
-    // 2. SOLO ENVIAR MIDI — estado y LEDs los gestiona processNote()
-    // ============================================================
+    // ── Enviar MIDI — Logic confirma el estado de vuelta ─────────
     const byte* currentMap = (currentPage == 1) ? MIDI_NOTES_PG1 : MIDI_NOTES_PG2;
     byte noteToSend = currentMap[key];
 
@@ -320,10 +317,11 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
         midiMsg[1] = noteToSend;
         midiMsg[2] = isPress ? 127 : 0;
         sendMIDIBytes(midiMsg, 3);
+        // Sin btnState aquí — Logic responde con Note On/Off
+        // y processNote() actualiza el estado
     }
 
     return 0;
 }
-
 
 // Fin del codigo

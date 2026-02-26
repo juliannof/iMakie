@@ -7,6 +7,7 @@
    ACCESO AL OBJETO MIDI (definido en main.cpp)
    ========================================================= */
 extern USBMIDI MIDI;
+extern void updateLeds(); // definida en Hardware.cpp
 
 /* =========================================================
    sendMIDIBytes() — Reemplaza sendToPico() en todo el archivo
@@ -469,43 +470,47 @@ void processMackieSysEx(byte* payload, int len) {
 void processNote(byte status, byte note, byte velocity) {
     bool is_on = ((status & 0xF0) == 0x90 && velocity > 0);
 
-    // --- LEDs de modo display (113=SMPTE, 114=BEATS) ---
-    // DEBEN ir ANTES del return note > 31
-    if (note == 113) {  // SMPTE LED
-        if (is_on) {
-            currentTimecodeMode = MODE_SMPTE;
-            needsHeaderRedraw = true;
-            log_i("Modo -> SMPTE");
-        }
+    // --- Modo display ---
+    if (note == 113) {
+        if (is_on) { currentTimecodeMode = MODE_SMPTE; needsHeaderRedraw = true; }
         return;
     }
-    if (note == 114) {  // BEATS LED
-        if (is_on) {
-            currentTimecodeMode = MODE_BEATS;
-            needsHeaderRedraw = true;
-            log_i("Modo -> BEATS");
-        }
+    if (note == 114) {
+        if (is_on) { currentTimecodeMode = MODE_BEATS; needsHeaderRedraw = true; }
         return;
     }
 
-    // --- Botones REC/SOLO/MUTE/SELECT (notas 0-31) ---
-    if (note > 31) return;
+    // --- PG3: notas Mackie 0-31 → recStates/soloStates/muteStates/selectStates ---
+    if (note <= 31) {
+        int group     = note / 8;
+        int track_idx = note % 8;
+        bool stateChanged = false;
 
-    int group     = note / 8;
-    int track_idx = note % 8;
-    bool stateChanged = false;
+        switch (group) {
+            case 0: if (recStates[track_idx]    != is_on) { recStates[track_idx]    = is_on; stateChanged = true; } break;
+            case 1: if (soloStates[track_idx]   != is_on) { soloStates[track_idx]   = is_on; stateChanged = true; } break;
+            case 2: if (muteStates[track_idx]   != is_on) { muteStates[track_idx]   = is_on; stateChanged = true; } break;
+            case 3: if (selectStates[track_idx] != is_on) { selectStates[track_idx] = is_on; stateChanged = true; } break;
+        }
 
-    switch (group) {
-        case 0: if (recStates[track_idx]    != is_on) { recStates[track_idx]    = is_on; stateChanged = true; } break;
-        case 1: if (soloStates[track_idx]   != is_on) { soloStates[track_idx]   = is_on; stateChanged = true; } break;
-        case 2: if (muteStates[track_idx]   != is_on) { muteStates[track_idx]   = is_on; stateChanged = true; } break;
-        case 3: if (selectStates[track_idx] != is_on) { selectStates[track_idx] = is_on; stateChanged = true; } break;
+        if (stateChanged) {
+            needsMainAreaRedraw = true;
+            log_i("<<< PG3 Pista %d grupo %d -> %s", track_idx + 1, group, is_on ? "ON" : "OFF");
+        }
+        return;
     }
 
-    if (stateChanged) {
-        needsMainAreaRedraw = true;
-        const char* g = (group==0)?"REC":(group==1)?"SOLO":(group==2)?"MUTE":"SELECT";
-        log_i("<<< BOTÓN: Pista %d - %s -> %s", track_idx + 1, g, is_on ? "ON" : "OFF");
+    // --- PG1/PG2: buscar la nota en ambos mapas → actualizar btnState[] ---
+    for (int key = 0; key < 32; key++) {
+        if (MIDI_NOTES_PG1[key] == note || MIDI_NOTES_PG2[key] == note) {
+            if (btnState[key] != is_on) {
+                btnState[key]       = is_on;
+                needsMainAreaRedraw = true;
+                updateLeds();
+                log_i("<<< PG1/2 key=%d note=%d -> %s", key, note, is_on ? "ON" : "OFF");
+            }
+            return;
+        }
     }
 }
 
