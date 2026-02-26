@@ -473,9 +473,9 @@ void processMackieSysEx(byte* payload, int len) {
 void processNote(byte status, byte note, byte velocity) {
     bool is_on = ((status & 0xF0) == 0x90 && velocity > 0);
 
-    // Rango 0-31: REC/SOLO/MUTE/SELECT — lógica de estado por grupo
+    // ─── MIXER (notas 0-31): REC/SOLO/MUTE/SELECT ───────────────
     if (note <= 31) {
-        int group = note / 8;
+        int group     = note / 8;
         int track_idx = note % 8;
         bool stateChanged = false;
 
@@ -488,18 +488,25 @@ void processNote(byte status, byte note, byte velocity) {
 
         if (stateChanged) {
             needsMainAreaRedraw = true;
-            const char* g = (group==0)?"REC":(group==1)?"SOLO":(group==2)?"MUTE":"SELECT";
-            log_i("<<< BOTÓN: Pista %d - %s -> %s", track_idx+1, g, is_on?"ON":"OFF");
+            log_i("<<< MIXER: Pista %d grupo %d -> %s", track_idx+1, group, is_on?"ON":"OFF");
         }
         return;
     }
 
-    // Rango 32-127: botones globales (transport, automation, función)
-    // Logic manda feedback de LED — almacenamos estado para updateLeds()
-    if (note < 128 && btnState[note] != is_on) {
-        btnState[note] = is_on;
-        needsMainAreaRedraw = true;
-        log_i("<<< BOTÓN GLOBAL: nota=%d -> %s", note, is_on?"ON":"OFF");
+    // ─── PADS PG1 / PG2 (notas > 31): reverse lookup ────────────
+    // Buscar qué pad corresponde a esta nota en la página actual
+    const byte* map1 = MIDI_NOTES_PG1;
+    const byte* map2 = MIDI_NOTES_PG2;
+
+    for (int i = 0; i < 32; i++) {
+        if (map1[i] == note || map2[i] == note) {
+            if (btnState[i] != is_on) {
+                btnState[i] = is_on;
+                needsMainAreaRedraw = true;
+                log_i("<<< PAD %d (nota 0x%02X) -> %s", i, note, is_on?"ON":"OFF");
+            }
+            return;
+        }
     }
 }
 
