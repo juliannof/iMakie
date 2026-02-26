@@ -473,37 +473,31 @@ void processMackieSysEx(byte* payload, int len) {
 void processNote(byte status, byte note, byte velocity) {
     bool is_on = ((status & 0xF0) == 0x90 && velocity > 0);
 
-    // ─── MIXER (notas 0-31): REC/SOLO/MUTE/SELECT ───────────────
+    // ── PG3 Mixer: notas 0x00-0x1F → recStates/soloStates/muteStates/selectStates ──
     if (note <= 31) {
         int group     = note / 8;
         int track_idx = note % 8;
         bool stateChanged = false;
-
-        switch(group) {
+        switch (group) {
             case 0: if (recStates[track_idx]    != is_on) { recStates[track_idx]    = is_on; stateChanged = true; } break;
             case 1: if (soloStates[track_idx]   != is_on) { soloStates[track_idx]   = is_on; stateChanged = true; } break;
             case 2: if (muteStates[track_idx]   != is_on) { muteStates[track_idx]   = is_on; stateChanged = true; } break;
             case 3: if (selectStates[track_idx] != is_on) { selectStates[track_idx] = is_on; stateChanged = true; } break;
         }
-
         if (stateChanged) {
             needsMainAreaRedraw = true;
-            log_i("<<< MIXER: Pista %d grupo %d -> %s", track_idx+1, group, is_on?"ON":"OFF");
+            log_i("<<< MIXER nota=0x%02X pista=%d -> %s", note, track_idx+1, is_on?"ON":"OFF");
         }
         return;
     }
 
-    // ─── PADS PG1 / PG2 (notas > 31): reverse lookup ────────────
-    // Buscar qué pad corresponde a esta nota en la página actual
-    const byte* map1 = MIDI_NOTES_PG1;
-    const byte* map2 = MIDI_NOTES_PG2;
-
+    // ── PG1/PG2: reverse lookup → btnState[] ──
     for (int i = 0; i < 32; i++) {
-        if (map1[i] == note || map2[i] == note) {
+        if (MIDI_NOTES_PG1[i] == note || MIDI_NOTES_PG2[i] == note) {
             if (btnState[i] != is_on) {
                 btnState[i] = is_on;
                 needsMainAreaRedraw = true;
-                log_i("<<< PAD %d (nota 0x%02X) -> %s", i, note, is_on?"ON":"OFF");
+                log_i("<<< PAD %d (nota=0x%02X) -> %s", i, note, is_on?"ON":"OFF");
             }
             return;
         }

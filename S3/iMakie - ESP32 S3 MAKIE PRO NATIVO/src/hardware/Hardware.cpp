@@ -130,35 +130,43 @@ void handleVUMeterDecay() {
 // ****************************************************************************
 
 void updateLeds() {
-
     const byte* colorIndexMap;
     if      (currentPage == 1) colorIndexMap = LED_COLORS_PG1;
     else if (currentPage == 2) colorIndexMap = LED_COLORS_PG2;
     else                       colorIndexMap = LED_COLORS_PG3;
 
-    const byte* currentMap;
-    if      (currentPage == 1) currentMap = MIDI_NOTES_PG1;
-    else if (currentPage == 2) currentMap = MIDI_NOTES_PG2;
-    else                       currentMap = MIDI_NOTES_PG1; // ajustar si PG3 tiene mapa propio
-
     for (int i = 0; i < 32; i++) {
-        uint32_t colorFinal = 0;
-        uint32_t baseColor  = PALETTE[colorIndexMap[i]];
+        uint32_t baseColor = PALETTE[colorIndexMap[i]];
+        bool active = false;
 
-        // Estado según feedback de Logic (nota MIDI → btnState)
-        byte nota = currentMap[i];
-        bool estadoLogic = (nota != 0x00) && btnState[nota];
+        if (currentPage == 3) {
+            // PG3: el estado viene de recStates/soloStates/muteStates
+            // según la nota MIDI que tiene asignada ese pad en PG1
+            byte note = MIDI_NOTES_PG1[i];
+            if (note <= 31) {
+                int group     = note / 8;
+                int track_idx = note % 8;
+                switch (group) {
+                    case 0: active = recStates[track_idx];    break;
+                    case 1: active = soloStates[track_idx];   break;
+                    case 2: active = muteStates[track_idx];   break;
+                    case 3: active = selectStates[track_idx]; break;
+                }
+            }
+        } else {
+            // PG1/PG2: el estado viene de btnState[]
+            active = btnState[i];
+        }
 
-        if (estadoLogic) {
-            if (baseColor == C_OFF) baseColor = C_WHITE;
-            colorFinal = applyMidBrightness(baseColor);
+        uint32_t colorFinal;
+        if (active) {
+            colorFinal = (baseColor == C_OFF) ? C_WHITE : baseColor;
         } else {
             colorFinal = applyBrightness(baseColor);
         }
 
-        // Overrides locales
+        // Overrides
         if (i == 26 && globalShiftPressed) colorFinal = C_YELLOW;
-
         if (i == 31) {
             if      (currentPage == 1) colorFinal = applyBrightness(C_BLUE);
             else if (currentPage == 2) colorFinal = applyBrightness(C_GREEN);
@@ -274,8 +282,6 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
     // ============================================================
     // 1. BOTONES DE GESTIÓN LOCAL
     // ============================================================
-
-    // BOTÓN DE PÁGINA (índice 31 — esquina inferior derecha)
     if (key == 31 && isPress) {
         currentPage = (currentPage % 3) + 1;
         updateLeds();
@@ -283,7 +289,6 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
         return 0;
     }
 
-    // BOTÓN SHIFT (índice 26)
     if (key == 26) {
         globalShiftPressed = isPress;
         if (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_RISING ||
@@ -291,26 +296,10 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
             needsMainAreaRedraw = true;
             updateLeds();
         }
-        // Shift también envía su nota MIDI → sigue al bloque de abajo
     }
 
     // ============================================================
-    // 2. FEEDBACK VISUAL — siempre, sea cual sea la nota
-    // ============================================================
-    btnState[key] = isPress;
-    needsMainAreaRedraw = true;
-
-    if (isPress) {
-        const byte* colorIndexMap = (currentPage == 1) ? LED_COLORS_PG1 : LED_COLORS_PG2;
-        uint32_t rgb888 = PALETTE[colorIndexMap[key]];
-        trellis.setPixelColor(key, rgb888);  // color completo en press
-        trellis.show();
-    } else {
-        updateLeds();  // restaurar al soltar
-    }
-
-    // ============================================================
-    // 3. ENVIAR MIDI — solo si tiene nota asignada
+    // 2. SOLO ENVIAR MIDI — estado y LEDs los gestiona processNote()
     // ============================================================
     const byte* currentMap = (currentPage == 1) ? MIDI_NOTES_PG1 : MIDI_NOTES_PG2;
     byte noteToSend = currentMap[key];
