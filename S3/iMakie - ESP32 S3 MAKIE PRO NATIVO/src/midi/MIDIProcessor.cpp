@@ -225,44 +225,40 @@ void handleMcuHandshake(byte* challenge_code) {
 // Control Change — Display de Timecode/Beats
 // *****************************************************************
 void processControlChange(byte channel, byte controller, byte value) {
-    log_v("CC Mode=%s, controller=%d, value=0x%02X", 
-      (currentTimecodeMode == MODE_BEATS) ? "BEATS" : "SMPTE", controller, value);
+    log_d("CC CH=%d, CC=%d, Val=0x%02X", channel, controller, value);
 
     if ((channel != 0 && channel != 15) || (controller < 64 || controller > 73)) {
-        log_w("processControlChange: CC ignorado. Channel=%d, Controller=%d.", channel, controller);
+        log_w("CC ignorado. CH=%d, CC=%d", channel, controller);
         return;
     }
 
-    int digit_index = 73 - controller;
-    if (digit_index < 0 || digit_index >= 10) {
-        log_e("processControlChange: Índice de dígito fuera de rango: %d", digit_index);
-        return;
-    }
+    int digit_index = 73 - controller;  // CC64→idx9 (MSB), CC73→idx0 (LSB)
 
-    byte char_code = value & 0x3F;
-    char display_char = (char_code < 64) ? MACKIE_CHAR_MAP[char_code] : '?';
+    byte char_code   = value & 0x3F;
+    char ascii_char  = (char_code < 64) ? MACKIE_CHAR_MAP[char_code] : '?';
+    byte char_to_store = (byte)ascii_char;
+    if (value & 0x40) char_to_store |= 0x80;  // bit separador
 
-    byte char_to_store = (byte)display_char;
-    if ((value & 0x40) != 0) {
-        char_to_store |= 0x80;
-    }
-
+    // *** Guardar en AMBOS buffers siempre ***
+    // El DAW envía CCs antes de la nota de modo → no sabemos aún qué modo vendrá
     beatsChars_clean[digit_index]    = char_to_store;
     timeCodeChars_clean[digit_index] = char_to_store;
 
     needsHeaderRedraw = true;
 }
 
-// Formatear beat string — BAR.BEAT.SUB.TICK
+// ****************************************************************************
+// Formatear Beat String  BAR.BEAT.SUB.TICK
+// ****************************************************************************
 String formatBeatString() {
     char formatted[14];
     int pos = 0;
-    for (int i = 0; i < 10; i++) {   // ← de vuelta a 0→9
-        byte char_with_dot = beatsChars_clean[i];
-        char ascii_char = char_with_dot & 0x7F;
-        if (ascii_char == 0 || ascii_char < 32) ascii_char = ' ';
-        formatted[pos++] = ascii_char;
-        if ((char_with_dot & 0x80) != 0) formatted[pos++] = '.';
+    for (int i = 0; i < 10; i++) {  // ← 10, no 12
+        byte b = beatsChars_clean[i];
+        char c = b & 0x7F;
+        if (c == 0 || c < 32) c = ' ';
+        formatted[pos++] = c;
+        if (b & 0x80) formatted[pos++] = '.';
     }
     formatted[pos] = '\0';
     String result = String(formatted);
@@ -270,15 +266,19 @@ String formatBeatString() {
     return (result.length() == 0) ? "---.---.---" : result;
 }
 
+
+// ****************************************************************************
+// Formatear Timecode String  HH:MM:SS:FF
+// ****************************************************************************
 String formatTimecodeString() {
     char formatted[14];
     int pos = 0;
-    for (int i = 0; i < 10; i++) {   // ← de vuelta a 0→9
-        byte char_with_dot = timeCodeChars_clean[i];
-        char ascii_char = char_with_dot & 0x7F;
-        if (ascii_char == 0 || ascii_char < 32) ascii_char = ' ';
-        formatted[pos++] = ascii_char;
-        if ((char_with_dot & 0x80) != 0) formatted[pos++] = ':';
+    for (int i = 0; i < 10; i++) {  // ← 10, no 12
+        byte b = timeCodeChars_clean[i];
+        char c = b & 0x7F;
+        if (c == 0 || c < 32) c = ' ';
+        formatted[pos++] = c;
+        if (b & 0x80) formatted[pos++] = ':';
     }
     formatted[pos] = '\0';
     String result = String(formatted);
@@ -469,38 +469,33 @@ void processMackieSysEx(byte* payload, int len) {
 void processNote(byte status, byte note, byte velocity) {
     bool is_on = ((status & 0xF0) == 0x90 && velocity > 0);
 
-    // --- Notas de modo de display (enviadas por el DAW) ---
-    if (note == 113) { // SMPTE LED ON = el DAW está en modo SMPTE
-        if (is_on && currentTimecodeMode != MODE_SMPTE) {
+    // --- LEDs de modo display (113=SMPTE, 114=BEATS) ---
+    // DEBEN ir ANTES del return note > 31
+    if (note == 113) {  // SMPTE LED
+        if (is_on) {
             currentTimecodeMode = MODE_SMPTE;
-            // Limpiar buffer SMPTE para no mostrar datos residuales
-            memset(timeCodeChars_clean, ' ', 10);
-            timeCodeChars_clean[10] = '\0';
             needsHeaderRedraw = true;
-            log_i("Modo cambiado a: SMPTE");
+            log_i("Modo -> SMPTE");
         }
         return;
     }
-    if (note == 114) { // BEATS LED ON = el DAW está en modo BEATS
-        if (is_on && currentTimecodeMode != MODE_BEATS) {
+    if (note == 114) {  // BEATS LED
+        if (is_on) {
             currentTimecodeMode = MODE_BEATS;
-            // Limpiar buffer BEATS
-            memset(beatsChars_clean, ' ', 10);
-            beatsChars_clean[10] = '\0';
             needsHeaderRedraw = true;
-            log_i("Modo cambiado a: BEATS");
+            log_i("Modo -> BEATS");
         }
         return;
     }
 
-    // --- El resto de notas (0-31) ---
+    // --- Botones REC/SOLO/MUTE/SELECT (notas 0-31) ---
     if (note > 31) return;
 
-    int group = note / 8;
+    int group     = note / 8;
     int track_idx = note % 8;
     bool stateChanged = false;
 
-    switch(group) {
+    switch (group) {
         case 0: if (recStates[track_idx]    != is_on) { recStates[track_idx]    = is_on; stateChanged = true; } break;
         case 1: if (soloStates[track_idx]   != is_on) { soloStates[track_idx]   = is_on; stateChanged = true; } break;
         case 2: if (muteStates[track_idx]   != is_on) { muteStates[track_idx]   = is_on; stateChanged = true; } break;
@@ -509,8 +504,8 @@ void processNote(byte status, byte note, byte velocity) {
 
     if (stateChanged) {
         needsMainAreaRedraw = true;
-        const char* group_name = (group==0)?"REC":(group==1)?"SOLO":(group==2)?"MUTE":"SELECT";
-        log_i("<<< BOTÓN: Pista %d - %s -> %s", track_idx + 1, group_name, is_on ? "ON" : "OFF");
+        const char* g = (group==0)?"REC":(group==1)?"SOLO":(group==2)?"MUTE":"SELECT";
+        log_i("<<< BOTÓN: Pista %d - %s -> %s", track_idx + 1, g, is_on ? "ON" : "OFF");
     }
 }
 
