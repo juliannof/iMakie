@@ -116,7 +116,7 @@ void setup() {
       ESP.getPsramSize(), ESP.getFreePsram());
     log_e("Flash: %d bytes", ESP.getFlashChipSize());
 
-    log_e("--- Sistema listo. Pico eliminada. USB MIDI activo. ---");
+    log_e("--- V0.1 * Sistema listo. USB MIDI activo. ---");
 }
 
 /* =========================================================
@@ -143,7 +143,6 @@ void loop() {
         }
     }
 
-    
 
     if (logicConnectionState == ConnectionState::CONNECTED) {
         if (!wasConnected) {
