@@ -27,6 +27,8 @@ namespace {
     byte challenge_buffer[7];
     int challenge_idx = 0;
 
+    static uint16_t fadersAtMinMask = 0;
+    static const uint16_t ALL_FADERS_MIN_MASK = 0x01FF; // bits 0-8
     unsigned long lastVersionReplyTime = 0;
     const unsigned long VERSION_REPLY_COOLDOWN_MS = 200; // reducido: Logic reintenta rápido durante init
 }
@@ -90,6 +92,8 @@ void sendMIDIBytes(const byte* data, size_t len) {
 // ****************************************************************************
 void processMidiByte(byte b) {
 
+    log_v(">> RAW: 0x%02X", b);   // ← línea temporal
+
 
     if (b >= 0xF8) return; // RealTime
 
@@ -105,7 +109,7 @@ void processMidiByte(byte b) {
             if (challenge_idx < 7) {
                 challenge_buffer[challenge_idx++] = b;
                 if (challenge_idx == 7) {
-                    log_i("[HANDSHAKE] ¡7 bytes pescados! Completando handshake.");
+                    log_e("[HANDSHAKE] ¡7 bytes pescados! Completando handshake.");
                     handleMcuHandshake(challenge_buffer);
                     handshakeState = HandshakeState::IDLE;
                 }
@@ -205,7 +209,7 @@ void handleMcuHandshake(byte* challenge_code) {
                           challenge_code[0], challenge_code[1], challenge_code[2], challenge_code[3],
                           challenge_code[4], challenge_buffer[5], challenge_buffer[6], 0xF7 };
     sendMIDIBytes(response, sizeof(response));
-    log_i(">>> MCU Handshake: Respuesta enviada (%d bytes).", sizeof(response));
+    log_e(">>> MCU Handshake: Respuesta enviada (%d bytes).", sizeof(response));
 
     // 2. Confirmación "Online"
     byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x02, 0xF7};
@@ -535,22 +539,36 @@ void processNote(byte status, byte note, byte velocity) {
 // Pitch Bend — Faders
 // ****************************************************************************
 void processPitchBend(byte channel, int bendValue) {
-    if (channel >= 0 && channel < 9) {
-        float faderPositionNormalized = (float)(bendValue + 8192) / 16383.0f;
+    if (channel > 9) return;
 
-        if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) {
-            logicConnectionState = ConnectionState::CONNECTED;
+    // --- Detección de desconexión ---
+    if (bendValue == -8192) {
+        fadersAtMinMask |= (1 << channel);
+        if (fadersAtMinMask == ALL_FADERS_MIN_MASK &&
+            logicConnectionState == ConnectionState::CONNECTED) {
+            logicConnectionState = ConnectionState::DISCONNECTED;
             needsTOTALRedraw = true;
-            log_i("DAW conectado: Primer PitchBend en Track %d. -> CONNECTED.", channel + 1);
+            fadersAtMinMask = 0;
+            log_e("[DISCONNECT] Todos los faders en -8192 -> DISCONNECTED.");
+            return;
         }
+    } else {
+        fadersAtMinMask &= ~(1 << channel); // movimiento real → limpia el bit
+    }
 
+    // --- Transición HANDSHAKE_COMPLETE → CONNECTED ---
+    if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) {
+        logicConnectionState = ConnectionState::CONNECTED;
+        needsTOTALRedraw = true;
+        log_e("DAW conectado: Primer PitchBend Track %d -> CONNECTED.", channel + 1);
+    }
+
+    // --- Actualizar posición del fader ---
+    if (channel < 9) {
+        float faderPositionNormalized = (float)(bendValue + 8192) / 16383.0f;
         if (abs(faderPositions[channel] - faderPositionNormalized) > 0.001f) {
             faderPositions[channel] = faderPositionNormalized;
             needsMainAreaRedraw = true;
         }
     }
-}
-
-bool isLogicConnected() {
-    return (logicConnectionState == ConnectionState::CONNECTED);
 }
