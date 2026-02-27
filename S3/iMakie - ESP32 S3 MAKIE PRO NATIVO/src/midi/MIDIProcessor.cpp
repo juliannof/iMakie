@@ -32,7 +32,7 @@ namespace {
     static const uint16_t ALL_FADERS_MIN_MASK = 0x01FF; // bits 0-8
     static unsigned long lastMidiActivityTime = 0;
     
-    static const unsigned long MIDI_TIMEOUT_MS = 8000; // 3 segundos sin MIDI = desconectado
+    static const unsigned long MIDI_TIMEOUT_MS = 1000028000; // 3 segundos sin MIDI = desconectado
     static const int DISCONNECT_THRESHOLD = 9;           // 7 de 9 es suficiente
     static const unsigned long DISCONNECT_WINDOW_MS = 150; // ventana de 300ms
 
@@ -63,8 +63,19 @@ unsigned long masterMeterDecayTimer = 0;
    Para SysEx: envía byte a byte (único método válido en Core 3.1.1)
    ========================================================= */
 void sendMIDIBytes(const byte* data, size_t len) {
-    log_v("[MIDI OUT] Enviando %d bytes: 0x%02X 0x%02X 0x%02X", len, data[0], data[1], data[2]);
+    log_v("[MIDI OUT] Enviando %d bytes", len);
 
+    // --- SysEx: enviar byte a byte ---
+    if (data[0] == 0xF0) {
+        for (size_t i = 0; i < len; i++) {
+            MIDI.write(data[i]);
+        }
+        //MIDI.flush();
+        log_v("[MIDI OUT] SysEx enviado OK (%d bytes)", len);
+        return;
+    }
+
+    // --- Mensajes de canal (3 bytes) ---
     if (len == 3) {
         byte status  = data[0] & 0xF0;
         byte channel = (data[0] & 0x0F) + 1;
@@ -73,10 +84,8 @@ void sendMIDIBytes(const byte* data, size_t len) {
 
         switch (status) {
             case 0x90:
-                if (byte2 > 0)
-                    MIDI.noteOn(byte1, byte2, channel);
-                else
-                    MIDI.noteOff(byte1, 0, channel);
+                if (byte2 > 0) MIDI.noteOn(byte1, byte2, channel);
+                else           MIDI.noteOff(byte1, 0, channel);
                 break;
             case 0x80:
                 MIDI.noteOff(byte1, byte2, channel);
@@ -89,20 +98,14 @@ void sendMIDIBytes(const byte* data, size_t len) {
                 break;
         }
     }
-
-    log_v("[MIDI OUT] Enviado OK");
 }
-
 
 // ****************************************************************************
 // Procesar byte MIDI entrante
 // ****************************************************************************
+
 void processMidiByte(byte b) {
-
-    log_v(">> RAW: 0x%02X", b);   // ← línea temporal
-    //lastMidiActivityTime = millis(); // ← actualizar en cada byte
-
-
+    log_v(">> RAW: 0x%02X", b);
 
     if (b >= 0xF8) return; // RealTime
 
@@ -110,6 +113,12 @@ void processMidiByte(byte b) {
         log_w("¡SysEx interrumpido! Recibido Status 0x%02X dentro de SysEx. Reseteando.", b);
         in_sysex = false;
         midi_idx = 0;
+        // ✅ Cancelar handshake si estaba pescando bytes
+        if (handshakeState == HandshakeState::AWAITING_CHALLENGE_BYTES) {
+            handshakeState = HandshakeState::IDLE;
+            challenge_idx = 0;
+            log_w("[HANDSHAKE] Cancelado por interrupción SysEx.");
+        }
     }
 
     // ----- LÓGICA DE HANDSHAKE -----
@@ -126,6 +135,13 @@ void processMidiByte(byte b) {
                 log_e("[HANDSHAKE] challenge_idx fuera de límites (%d). Byte 0x%02X.", challenge_idx, b);
             }
             return;
+        } else {
+            // ✅ Llegó un status byte mientras pescamos — cancelar handshake
+            // y dejar que el byte se procese normalmente abajo
+            log_w("[HANDSHAKE] Status byte 0x%02X recibido mientras pescaba. Cancelando.", b);
+            handshakeState = HandshakeState::IDLE;
+            challenge_idx = 0;
+            // NO return — continuar procesando el byte
         }
     }
 
@@ -202,7 +218,6 @@ void processMidiByte(byte b) {
         log_w("processMidiByte: Data Byte huérfano (0x%02X). Ignorando.", b);
     }
 }
-
 
 // *****************************************************************
 // Respuesta al Handshake MCU
@@ -517,7 +532,6 @@ void processMackieSysEx(byte* payload, int len) {
     break;
 }
 
-        
 
         default:
             break;
