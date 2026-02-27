@@ -300,12 +300,9 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
 
     // ── Botón SMPTE/BEATS (key 15) ───────────────────────────────
     if (key == 15 && isPress) {
-        currentTimecodeMode = (currentTimecodeMode == MODE_BEATS)
-                               ? MODE_SMPTE
-                               : MODE_BEATS;
-        needsHeaderRedraw = true;
-        log_i("Hardware: Modo timecode → %s",
-              currentTimecodeMode == MODE_BEATS ? "BEATS" : "SMPTE");
+        byte midiMsg[3] = { 0x90, 0x35, 0x7F };  // nota 53 = 0x35
+        sendMIDIBytes(midiMsg, 3);
+        // SIN tocar currentTimecodeMode aquí — Logic confirma con nota 113/114
         return 0;
     }
 

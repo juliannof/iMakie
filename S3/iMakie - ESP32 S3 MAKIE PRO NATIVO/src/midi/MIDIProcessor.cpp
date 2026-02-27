@@ -258,7 +258,7 @@ void processControlChange(byte channel, byte controller, byte value) {
 String formatBeatString() {
     char formatted[14];
     int pos = 0;
-    for (int i = 0; i < 10; i++) {  // ← 10, no 12
+    for (int i = 0; i < 10; i++) {
         byte b = beatsChars_clean[i];
         char c = b & 0x7F;
         if (c == 0 || c < 32) c = ' ';
@@ -271,19 +271,18 @@ String formatBeatString() {
     return (result.length() == 0) ? "---.---.---" : result;
 }
 
-
 // ****************************************************************************
 // Formatear Timecode String  HH:MM:SS:FF
 // ****************************************************************************
 String formatTimecodeString() {
     char formatted[14];
     int pos = 0;
-    for (int i = 0; i < 10; i++) {  // ← 10, no 12
+    for (int i = 0; i < 10; i++) {
         byte b = timeCodeChars_clean[i];
         char c = b & 0x7F;
         if (c == 0 || c < 32) c = ' ';
         formatted[pos++] = c;
-        if (b & 0x80) formatted[pos++] = ':';
+        if (b & 0x80) formatted[pos++] = '.';  // igual que BEATS
     }
     formatted[pos] = '\0';
     String result = String(formatted);
