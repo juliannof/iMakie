@@ -130,6 +130,22 @@ void handleVUMeterDecay() {
 // ****************************************************************************
 
 void updateLeds() {
+    // --- STANDBY: todos los LEDs apagados excepto indicador de página ---
+    if (!isLogicConnected()) {
+        for (int i = 0; i < 32; i++) {
+            trellis.setPixelColor(i, 0x000000); // apagado
+        }
+        // Solo botón de página activo, tenue, para orientar al usuario
+        if (31 < 32) {
+            uint32_t pageColor;
+            if      (currentPage == 1) pageColor = applyBrightness(C_BLUE);
+            else if (currentPage == 2) pageColor = applyBrightness(C_GREEN);
+            else                       pageColor = applyBrightness(C_RED);
+            trellis.setPixelColor(31, pageColor);
+        }
+        trellis.show();
+        return; // ← salir sin procesar estados
+    }
     const byte* colorIndexMap;
     if      (currentPage == 1) colorIndexMap = LED_COLORS_PG1;
     else if (currentPage == 2) colorIndexMap = LED_COLORS_PG2;

@@ -100,7 +100,7 @@ void sendMIDIBytes(const byte* data, size_t len) {
 void processMidiByte(byte b) {
 
     log_v(">> RAW: 0x%02X", b);   // ← línea temporal
-    lastMidiActivityTime = millis(); // ← actualizar en cada byte
+    //lastMidiActivityTime = millis(); // ← actualizar en cada byte
 
 
 
@@ -477,6 +477,48 @@ void processMackieSysEx(byte* payload, int len) {
             break;
         }
 
+        case 0x72: { // VU Meters
+            if (len < 13) break;
+
+            // ✅ Solo los VU mantienen viva la conexión
+            lastMidiActivityTime = millis();
+
+    // --- Detección de cierre: todos los bytes a 0x07 ---
+    if (logicConnectionState == ConnectionState::CONNECTED) {
+        bool allReset = true;
+        for (int i = 0; i < 8; i++) {
+            if (payload[5 + i] != 0x07) { allReset = false; break; }
+        }
+        if (allReset) {
+            logicConnectionState = ConnectionState::DISCONNECTED;
+            needsTOTALRedraw = true;
+            fadersAtMinMask = 0;
+            log_e("[DISCONNECT] VU reset 0x07x8 -> DISCONNECTED.");
+            return;
+        }
+    }
+
+    // --- Procesado normal ---
+    for (int i = 0; i < 8; i++) {
+        byte raw = payload[5 + i];
+        byte channel = raw & 0x0F;   // bits 0-3 = canal
+        byte level   = (raw >> 4);   // bits 4-7 = nivel (0-7)
+        bool clip    = (raw == 0x0F);
+
+        if (channel < 8) {
+            float normalized = level / 7.0f;
+            if (vuLevels[channel] != normalized) {
+                vuLevels[channel] = normalized;
+                vuClipState[channel] = clip;
+                needsVUMetersRedraw = true;
+            }
+        }
+    }
+    break;
+}
+
+        
+
         default:
             break;
     }
@@ -612,4 +654,7 @@ void checkMidiTimeout() {
                   millis() - lastMidiActivityTime);
         }
     }
+}
+bool isLogicConnected() {
+    return (logicConnectionState == ConnectionState::CONNECTED);
 }
