@@ -7,7 +7,7 @@
 // --- Variables "Privadas" de este Módulo ---
 namespace {
     const int TFT_BL_CHANNEL = 0;
-    uint8_t screenBrightness = 255;
+    uint8_t screenBrightness = 0;
 }
 
 
@@ -32,7 +32,7 @@ void initDisplay() {
     tft.setRotation(3);
     tft.fillScreen(TFT_BG_COLOR);
 
-    ledcAttach(TFT_BL, 5000, 8);
+    ledcAttach(TFT_BL, 100, 8);
     setScreenBrightness(screenBrightness);
     ledcWrite(TFT_BL, screenBrightness);
 
@@ -63,7 +63,7 @@ void drawOfflineScreen() {
 
 void drawInitializingScreen() {
     log_v("drawInitializingScreen()");
-    tft.fillScreen(TFT_DARKGREY);
+    tft.fillScreen(TFT_BLUE);
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(TFT_WHITE);
     tft.drawString("MIDI Handshake OK!", tft.width() / 2, tft.height() / 2 - 30);

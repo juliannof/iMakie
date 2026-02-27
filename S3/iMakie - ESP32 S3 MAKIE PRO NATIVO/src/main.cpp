@@ -105,7 +105,7 @@ void setup() {
 
     // Esperar enumeración del host (macOS / Logic necesita este tiempo)
     log_e("Esperando enumeracion USB del host...");
-    delay(3000);
+    delay(2000);
 
     // Inicialización del resto de módulos
     initDisplay();
