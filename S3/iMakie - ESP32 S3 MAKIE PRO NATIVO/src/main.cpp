@@ -81,8 +81,8 @@ void setup() {
     Serial.begin(115200);
     log_e("Iniciando setup...");
 
-    memset(timeCodeChars_dirty, ' ', 12); timeCodeChars_dirty[12] = '\0';
-    memset(beatsChars_dirty,   ' ', 12); beatsChars_dirty[12]   = '\0';
+    //memset(timeCodeChars_dirty, ' ', 12); timeCodeChars_dirty[12] = '\0';
+    //memset(beatsChars_dirty,   ' ', 12); beatsChars_dirty[12]   = '\0';
     memset(timeCodeChars_clean, ' ', 12); timeCodeChars_clean[12] = '\0';
     memset(beatsChars_clean,   ' ', 12); beatsChars_clean[12]   = '\0';
 

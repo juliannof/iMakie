@@ -27,7 +27,7 @@ public:
             cfg.dma_channel = SPI_DMA_CH_AUTO;
             cfg.pin_sclk    = 10;
             cfg.pin_mosi    = 11;
-            cfg.pin_miso    = 4;
+            //cfg.pin_miso    = 4;
             cfg.pin_dc      = 12;
             _bus_instance.config(cfg);
             _panel_instance.setBus(&_bus_instance);
