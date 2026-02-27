@@ -1,20 +1,20 @@
 // src/main.cpp
 #include "config.h"
-#include <USB.h>           // ✅ USB stack nativo S3
-#include <USBMIDI.h>       // ✅ USB MIDI nativo S3
-#include <class/midi/midi_device.h>  // ✅ TinyUSB MIDI para tud_midi_stream_read()
-#include "midi/MIDIProcessor.h" // ✅ NUEVO: para acceso a processMidiByte()
+#include <USB.h>
+#include <USBMIDI.h>
+#include <class/midi/midi_device.h>
+#include "midi/MIDIProcessor.h"
 #include "display/Display.h"
 #include "hardware/Hardware.h"
 
 /* =========================================================
-   USB MIDI - Objeto global (extern accesible desde MIDIProcessor)
+   USB MIDI
    ========================================================= */
 USBMIDI MIDI;
 
 // --- DEFINICIÓN DE OBJETOS Y VARIABLES GLOBALES ---
-TFT_eSPI tft;
-TFT_eSprite header(&tft), mainArea(&tft), vuSprite(&tft);
+LGFX tft;                                               // ← TFT_eSPI → LGFX
+LGFX_Sprite header(&tft), mainArea(&tft), vuSprite(&tft); // ← TFT_eSprite → LGFX_Sprite
 
 Adafruit_NeoTrellis t_array[Y_DIM / 4][X_DIM / 4] = {{ Adafruit_NeoTrellis(0x2F), Adafruit_NeoTrellis(0x2E) }};
 Adafruit_MultiTrellis trellis((Adafruit_NeoTrellis *)t_array, Y_DIM / 4, X_DIM / 4);
@@ -35,7 +35,7 @@ String timeCodeString = "00:00:00:00";
 String beatsString = "  1. 1. 1.  ";
 String assignmentString = "--";
 
-// Posiciones de faders (0.0 a 1.0)
+// Posiciones de faders
 float faderPositions[9] = {0.0f};
 
 // Banderas de redibujo
@@ -72,11 +72,7 @@ int currentPage = 1;
 int currentMasterFader = 0;
 int currentMeterValue = 0;
 
-extern int currentPage;
-extern bool globalShiftPressed;
-extern bool needsMainAreaRedraw;
 
-// Recepción MIDI: polling en el loop con MIDI.available() / MIDI.read()
 
 /* =========================================================
    SETUP
@@ -85,7 +81,6 @@ void setup() {
     Serial.begin(115200);
     log_e("Iniciando setup...");
 
-    // Inicialización de buffers de tiempo
     memset(timeCodeChars_dirty, ' ', 12); timeCodeChars_dirty[12] = '\0';
     memset(beatsChars_dirty,   ' ', 12); beatsChars_dirty[12]   = '\0';
     memset(timeCodeChars_clean, ' ', 12); timeCodeChars_clean[12] = '\0';
@@ -93,27 +88,22 @@ void setup() {
 
     snprintf(tempoString, sizeof(tempoString), "%.2f BPM", projectTempo);
 
-    // ❌ ELIMINADO: initUART();
-
-    // ✅ NUEVO: Inicialización USB MIDI nativo
     log_e("Inicializando USB stack...");
     USB.begin();
     delay(200);
 
     log_e("Inicializando USB MIDI...");
-    MIDI.begin(); // Recepción via polling en loop()
+    MIDI.begin();
 
-    // Esperar enumeración del host (macOS / Logic necesita este tiempo)
     log_e("Esperando enumeracion USB del host...");
     delay(2000);
 
-    // Inicialización del resto de módulos
     initDisplay();
     log_e("initDisplay() completado.");
     initHardware();
     log_e("initHardware() completado.");
-    log_e("PSRAM: %d bytes total, %d bytes libre", 
-      ESP.getPsramSize(), ESP.getFreePsram());
+    log_e("PSRAM: %d bytes total, %d bytes libre",
+          ESP.getPsramSize(), ESP.getFreePsram());
     log_e("Flash: %d bytes", ESP.getFlashChipSize());
 
     log_e("--- V0.1 * Sistema listo. USB MIDI activo. ---");
@@ -123,26 +113,18 @@ void setup() {
    LOOP
    ========================================================= */
 void loop() {
-    
-    //checkMidiTimeout(); // ← sin MIDIProcessor::
-
     static bool wasConnected = false;
 
-    // ✅ Recepción MIDI via TinyUSB directo — stream_read da bytes MIDI crudos
     {
         uint8_t rx_buf[64];
         uint32_t count = tud_midi_stream_read(rx_buf, sizeof(rx_buf));
         if (count > 0) {
-        log_v("[MIDI IN] %d bytes", count); // Solo el resumen, sin logar cada byte
-        for (uint32_t i = 0; i < count; i++) {
-            processMidiByte(rx_buf[i]);
-        }
-        }
-        for (uint32_t i = 0; i < count; i++) {
-            processMidiByte(rx_buf[i]);
+            log_v("[MIDI IN] %d bytes", count);
+            for (uint32_t i = 0; i < count; i++) {
+                processMidiByte(rx_buf[i]);
+            }
         }
     }
-
 
     if (logicConnectionState == ConnectionState::CONNECTED) {
         if (!wasConnected) {

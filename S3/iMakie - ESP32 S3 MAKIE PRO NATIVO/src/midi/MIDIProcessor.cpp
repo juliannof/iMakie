@@ -577,19 +577,6 @@ void processMackieSysEx(byte* payload, int len) {
 
             lastMidiActivityTime = millis();
 
-            if (logicConnectionState == ConnectionState::CONNECTED) {
-                bool allReset = true;
-                for (int i = 0; i < 8; i++) {
-                    if (payload[5 + i] != 0x07) { allReset = false; break; }
-                }
-                if (allReset) {
-                    logicConnectionState = ConnectionState::DISCONNECTED;
-                    needsTOTALRedraw = true;
-                    fadersAtMinMask  = 0;
-                    log_d("[DISCONNECT] VU reset 0x07x8 -> DISCONNECTED.");
-                    return;
-                }
-            }
 
             for (int i = 0; i < 8; i++) {
                 byte raw     = payload[5 + i];

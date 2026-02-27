@@ -6,8 +6,7 @@
 
 // --- Variables "Privadas" de este Módulo ---
 namespace {
-    const int TFT_BL_CHANNEL = 0;
-    uint8_t screenBrightness = 0;
+    uint8_t screenBrightness = 255;
 }
 
 
@@ -28,25 +27,24 @@ void initDisplay() {
     }
 
     tft.init();
-    tft.initDMA();
+    // tft.initDMA() — no existe en LovyanGFX, lo gestiona internamente
     tft.setRotation(3);
     tft.fillScreen(TFT_BG_COLOR);
 
-    ledcAttach(TFT_BL, 100, 8);
+    // Backlight — digitalWrite puro, sin PWM, sin ruido SPI
+    pinMode(TFT_BL, OUTPUT);
     setScreenBrightness(screenBrightness);
-    ledcWrite(TFT_BL, screenBrightness);
 
-    // Un solo sprite reutilizable para MAIN1 y MAIN2
-    mainArea.createSprite(MAIN_AREA_WIDTH, MAIN_AREA_HEIGHT); // 480 × 135
-    header.createSprite(SCREEN_WIDTH, HEADER_HEIGHT);          // 480 × 50
-    vuSprite.createSprite(TRACK_WIDTH, VU_METER_HEIGHT);       // 60  × 135
+    mainArea.createSprite(MAIN_AREA_WIDTH, MAIN_AREA_HEIGHT);
+    header.createSprite(SCREEN_WIDTH, HEADER_HEIGHT);
+    vuSprite.createSprite(TRACK_WIDTH, VU_METER_HEIGHT);
 
     log_i("[SETUP] Módulo de Display iniciado.");
 }
 
 void setScreenBrightness(uint8_t brightness) {
     screenBrightness = brightness;
-    ledcWrite(TFT_BL_CHANNEL, screenBrightness);
+    digitalWrite(TFT_BL, brightness > 0 ? HIGH : LOW);
 }
 
 
@@ -86,7 +84,7 @@ void drawHeaderSprite() {
                          : formatTimecodeString();
 
     header.setTextDatum(MC_DATUM);
-    header.setFreeFont(&FreeMonoBold12pt7b);
+    header.setFont(&fonts::FreeMonoBold12pt7b);   // ← setFreeFont → setFont
     header.setTextSize(1);
     header.setTextColor(currentTimecodeMode == MODE_BEATS ? TFT_CYAN : TFT_ORANGE);
 
@@ -97,7 +95,7 @@ void drawHeaderSprite() {
     header.drawString(displayText.c_str(), SCREEN_WIDTH / 2, HEADER_HEIGHT / 2);
 
     header.setTextDatum(MR_DATUM);
-    header.setFreeFont(&FreeMono9pt7b);
+    header.setFont(&fonts::FreeMono9pt7b);         // ← setFreeFont → setFont
     header.setTextSize(1);
 
     if (currentTimecodeMode == MODE_BEATS) {
@@ -122,7 +120,7 @@ void drawHeaderSprite() {
 // DRAWBUTTON
 // ─────────────────────────────────────────────────────────────────────────────
 
-void drawButton(TFT_eSprite &sprite,
+void drawButton(LGFX_Sprite &sprite,              // ← TFT_eSprite → LGFX_Sprite
                 int x, int y, int w, int h,
                 const char* label, bool active,
                 uint16_t activeColor,
@@ -142,7 +140,8 @@ void drawButton(TFT_eSprite &sprite,
 // VU METERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-void drawMeter(TFT_eSprite &sprite, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+void drawMeter(LGFX_Sprite &sprite,               // ← TFT_eSprite → LGFX_Sprite
+               uint16_t x, uint16_t y, uint16_t w, uint16_t h,
                float level, float peakLevel, bool isClipping) {
     log_v("  drawMeter(): x=%d y=%d w=%d h=%d level=%.3f peak=%.3f clip=%d",
           x, y, w, h, level, peakLevel, isClipping);
@@ -168,32 +167,24 @@ void drawMeter(TFT_eSprite &sprite, uint16_t x, uint16_t y, uint16_t w, uint16_t
         peakSegment_idx = (size_t)-1;
     }
 
-    uint16_t green_off  = VU_GREEN_OFF;
-    uint16_t green_on   = VU_GREEN_ON;
-    uint16_t yellow_off = VU_YELLOW_OFF;
-    uint16_t yellow_on  = VU_YELLOW_ON;
-    uint16_t red_off    = VU_RED_OFF;
-    uint16_t red_on     = VU_RED_ON;
-    uint16_t peak_color = VU_PEAK_COLOR;
-
     for (int i = 0; i < numSegments; i++) {
         uint16_t segY = y + h - (static_cast<uint16_t>(i) + 1) * (segmentHeight + padding);
         uint16_t selectedColor;
 
         if (static_cast<size_t>(i) == peakSegment_idx && peakLevel > level + 0.001f) {
-            selectedColor = peak_color;
+            selectedColor = VU_PEAK_COLOR;
         } else if (static_cast<size_t>(i) < activeSegments) {
-            if      (i < 8)  selectedColor = green_on;
-            else if (i < 10) selectedColor = yellow_on;
-            else             selectedColor = red_on;
+            if      (i < 8)  selectedColor = VU_GREEN_ON;
+            else if (i < 10) selectedColor = VU_YELLOW_ON;
+            else             selectedColor = VU_RED_ON;
         } else {
-            if      (i < 8)  selectedColor = green_off;
-            else if (i < 10) selectedColor = yellow_off;
-            else             selectedColor = red_off;
+            if      (i < 8)  selectedColor = VU_GREEN_OFF;
+            else if (i < 10) selectedColor = VU_YELLOW_OFF;
+            else             selectedColor = VU_RED_OFF;
         }
 
         if (static_cast<size_t>(i) == (size_t)(numSegments - 1) && isClipping) {
-            selectedColor = red_on;
+            selectedColor = VU_RED_ON;
         }
 
         sprite.fillRect(x, segY, w, segmentHeight, selectedColor);
@@ -203,7 +194,7 @@ void drawMeter(TFT_eSprite &sprite, uint16_t x, uint16_t y, uint16_t w, uint16_t
 void drawVUMeters() {
     log_v("drawVUMeters(): 8 canales en Y=%d.", VU_METER_AREA_Y);
 
-    const uint16_t meter_x = (TRACK_WIDTH - 20) / 2; // centrado en sprite de 60px
+    const uint16_t meter_x = (TRACK_WIDTH - 20) / 2;
 
     for (int track = 0; track < 8; track++) {
         vuSprite.fillSprite(TFT_BG_COLOR);
@@ -221,33 +212,27 @@ void drawVUMeters() {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HELPER: atenúa un color RGB565 a ~25%
+// HELPERS DE COLOR
 // ─────────────────────────────────────────────────────────────────────────────
 
 static uint16_t dimColor(uint16_t color) {
     uint8_t r = (color >> 11) & 0x1F;
     uint8_t g = (color >> 5)  & 0x3F;
     uint8_t b =  color        & 0x1F;
-    r = r / 4;
-    g = g / 4;
-    b = b / 4;
-    return (r << 11) | (g << 5) | b;
+    return ((r / 4) << 11) | ((g / 4) << 5) | (b / 4);
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PÁGINAS PG1 y PG2
-// MAIN1 → pads 0-15  (filas 1 y 2) → pushSprite en MAIN1_Y
-// MAIN2 → pads 16-31 (filas 3 y 4) → pushSprite en MAIN2_Y
-// ─────────────────────────────────────────────────────────────────────────────
-
-// 50% — color medio para pads inactivos (visible pero distinguible del activo)
 static uint16_t midColor(uint16_t color) {
     uint8_t r = (color >> 11) & 0x1F;
     uint8_t g = (color >> 5)  & 0x3F;
     uint8_t b =  color        & 0x1F;
     return ((r / 2) << 11) | ((g / 2) << 5) | (b / 2);
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PÁGINAS PG1 y PG2
+// ─────────────────────────────────────────────────────────────────────────────
 
 static void _drawPadsHalf(const char** labels, const byte* colors,
                            int startPad, int endPad) {
@@ -265,8 +250,8 @@ static void _drawPadsHalf(const char** labels, const byte* colors,
         int x = (col  * cellW) + (cellW  - btnSize) / 2;
         int y = (fila * cellH) + (cellH  - btnSize) / 2;
 
-        uint8_t  colorIdx     = (colors[i] < 9) ? colors[i] : 0;
-        uint16_t activeColor  = PALETTE[colorIdx].rgb565;
+        uint8_t  colorIdx      = (colors[i] < 9) ? colors[i] : 0;
+        uint16_t activeColor   = PALETTE[colorIdx].rgb565;
         uint16_t inactiveColor = dimColor(activeColor);
 
         uint16_t txtColor = globalShiftPressed ? TFT_YELLOW : TFT_WHITE;
@@ -310,8 +295,6 @@ void drawPage2() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PÁGINA 3 — Mixer
-// MAIN1 → REC / SOLO / MUTE + nombre de pista  → pushSprite en MAIN1_Y
-// MAIN2 → no se dibuja — VU meters ocupan MAIN2_Y via drawOverlay()
 // ─────────────────────────────────────────────────────────────────────────────
 
 void drawPage3() {
@@ -342,12 +325,12 @@ void drawPage3() {
                             track * TRACK_WIDTH + TRACK_WIDTH / 2, nameY);
     }
 
-    mainArea.pushSprite(0, MAIN1_Y); // solo MAIN1 — MAIN2 queda libre para VU meters
+    mainArea.pushSprite(0, MAIN1_Y);
 }
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OVERLAY — capa sobre mainArea, solo en PG3
+// OVERLAY
 // ─────────────────────────────────────────────────────────────────────────────
 
 void drawOverlay() {
@@ -357,16 +340,15 @@ void drawOverlay() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TABLA DE DESPACHO
-// Añadir página: (1) escribir drawPageN()  (2) añadir línea aquí
 // ─────────────────────────────────────────────────────────────────────────────
 
 typedef void (*PageDrawFn)();
 
 static const PageDrawFn pageDrawTable[] = {
-    nullptr,    // índice 0 — no se usa
-    drawPage1,  // currentPage == 1
-    drawPage2,  // currentPage == 2
-    drawPage3,  // currentPage == 3
+    nullptr,
+    drawPage1,
+    drawPage2,
+    drawPage3,
 };
 
 static const int NUM_PAGES = (sizeof(pageDrawTable) / sizeof(pageDrawTable[0])) - 1;
@@ -374,7 +356,6 @@ static const int NUM_PAGES = (sizeof(pageDrawTable) / sizeof(pageDrawTable[0])) 
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DISPATCHER PRINCIPAL
-// Cada página gestiona sus propios pushSprite internamente
 // ─────────────────────────────────────────────────────────────────────────────
 
 void drawMainArea() {
@@ -402,14 +383,13 @@ void nextPage() {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UPDATE DISPLAY — orquestador principal
+// UPDATE DISPLAY
 // ─────────────────────────────────────────────────────────────────────────────
 
 void updateDisplay() {
     log_v("updateDisplay(): conexión=%d totalRedraw=%d",
           (int)logicConnectionState, needsTOTALRedraw);
 
-    // --- REDIBUJO TOTAL ---
     if (needsTOTALRedraw) {
         if (logicConnectionState == ConnectionState::CONNECTED) {
             needsHeaderRedraw = true;
@@ -428,7 +408,6 @@ void updateDisplay() {
         return;
     }
 
-    // --- REDIBUJO PARCIAL ---
     if (logicConnectionState == ConnectionState::CONNECTED) {
         log_v("updateDisplay(): Header=%d Main=%d VU=%d",
               needsHeaderRedraw, needsMainAreaRedraw, needsVUMetersRedraw);
@@ -440,7 +419,7 @@ void updateDisplay() {
 
         if (needsMainAreaRedraw) {
             drawMainArea();
-            drawOverlay();              // ← siempre encima
+            drawOverlay();
             needsMainAreaRedraw = false;
             needsVUMetersRedraw = false;
         }

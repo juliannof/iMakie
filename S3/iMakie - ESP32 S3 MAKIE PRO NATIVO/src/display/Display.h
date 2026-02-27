@@ -1,7 +1,7 @@
 // src/display/Display.h
 #pragma once
 #include <Arduino.h>
-#include <TFT_eSPI.h>
+#include <LovyanGFX.hpp>        // ← TFT_eSPI.h → LovyanGFX.hpp
 #include "../config.h"
 
 // --- Declaración de banderas globales de redibujo ---
@@ -56,25 +56,14 @@ void nextPage();
 
 /**
  * @brief Dibuja un botón con estado activo/inactivo en un sprite dado.
- *
- * @param sprite       Sprite destino donde se dibuja.
- * @param x            Posición X (esquina superior izquierda).
- * @param y            Posición Y (esquina superior izquierda).
- * @param w            Anchura en píxeles.
- * @param h            Altura en píxeles.
- * @param label        Texto a mostrar en el botón.
- * @param active       true = botón encendido, false = apagado.
- * @param activeColor  Color RGB565 cuando el botón está activo.
- * @param textColor    Color RGB565 del texto.
- * @param inactiveColor Color RGB565 cuando el botón está inactivo (por defecto gris oscuro).
  */
-void drawButton(TFT_eSprite &sprite,
+void drawButton(LGFX_Sprite &sprite,        // ← TFT_eSprite → LGFX_Sprite
                 int x, int y, int w, int h,
                 const char* label,
                 bool active,
                 uint16_t activeColor,
-                uint16_t textColor     = TFT_WHITE,
-                uint16_t inactiveColor = 0x2104);
+                uint16_t textColor      = TFT_WHITE,
+                uint16_t inactiveColor  = 0x2104);
 
 /**
  * @brief Dibuja todos los vúmetros en el área dedicada.
@@ -84,13 +73,11 @@ void drawVUMeters();
 /**
  * @brief Dibuja un único vúmetro con nivel instantáneo y de pico.
  */
-void drawMeter(TFT_eSprite &sprite,
+void drawMeter(LGFX_Sprite &sprite,         // ← TFT_eSprite → LGFX_Sprite
                uint16_t x, uint16_t y, uint16_t w, uint16_t h,
                float level, float peakLevel, bool isClipping);
 
 /**
  * @brief Gestiona la lógica de sincronización del display de tiempo.
- *        Copia los datos de los buffers "sucios" a los "limpios" si se ha
- *        actualizado la información y ha pasado el tiempo de espera.
  */
 void handleDisplaySynchronization();
