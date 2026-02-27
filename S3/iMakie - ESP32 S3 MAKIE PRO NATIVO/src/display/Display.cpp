@@ -55,6 +55,7 @@ void setScreenBrightness(uint8_t brightness) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 void drawOfflineScreen() {
+    tft.fillScreen(TFT_BLACK);
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(TFT_DARKGREY);
     tft.drawString("iMakie Control", tft.width() / 2, tft.height() / 2);

@@ -112,6 +112,9 @@ void setup() {
     log_e("initDisplay() completado.");
     initHardware();
     log_e("initHardware() completado.");
+    log_e("PSRAM: %d bytes total, %d bytes libre", 
+      ESP.getPsramSize(), ESP.getFreePsram());
+    log_e("Flash: %d bytes", ESP.getFlashChipSize());
 
     log_e("--- Sistema listo. Pico eliminada. USB MIDI activo. ---");
 }
@@ -120,6 +123,9 @@ void setup() {
    LOOP
    ========================================================= */
 void loop() {
+    
+    checkMidiTimeout(); // ← sin MIDIProcessor::
+
     static bool wasConnected = false;
 
     // ✅ Recepción MIDI via TinyUSB directo — stream_read da bytes MIDI crudos

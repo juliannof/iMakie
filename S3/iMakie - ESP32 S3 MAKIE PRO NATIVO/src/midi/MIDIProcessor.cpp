@@ -28,7 +28,14 @@ namespace {
     int challenge_idx = 0;
 
     static uint16_t fadersAtMinMask = 0;
+    static unsigned long firstFaderMinTime = 0;
     static const uint16_t ALL_FADERS_MIN_MASK = 0x01FF; // bits 0-8
+    static unsigned long lastMidiActivityTime = 0;
+    
+    static const unsigned long MIDI_TIMEOUT_MS = 8000; // 3 segundos sin MIDI = desconectado
+    static const int DISCONNECT_THRESHOLD = 9;           // 7 de 9 es suficiente
+    static const unsigned long DISCONNECT_WINDOW_MS = 150; // ventana de 300ms
+
     unsigned long lastVersionReplyTime = 0;
     const unsigned long VERSION_REPLY_COOLDOWN_MS = 200; // reducido: Logic reintenta rápido durante init
 }
@@ -93,6 +100,8 @@ void sendMIDIBytes(const byte* data, size_t len) {
 void processMidiByte(byte b) {
 
     log_v(">> RAW: 0x%02X", b);   // ← línea temporal
+    lastMidiActivityTime = millis(); // ← actualizar en cada byte
+
 
 
     if (b >= 0xF8) return; // RealTime
@@ -375,7 +384,10 @@ void processMackieSysEx(byte* payload, int len) {
         // Si ya estamos CONNECTED: solo confirmamos con 02 (ya online).
         // Enviar 01 de nuevo provocaría que Logic repitiese el ciclo completo.
         if (logicConnectionState == ConnectionState::CONNECTED) {
-            log_i("[HANDSHAKE] Re-query en CONNECTED. Solo 02.");
+            log_i("[HANDSHAKE] Re-query en CONNECTED. Resetando máscara y timeout.");
+            fadersAtMinMask  = 0;       // ← cancela falso disconnect
+            firstFaderMinTime = 0;
+            lastMidiActivityTime = millis(); // ← cancela falso timeout
             byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x02, 0xF7};
             sendMIDIBytes(online_msg, sizeof(online_msg));
             return;
@@ -543,23 +555,39 @@ void processPitchBend(byte channel, int bendValue) {
 
     // --- Detección de desconexión ---
     if (bendValue == -8192) {
-        fadersAtMinMask |= (1 << channel);
-        if (fadersAtMinMask == ALL_FADERS_MIN_MASK &&
-            logicConnectionState == ConnectionState::CONNECTED) {
-            logicConnectionState = ConnectionState::DISCONNECTED;
-            needsTOTALRedraw = true;
-            fadersAtMinMask = 0;
-            log_e("[DISCONNECT] Todos los faders en -8192 -> DISCONNECTED.");
-            return;
+        if (logicConnectionState == ConnectionState::CONNECTED) {
+            unsigned long now = millis();
+
+            if (fadersAtMinMask == 0) firstFaderMinTime = now;
+
+            fadersAtMinMask |= (1 << channel);
+            int bitsSet = __builtin_popcount(fadersAtMinMask);
+
+            if (bitsSet >= DISCONNECT_THRESHOLD && 
+                (now - firstFaderMinTime) <= DISCONNECT_WINDOW_MS) {
+                unsigned long elapsed = now - firstFaderMinTime; // ✅ ANTES de resetear
+                logicConnectionState = ConnectionState::DISCONNECTED;
+                needsTOTALRedraw = true;
+                fadersAtMinMask = 0;
+                firstFaderMinTime = 0;
+                log_e("[DISCONNECT] %d faders en -8192 en %lums -> DISCONNECTED.", bitsSet, elapsed);
+                return;
+            }
+
+            if ((now - firstFaderMinTime) > DISCONNECT_WINDOW_MS) {
+                fadersAtMinMask = (1 << channel);
+                firstFaderMinTime = now;
+            }
         }
     } else {
-        fadersAtMinMask &= ~(1 << channel); // movimiento real → limpia el bit
+        fadersAtMinMask &= ~(1 << channel);
     }
 
     // --- Transición HANDSHAKE_COMPLETE → CONNECTED ---
     if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) {
         logicConnectionState = ConnectionState::CONNECTED;
         needsTOTALRedraw = true;
+        fadersAtMinMask = 0;
         log_e("DAW conectado: Primer PitchBend Track %d -> CONNECTED.", channel + 1);
     }
 
@@ -569,6 +597,19 @@ void processPitchBend(byte channel, int bendValue) {
         if (abs(faderPositions[channel] - faderPositionNormalized) > 0.001f) {
             faderPositions[channel] = faderPositionNormalized;
             needsMainAreaRedraw = true;
+        }
+    }
+}
+
+// Función pública para llamar desde loop():
+void checkMidiTimeout() {
+    if (logicConnectionState == ConnectionState::CONNECTED) {
+        if (millis() - lastMidiActivityTime > MIDI_TIMEOUT_MS) {
+            logicConnectionState = ConnectionState::DISCONNECTED;
+            needsTOTALRedraw = true;
+            fadersAtMinMask = 0;
+            log_e("[TIMEOUT] Sin MIDI por %lums -> DISCONNECTED.", 
+                  millis() - lastMidiActivityTime);
         }
     }
 }
