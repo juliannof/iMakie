@@ -7,7 +7,7 @@
 
 // --- VARIABLES "PRIVADAS" DE ESTE MÓDULO ---
 namespace {
-    uint8_t trellisBrightness = 8; // Valor de brillo por defecto
+    uint8_t trellisBrightness = 30; // Valor de brillo por defecto
     const uint32_t baseColors[4] = {0xFF0000, 0xFFFF00, 0xFF0000, 0xFFFFFF};
 }
 

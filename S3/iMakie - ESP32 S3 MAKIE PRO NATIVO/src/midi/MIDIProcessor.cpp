@@ -14,7 +14,7 @@ extern bool btnStatePG2[32];
 
 // --- Variables internas del parser MIDI ---
 namespace {
-    byte midi_buffer[256];
+    byte midi_buffer[512];
     int midi_idx = 0;
     bool in_sysex = false;
     byte last_status_byte = 0;
@@ -124,7 +124,7 @@ void sendMIDIBytes(const byte* data, size_t len) {
                 MIDI.controlChange(byte1, byte2, channel);
                 break;
             default:
-                log_e("[MIDI OUT] Mensaje no soportado: 0x%02X", status);
+                log_d("[MIDI OUT] Mensaje no soportado: 0x%02X", status);
                 break;
         }
     }
@@ -135,111 +135,146 @@ void sendMIDIBytes(const byte* data, size_t len) {
 // ****************************************************************************
 
 void processMidiByte(byte b) {
-    log_v(">> RAW: 0x%02X", b);
-
-    if (b >= 0xF8) return; // RealTime
-
-    if (in_sysex && (b & 0x80) && b != 0xF7) {
-        log_w("¡SysEx interrumpido! Recibido Status 0x%02X dentro de SysEx. Reseteando.", b);
-        in_sysex = false;
-        midi_idx = 0;
-        // ✅ Cancelar handshake si estaba pescando bytes
-        if (handshakeState == HandshakeState::AWAITING_CHALLENGE_BYTES) {
-            handshakeState = HandshakeState::IDLE;
-            challenge_idx = 0;
-            log_w("[HANDSHAKE] Cancelado por interrupción SysEx.");
-        }
+    // 1. FILTRAR REALTIME (Clock, Start, Stop, Reset) - No afectan al estado
+    if (b >= 0xF8) {
+        // handleRealTime(b); // Descomenta si necesitas procesar Clocks
+        return; 
     }
 
-    // ----- LÓGICA DE HANDSHAKE -----
-    if (handshakeState == HandshakeState::AWAITING_CHALLENGE_BYTES) {
-        if (b < 0x80) {
-            if (challenge_idx < 7) {
+    // 2. PROCESAR STATUS BYTES (>= 0x80)
+    if (b & 0x80) {
+        // A. Inicio de SysEx
+        if (b == 0xF0) {
+            if (in_sysex) {
+                log_w("processMidiByte: 0xF0 recibido dentro de otro SysEx (Re-inicio).");
+            }
+            in_sysex = true;
+            midi_idx = 0; // Reiniciamos índice para empezar a grabar
+            return;
+        }
+
+        // B. Fin de SysEx
+        if (b == 0xF7) {
+            if (in_sysex) {
+                in_sysex = false;
+                // Procesamos el SysEx acumulado
+                processMackieSysEx(midi_buffer, midi_idx);
+            } else {
+                log_w("processMidiByte: 0xF7 recibido sin SysEx activo. Ignorando.");
+            }
+            return;
+        }
+
+        // C. Status Byte Estándar (NoteOn, CC, PitchBend, etc.)
+        // Si estábamos en SysEx, este byte lo interrumpe y lo cancela.
+        if (in_sysex) {
+            log_w("¡SysEx interrumpido! Recibido Status 0x%02X. Cancelando SysEx actual.", b);
+            in_sysex = false;
+            // Opcional: limpiar handshake si es necesario
+            if (handshakeState == HandshakeState::AWAITING_CHALLENGE_BYTES) {
+                handshakeState = HandshakeState::IDLE;
+            }
+        }
+
+        // Guardamos el Status para Running Status y reiniciamos contador de mensaje corto
+        last_status_byte = b;
+        midi_idx = 0; 
+        return;
+    }
+
+    // 3. PROCESAR DATA BYTES (< 0x80)
+    
+    // CASO A: Estamos dentro de un SysEx
+    if (in_sysex) {
+        // Lógica especial de Handshake (solo si realmente lo necesitas aquí)
+        /* 
+        NOTA: Lo ideal es manejar el handshake dentro de processMackieSysEx. 
+        Si lo mantienes aquí, asegúrate de que no robe bytes del buffer normal.
+        */
+        if (handshakeState == HandshakeState::AWAITING_CHALLENGE_BYTES) {
+             if (challenge_idx < 7) {
                 challenge_buffer[challenge_idx++] = b;
                 if (challenge_idx == 7) {
-                    log_i("[HANDSHAKE] ¡7 bytes pescados! Completando handshake.");
+                    log_i("[HANDSHAKE] Completado en stream.");
                     handleMcuHandshake(challenge_buffer);
                     handshakeState = HandshakeState::IDLE;
                 }
-            } else {
-                log_e("[HANDSHAKE] challenge_idx fuera de límites (%d). Byte 0x%02X.", challenge_idx, b);
-            }
-            return; // solo consume data bytes
+             }
+             // OJO: ¿Quieres que el byte también vaya al buffer normal? 
+             // Mackie suele enviar el handshake DENTRO del sysex. 
+             // Lo guardamos en midi_buffer también por si acaso.
         }
-        // b >= 0x80: cae al procesamiento normal SIN cancelar handshakeState
-    }
 
-    // ----- LÓGICA MIDI NORMAL -----
-    if (b == 0xF0) {
-        in_sysex = true;
-        midi_idx = 0;
-        return;
-    }
-    if (b == 0xF7) {
-        if (in_sysex) {
-            in_sysex = false;
-            processMackieSysEx(midi_buffer, midi_idx);
-        } else {
-            log_w("processMidiByte: 0xF7 sin SysEx activo. Ignorando.");
-        }
-        return;
-    }
-    if (in_sysex) {
+        // Guardar en buffer SysEx
         if (midi_idx < sizeof(midi_buffer)) {
             midi_buffer[midi_idx++] = b;
         } else {
-            log_v("processMidiByte: Buffer SysEx desbordado. Descartando.");
-            in_sysex = false;
-            midi_idx = 0;
+            // CRÍTICO: Si se llena, SOLO dejamos de grabar, pero 
+            // NO ponemos in_sysex = false. Esperamos al F7.
+            static bool overflowWarned = false;
+            if (!overflowWarned) {
+                log_d("processMidiByte: Buffer SysEx LLENO (%d bytes). Ignorando resto de datos hasta F7.", sizeof(midi_buffer));
+                overflowWarned = true;
+            }
+            // Resetear overflowWarned cuando llegue F7 o F0
         }
         return;
     }
 
-    // --- Mensajes de canal ---
-    if (b & 0x80) {
-        last_status_byte = b;
-        midi_idx = 0;
-    } else if (last_status_byte != 0) {
-        if (midi_idx >= sizeof(midi_buffer)) {
-            log_e("processMidiByte: midi_buffer desbordado. Descartando.");
-            midi_idx = 0;
-            last_status_byte = 0;
-            return;
-        }
+    // CASO B: Datos de Mensajes de Canal (Notes, CC, etc.)
+    if (last_status_byte != 0) {
+        // Usamos un buffer temporal pequeño o reutilizamos el inicio de midi_buffer
+        // Nota: Reutilizar midi_buffer para mensajes cortos está bien si msg_idx es bajo.
+        
+        // Protección contra desbordamiento de mensajes cortos (raro, pero posible)
+        if (midi_idx >= 250) midi_idx = 0; 
+
         midi_buffer[midi_idx++] = b;
+        
         byte cmd_type = last_status_byte & 0xF0;
+        int msg_len_expected = 0;
 
-        int msg_len_expected;
-        if (cmd_type == 0xC0 || cmd_type == 0xD0) {
-            msg_len_expected = 2;
-        } else if (cmd_type == 0x80 || cmd_type == 0x90 || cmd_type == 0xB0 || cmd_type == 0xE0) {
-            msg_len_expected = 3;
-        } else {
-            log_w("processMidiByte: Tipo de comando 0x%02X no reconocido.", cmd_type);
-            midi_idx = 0;
-            last_status_byte = 0;
-            return;
+        // Definir longitud esperada de DATOS (sin contar el status)
+        switch (cmd_type) {
+            case 0xC0: case 0xD0: msg_len_expected = 1; break; // Program Change, Channel Pressure
+            case 0xF0: msg_len_expected = 0; break; // No debería llegar aquí
+            default:   msg_len_expected = 2; break; // NoteOn, NoteOff, CC, PitchBend (status + 2 bytes data)
         }
 
-        if (midi_idx == (msg_len_expected - 1)) {
-            if (cmd_type == 0x90 || cmd_type == 0x80) {
-                processNote(last_status_byte, midi_buffer[0], midi_buffer[1]);
-            } else if (cmd_type == 0xD0) {
-                processChannelPressure(last_status_byte & 0x0F, midi_buffer[0]);
-            } else if (cmd_type == 0xB0) {
-                processControlChange(last_status_byte & 0x0F, midi_buffer[0], midi_buffer[1]);
-            } else if (cmd_type == 0xE0) {
-                int bendValue = (midi_buffer[1] << 7) | midi_buffer[0];
-                processPitchBend(last_status_byte & 0x0F, bendValue);
+        // Verificamos si tenemos la longitud completa
+        if (midi_idx == msg_len_expected) {
+            byte data1 = midi_buffer[0];
+            byte data2 = (msg_len_expected > 1) ? midi_buffer[1] : 0;
+
+            switch (cmd_type) {
+                case 0x90: 
+                case 0x80: 
+                    processNote(last_status_byte, data1, data2); 
+                    break;
+                case 0xD0: 
+                    processChannelPressure(last_status_byte & 0x0F, data1); 
+                    break;
+                case 0xB0: 
+                    processControlChange(last_status_byte & 0x0F, data1, data2); 
+                    break;
+                case 0xE0: 
+                    {
+                        int bendValue = (data2 << 7) | data1;
+                        processPitchBend(last_status_byte & 0x0F, bendValue);
+                    }
+                    break;
+                default:
+                    // Otros tipos ignorados o implementados después
+                    break;
             }
-            midi_idx = 0;
-        } else if (midi_idx >= msg_len_expected) {
-            log_v("processMidiByte: Mensaje malformado. Descartando.");
-            midi_idx = 0;
-            last_status_byte = 0;
+            
+            // Reiniciamos índice para el siguiente mensaje (Running Status)
+            // Si el siguiente byte es Data, se llenará midi_buffer[0] otra vez.
+            midi_idx = 0; 
         }
     } else {
-        log_w("processMidiByte: Data Byte huérfano (0x%02X). Ignorando.", b);
+        // Data byte recibido sin Status previo y sin estar en SysEx
+        log_v("processMidiByte: Huérfano real (0x%02X). Ignorando.", b);
     }
 }
 
@@ -255,7 +290,7 @@ void handleMcuHandshake(byte* challenge_code) {
                           challenge_code[3], challenge_code[4], challenge_code[5],
                           challenge_code[6], 0xF7 };
     sendMIDIBytes(response, sizeof(response));  // ✅ sendMIDIBytes, no sendToPico
-    log_e(">>> MCU Handshake: Respuesta enviada (15 bytes).");
+    log_d(">>> MCU Handshake: Respuesta enviada (15 bytes).");
 
     byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x02, 0xF7};
     sendMIDIBytes(online_msg, sizeof(online_msg));  // ✅
@@ -268,7 +303,7 @@ void handleMcuHandshake(byte* challenge_code) {
         if (previousState == ConnectionState::DISCONNECTED ||
             previousState == ConnectionState::AWAITING_SESSION) {
             needsTOTALRedraw = true;
-            log_i("Handshake completado. -> MIDI_HANDSHAKE_COMPLETE.");
+            log_d("Handshake completado. -> MIDI_HANDSHAKE_COMPLETE.");
         }
     }
 }
@@ -281,7 +316,7 @@ void processControlChange(byte channel, byte controller, byte value) {
     log_d("CC CH=%d, CC=%d, Val=0x%02X", channel, controller, value);
 
     if ((channel != 0 && channel != 15) || (controller < 64 || controller > 73)) {
-        log_w("CC ignorado. CH=%d, CC=%d", channel, controller);
+        log_d("CC ignorado. CH=%d, CC=%d", channel, controller);
         return;
     }
 
@@ -437,7 +472,7 @@ void processMackieSysEx(byte* payload, int len) {
         sendMIDIBytes(response, sizeof(response));
         handshakeState = HandshakeState::AWAITING_CHALLENGE_BYTES;
         challenge_idx  = 0;
-        log_e("[HANDSHAKE] Challenge enviado: 0x%02X 0x%02X 0x%02X 0x%02X", l1, l2, l3, l4);
+        log_d("[HANDSHAKE] Challenge enviado: 0x%02X 0x%02X 0x%02X 0x%02X", l1, l2, l3, l4);
         return;
     }
 
@@ -463,11 +498,11 @@ void processMackieSysEx(byte* payload, int len) {
             byte gr3 = payload[9];
             byte gr4 = payload[10];
 
-            log_e("[HANDSHAKE] Esperado:  0x%02X 0x%02X 0x%02X 0x%02X", r1, r2, r3, r4);
-            log_e("[HANDSHAKE] Recibido:  0x%02X 0x%02X 0x%02X 0x%02X", gr1, gr2, gr3, gr4);
+            log_d("[HANDSHAKE] Esperado:  0x%02X 0x%02X 0x%02X 0x%02X", r1, r2, r3, r4);
+            log_d("[HANDSHAKE] Recibido:  0x%02X 0x%02X 0x%02X 0x%02X", gr1, gr2, gr3, gr4);
 
             if (gr1 == r1 && gr2 == r2 && gr3 == r3 && gr4 == r4) {
-                log_e("[HANDSHAKE] ✅ Verificación correcta.");
+                log_d("[HANDSHAKE] ✅ Verificación correcta.");
             } else {
                 log_w("[HANDSHAKE] ⚠️ Verificación incorrecta — aceptando igualmente.");
             }
@@ -477,7 +512,7 @@ void processMackieSysEx(byte* payload, int len) {
             handshakeState       = HandshakeState::IDLE;
             logicConnectionState = ConnectionState::MIDI_HANDSHAKE_COMPLETE;
             needsTOTALRedraw     = true;
-            log_e("[HANDSHAKE] Handshake completado. -> MIDI_HANDSHAKE_COMPLETE.");
+            log_d("[HANDSHAKE] Handshake completado. -> MIDI_HANDSHAKE_COMPLETE.");
             break;
         }
 
@@ -551,7 +586,7 @@ void processMackieSysEx(byte* payload, int len) {
                     logicConnectionState = ConnectionState::DISCONNECTED;
                     needsTOTALRedraw = true;
                     fadersAtMinMask  = 0;
-                    log_e("[DISCONNECT] VU reset 0x07x8 -> DISCONNECTED.");
+                    log_d("[DISCONNECT] VU reset 0x07x8 -> DISCONNECTED.");
                     return;
                 }
             }
@@ -672,7 +707,7 @@ void processPitchBend(byte channel, int bendValue) {
                 needsTOTALRedraw = true;
                 fadersAtMinMask = 0;
                 firstFaderMinTime = 0;
-                log_e("[DISCONNECT] %d faders en -8192 en %lums -> DISCONNECTED.", bitsSet, elapsed);
+                log_d("[DISCONNECT] %d faders en -8192 en %lums -> DISCONNECTED.", bitsSet, elapsed);
                 return;
             }
 
@@ -690,7 +725,7 @@ void processPitchBend(byte channel, int bendValue) {
         logicConnectionState = ConnectionState::CONNECTED;
         needsTOTALRedraw = true;
         fadersAtMinMask = 0;
-        log_e("DAW conectado: Primer PitchBend Track %d -> CONNECTED.", channel + 1);
+        log_d("DAW conectado: Primer PitchBend Track %d -> CONNECTED.", channel + 1);
     }
 
     // --- Actualizar posición del fader ---
@@ -710,7 +745,7 @@ void checkMidiTimeout() {
             logicConnectionState = ConnectionState::DISCONNECTED;
             needsTOTALRedraw = true;
             fadersAtMinMask = 0;
-            log_e("[TIMEOUT] Sin MIDI por %lums -> DISCONNECTED.", 
+            log_d("[TIMEOUT] Sin MIDI por %lums -> DISCONNECTED.", 
                   millis() - lastMidiActivityTime);
         }
     }

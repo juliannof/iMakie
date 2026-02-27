@@ -124,7 +124,7 @@ void setup() {
    ========================================================= */
 void loop() {
     
-    checkMidiTimeout(); // ← sin MIDIProcessor::
+    //checkMidiTimeout(); // ← sin MIDIProcessor::
 
     static bool wasConnected = false;
 
