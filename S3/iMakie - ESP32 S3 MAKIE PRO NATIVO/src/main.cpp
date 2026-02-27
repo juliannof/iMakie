@@ -106,6 +106,12 @@ void setup() {
           ESP.getPsramSize(), ESP.getFreePsram());
     log_e("Flash: %d bytes", ESP.getFlashChipSize());
 
+    // Test DMA — fillScreen debería ser instantáneo si DMA funciona
+    unsigned long t = millis();
+    for (int i = 0; i < 10; i++) tft.fillScreen(TFT_BLACK);
+    unsigned long elapsed = millis() - t;
+    log_i("[DMA] 10x fillScreen en %lu ms — %.1f ms/frame", elapsed, elapsed / 10.0f);
+
     log_e("--- V0.1 * Sistema listo. USB MIDI activo. ---");
 }
 

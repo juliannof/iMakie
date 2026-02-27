@@ -39,6 +39,9 @@ void initDisplay() {
     header.createSprite(SCREEN_WIDTH, HEADER_HEIGHT);
     vuSprite.createSprite(TRACK_WIDTH, VU_METER_HEIGHT);
 
+    log_i("[DMA] PSRAM: %s", psramFound() ? "SI" : "NO");
+    log_i("[DMA] DMA channel: %d", SPI_DMA_CH_AUTO);
+    log_i("[DMA] Display: %dx%d", tft.width(), tft.height());
     log_i("[SETUP] Módulo de Display iniciado.");
 }
 
