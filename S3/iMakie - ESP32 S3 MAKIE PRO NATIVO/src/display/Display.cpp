@@ -85,8 +85,9 @@ void drawHeaderSprite() {
 
     header.setTextDatum(MC_DATUM);
     header.setFont(&fonts::FreeMonoBold12pt7b);   // ← setFreeFont → setFont
+    // header.setFont(&fonts::Font7);   // 7 segmentos — 48px, solo 1234567890:-.
     header.setTextSize(1);
-    header.setTextColor(currentTimecodeMode == MODE_BEATS ? TFT_CYAN : TFT_ORANGE);
+    header.setTextColor(currentTimecodeMode == MODE_BEATS ? TFT_WHITE : TFT_CYAN);
 
     log_d("drawHeaderSprite: %s: '%s'",
           (currentTimecodeMode == MODE_BEATS) ? "BEATS" : "TIMECODE",
@@ -99,10 +100,10 @@ void drawHeaderSprite() {
     header.setTextSize(1);
 
     if (currentTimecodeMode == MODE_BEATS) {
-        header.setTextColor(TFT_GREEN);
+        header.setTextColor(TFT_WHITE);
         header.drawString("BEATS", SCREEN_WIDTH - 10, HEADER_HEIGHT / 2);
     } else {
-        header.setTextColor(TFT_YELLOW);
+        header.setTextColor(TFT_CYAN);
         header.drawString("SMPTE", SCREEN_WIDTH - 10, HEADER_HEIGHT / 2);
     }
 

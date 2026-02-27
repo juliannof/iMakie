@@ -7,8 +7,7 @@
 
 // --- VARIABLES "PRIVADAS" DE ESTE MÓDULO ---
 namespace {
-    uint8_t trellisBrightness = 30; // Valor de brillo por defecto
-    const uint32_t baseColors[4] = {0xFF0000, 0xFFFF00, 0xFF0000, 0xFFFFFF};
+    uint8_t trellisBrightness = 10; // Valor de brillo por defecto
 }
 
 // --- PROTOTIPO DE LA FUNCIÓN DE CALLBACK (necesario porque initHardware la usa) ---

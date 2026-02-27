@@ -253,14 +253,15 @@ static const PaletteEntry PALETTE[9] = {
 static const byte LED_COLORS_PG1[32] = {
     5, 5, 5, 5, 5, 5, 6, 6,
     2, 6, 4, 8, 8, 2, 2, 2,
-    3, 3, 3, 3, 4, 4, 4, 4,
+    //3, 3, 3, 3, 4, 4, 4, 4,
+    4, 4, 4, 4, 3, 3, 3, 3,
     6, 2, 7, 7, 7, 7, 2, 1
 };
 
 static const byte LED_COLORS_PG2[32] = {
-    3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 4, 4, 4, 4,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    4, 4, 4, 4, 3, 3, 3, 3,
     6, 2, 7, 7, 7, 7, 2, 2
 };
 
@@ -268,7 +269,7 @@ static const byte LED_COLORS_PG3[32] = {
     0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,
-    6, 2, 7, 7, 7, 7, 2, 2
+    0, 0, 0, 0, 0, 0, 0, 2
 };
 
 
@@ -279,28 +280,30 @@ static const byte LED_COLORS_PG3[32] = {
 static const char* labels_PG1[32] = {
     "TRACK", "PAN",   "EQ",    "SEND",  "PLUG",  "INST",  "FLIP",  "GLOB",
     "READ",  "WRIT",  "TCH",   "LTCH",  "TRIM",  "OFF",   "SOLO0", "SMPT",
-    "BANK<", "BANK>", "CHAN<", "CHAN>",  "ZOOM",  "SCRUB", "NUDGE", "MARK",
+    //"BANK<", "BANK>", "CHAN<", "CHAN>",  "ZOOM",  "SCRUB", "NUDGE", "MARK",
+    "ZOOM",  "SCRUB", "NUDGE", "MARK", "CHAN<", "CHAN>", "BANK<", "BANK>",
     "UNDO",  "SAVE",  "SHIFT", "CTRL",  "OPT",   "CMD",   "ENTER", ">>PG2"
 };
 
 static const byte MIDI_NOTES_PG1[32] = {
     0x28, 0x2A, 0x2C, 0x29, 0x2B, 0x2D, 0x32, 0x33,
     0x4A, 0x4B, 0x4D, 0x4E, 0x4C, 0x4F, 0x57, 0x35,
-    0x2E, 0x2F, 0x30, 0x31, 0x64, 0x65, 0x66, 0x54,
+    //0x2E, 0x2F, 0x30, 0x31, 0x64, 0x65, 0x66, 0x54,
+    0x64, 0x65, 0x66, 0x54, 0x30, 0x31, 0x2E, 0x2F, 
     0x51, 0x50, 0x46, 0x47, 0x48, 0x49, 0x53, 0x00
 };
 
 static const char* labels_PG2[32] = {
     "F1",    "F2",    "F3",    "F4",    "F5",    "F6",    "F7",    "F8",
     "F9",    "F10",   "F11",   "F12",   "F13",   "F14",   "F15",   "F16",
-    "BANK<", "BANK>", "CHAN<", "CHAN>",  "ZOOM",  "SCRUB", "NUDGE", "MARK",
+    "ZOOM",  "SCRUB", "NUDGE", "MARK", "CHAN<", "CHAN>", "BANK<", "BANK>",
     "UNDO",  "SAVE",  "SHIFT", "CTRL",  "OPT",   "CMD",   "ENTER", ">>VU"
 };
 
 static const byte MIDI_NOTES_PG2[32] = {
     0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D,
     0x3E, 0x3F, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45,
-    0x2E, 0x2F, 0x30, 0x31, 0x64, 0x65, 0x66, 0x54,
+    0x64, 0x65, 0x66, 0x54, 0x30, 0x31, 0x2E, 0x2F,
     0x4C, 0x50, 0x46, 0x47, 0x48, 0x49, 0x52, 0x00
 };
 

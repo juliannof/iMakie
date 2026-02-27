@@ -339,19 +339,23 @@ void processControlChange(byte channel, byte controller, byte value) {
 // Formatear Beat String  BAR.BEAT.SUB.TICK
 // ****************************************************************************
 String formatBeatString() {
-    char formatted[14];
+    char formatted[24];
     int pos = 0;
+
     for (int i = 0; i < 10; i++) {
         byte b = beatsChars_clean[i];
         char c = b & 0x7F;
-        if (c == 0 || c < 32) c = ' ';
+        if (c < 32) c = ' ';
         formatted[pos++] = c;
-        if (b & 0x80) formatted[pos++] = '.';
+
+        // Separadores en posiciones fijas Mackie: 2, 4, 6
+        if (i == 2 || i == 4 || i == 6) formatted[pos++] = '.';
     }
     formatted[pos] = '\0';
+
     String result = String(formatted);
     result.trim();
-    return (result.length() == 0) ? "---.---.---" : result;
+    return (result.length() == 0) ? "---.---.---.---" : result;
 }
 
 // ****************************************************************************
@@ -363,9 +367,10 @@ String formatTimecodeString() {
     for (int i = 0; i < 10; i++) {
         byte b = timeCodeChars_clean[i];
         char c = b & 0x7F;
-        if (c == 0 || c < 32) c = ' ';
+        if (c == 0 || c < 32) c = ':';
+        if (c == ';') c = ':';          // ← Logic manda ; entre segundos y frames
         formatted[pos++] = c;
-        if (b & 0x80) formatted[pos++] = '.';  // igual que BEATS
+        if (b & 0x80) formatted[pos++] = ':';  // igual que BEATS
     }
     formatted[pos] = '\0';
     String result = String(formatted);
