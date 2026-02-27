@@ -672,7 +672,7 @@ void processNote(byte status, byte note, byte velocity) {
 
     if (stateChanged) {
         needsMainAreaRedraw = true;
-        updateLeds();
+        //updateLeds();
     }
 }
 

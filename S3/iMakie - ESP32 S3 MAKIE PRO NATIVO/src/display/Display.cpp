@@ -424,6 +424,7 @@ void updateDisplay() {
         if (needsMainAreaRedraw) {
             drawMainArea();
             drawOverlay();
+            //updateLeds();
             needsMainAreaRedraw = false;
             needsVUMetersRedraw = false;
         }

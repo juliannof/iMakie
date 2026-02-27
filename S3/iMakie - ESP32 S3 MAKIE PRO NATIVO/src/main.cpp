@@ -13,8 +13,8 @@
 USBMIDI MIDI;
 
 // --- DEFINICIÓN DE OBJETOS Y VARIABLES GLOBALES ---
-LGFX tft;                                               // ← TFT_eSPI → LGFX
-LGFX_Sprite header(&tft), mainArea(&tft), vuSprite(&tft); // ← TFT_eSprite → LGFX_Sprite
+LGFX tft;
+LGFX_Sprite header(&tft), mainArea(&tft), vuSprite(&tft);
 
 Adafruit_NeoTrellis t_array[Y_DIM / 4][X_DIM / 4] = {{ Adafruit_NeoTrellis(0x2F), Adafruit_NeoTrellis(0x2E) }};
 Adafruit_MultiTrellis trellis((Adafruit_NeoTrellis *)t_array, Y_DIM / 4, X_DIM / 4);
@@ -72,7 +72,58 @@ int currentPage = 1;
 int currentMasterFader = 0;
 int currentMeterValue = 0;
 
+// Handles de tareas dual core
+TaskHandle_t taskCore0Handle = NULL;
+TaskHandle_t taskCore1Handle = NULL;
 
+/* =========================================================
+   TAREA CORE 0 — MIDI (tiempo real)
+   ========================================================= */
+void taskCore0(void* pvParameters) {
+    log_e("MIDI task arrancando en Core %d", xPortGetCoreID());
+    for (;;) {
+        uint8_t rx_buf[64];
+        uint32_t count = tud_midi_stream_read(rx_buf, sizeof(rx_buf));
+        if (count > 0) {
+            log_v("[MIDI IN] %d bytes", count);
+            for (uint32_t i = 0; i < count; i++) {
+                processMidiByte(rx_buf[i]);
+            }
+        }
+        vTaskDelay(1);
+    }
+}
+
+/* =========================================================
+   TAREA CORE 1 — UI
+   ========================================================= */
+void taskCore1(void* pvParameters) {
+    //log_e("MIDI task arrancando en Core %d", xPortGetCoreID());
+    for (;;) {
+        static bool wasConnected = false;
+
+        if (logicConnectionState == ConnectionState::CONNECTED) {
+            if (!wasConnected) {
+                wasConnected = true;
+                needsTOTALRedraw = true;
+                log_e("Conectado a DAW. Forzando redibujo completo.");
+            }
+            handleVUMeterDecay();
+            updateLeds();
+            handleHardwareInputs();
+        } else {
+            if (wasConnected) {
+                resetToStandbyState();
+                wasConnected = false;
+                log_i("Desconectado de DAW. Transicionando a modo standby.");
+                needsTOTALRedraw = true;
+            }
+        }
+
+        updateDisplay();
+        vTaskDelay(10);
+    }
+}
 
 /* =========================================================
    SETUP
@@ -81,8 +132,6 @@ void setup() {
     Serial.begin(115200);
     log_e("Iniciando setup...");
 
-    //memset(timeCodeChars_dirty, ' ', 12); timeCodeChars_dirty[12] = '\0';
-    //memset(beatsChars_dirty,   ' ', 12); beatsChars_dirty[12]   = '\0';
     memset(timeCodeChars_clean, ' ', 12); timeCodeChars_clean[12] = '\0';
     memset(beatsChars_clean,   ' ', 12); beatsChars_clean[12]   = '\0';
 
@@ -102,55 +151,22 @@ void setup() {
     log_e("initDisplay() completado.");
     initHardware();
     log_e("initHardware() completado.");
+
     log_e("PSRAM: %d bytes total, %d bytes libre",
           ESP.getPsramSize(), ESP.getFreePsram());
     log_e("Flash: %d bytes", ESP.getFlashChipSize());
 
-    // Test DMA — fillScreen debería ser instantáneo si DMA funciona
+    // Test DMA
     unsigned long t = millis();
     for (int i = 0; i < 10; i++) tft.fillScreen(TFT_BLACK);
     unsigned long elapsed = millis() - t;
     log_i("[DMA] 10x fillScreen en %lu ms — %.1f ms/frame", elapsed, elapsed / 10.0f);
 
-    log_e("--- V0.1 * Sistema listo. USB MIDI activo. ---");
+    // Crear tareas pinadas a sus cores
+    xTaskCreatePinnedToCore(taskCore0, "MIDI", 4096, NULL, 2, &taskCore0Handle, 0);
+    xTaskCreatePinnedToCore(taskCore1, "UI",   8192, NULL, 1, &taskCore1Handle, 1);
+
+    log_e("--- V0.1 * Dual core activo. USB MIDI activo. ---");
 }
 
-/* =========================================================
-   LOOP
-   ========================================================= */
-void loop() {
-    static bool wasConnected = false;
-
-    {
-        uint8_t rx_buf[64];
-        uint32_t count = tud_midi_stream_read(rx_buf, sizeof(rx_buf));
-        if (count > 0) {
-            log_v("[MIDI IN] %d bytes", count);
-            for (uint32_t i = 0; i < count; i++) {
-                processMidiByte(rx_buf[i]);
-            }
-        }
-    }
-
-    if (logicConnectionState == ConnectionState::CONNECTED) {
-        if (!wasConnected) {
-            wasConnected = true;
-            needsTOTALRedraw = true;
-            log_e("Conectado a DAW. Forzando redibujo completo.");
-        }
-
-        handleVUMeterDecay();
-        updateLeds();
-        handleHardwareInputs();
-
-    } else {
-        if (wasConnected) {
-            resetToStandbyState();
-            wasConnected = false;
-            log_i("Desconectado de DAW. Transicionando a modo standby.");
-            needsTOTALRedraw = true;
-        }
-    }
-
-    updateDisplay();
-}
+void loop() { vTaskDelay(portMAX_DELAY); }
