@@ -65,11 +65,11 @@ void setup() {
     Serial.println("=== TEST BRILLO ===");
 
     // Reset manual
-    pinMode(33, OUTPUT);
-    digitalWrite(33, LOW);
-    delay(100);
-    digitalWrite(33, HIGH);
-    delay(200);
+    //pinMode(33, OUTPUT);
+    //digitalWrite(33, LOW);
+    //delay(100);
+    //digitalWrite(33, HIGH);
+    //delay(200);
 
     tft.init();
     tft.setRotation(0);

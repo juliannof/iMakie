@@ -142,7 +142,7 @@ void simulateVuSignal() {
 void setup() {
 
     Serial.begin(115200);
-    delay(1000); // Espera un momento para que el monitor serial se conecte
+    delay(3000);   // ← espera a que el monitor se conecte
     // --- Inicialización y configuración de la Pantalla ---
     initDisplay(); 
     //log_v("Track 1 DEMO started."); // Descomentar si usas esp_log

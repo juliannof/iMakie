@@ -40,26 +40,63 @@ static int8_t currentVPotLevel = VPOT_DEFAULT_LEVEL;
 //  initDisplay
 // ════════════════════════════════════════════════════════════
 void initDisplay() {
-    // Reset manual obligatorio para ST7789V3
-    pinMode(33, OUTPUT);
-    digitalWrite(33, LOW);
-    delay(100);
-    digitalWrite(33, HIGH);
-    delay(200);
+    // Reset manual SOLO en power-on, no en RST software
+    esp_reset_reason_t reason = esp_reset_reason();
+    Serial.printf("Reset reason: %d\n", (int)reason);
+    
+    if (reason == ESP_RST_POWERON) {
+        Serial.println("Power-on: reset manual del panel");
+        pinMode(33, OUTPUT);
+        digitalWrite(33, LOW);
+        delay(100);
+        digitalWrite(33, HIGH);
+        delay(200);
+    }
 
     tft.init();
     tft.setRotation(0);
     tft.fillScreen(TFT_BG_COLOR);
-    tft.setBrightness(screenBrightness);  // ← reemplaza ledcAttach + ledcWrite
+    tft.setBrightness(screenBrightness);
+    tft.fillScreen(TFT_BLUE                                                                                                                                                          );
+    delay(500);
+    tft.fillScreen(TFT_BG_COLOR);
 
-    mainArea.createSprite(MAINAREA_WIDTH,  MAINAREA_HEIGHT);
-    header.createSprite(TFT_WIDTH,         HEADER_HEIGHT);
+    // Especificar 16 bits explícitamente
+    mainArea.setColorDepth(16);
+    mainArea.createSprite(MAINAREA_WIDTH, MAINAREA_HEIGHT);
+
+    header.setColorDepth(16);
+    header.createSprite(TFT_WIDTH, HEADER_HEIGHT);
+    
+    vuSprite.setColorDepth(16);
     vuSprite.createSprite(TFT_WIDTH - MAINAREA_WIDTH, MAINAREA_HEIGHT);
-    vPotSprite.createSprite(TFT_WIDTH,     VPOT_HEIGHT);
+
+    vPotSprite.setColorDepth(16);
+    vPotSprite.createSprite(TFT_WIDTH, VPOT_HEIGHT);
+
+    // ── DEBUG: verifica que los sprites se crearon ──
+    Serial.printf("tft      : %d x %d\n", tft.width(), tft.height());
+    Serial.printf("header   : %d x %d  → pushSprite(0, 0)\n",   header.width(),   header.height());
+    Serial.printf("mainArea : %d x %d  → pushSprite(0, %d)\n",  mainArea.width(),  mainArea.height(), HEADER_HEIGHT);
+    Serial.printf("vuSprite : %d x %d  → pushSprite(%d, %d)\n", vuSprite.width(),  vuSprite.height(), MAINAREA_WIDTH, HEADER_HEIGHT);
+    Serial.printf("vPotSprite: %d x %d → pushSprite(0, %d)\n",  vPotSprite.width(),vPotSprite.height(), MAINAREA_HEIGHT + HEADER_HEIGHT);
+    Serial.printf("Layout total: %d px alto (pantalla: %d)\n", HEADER_HEIGHT + MAINAREA_HEIGHT + VPOT_HEIGHT, tft.height());
 
     setVPotLevel(VPOT_DEFAULT_LEVEL);
     needsTOTALRedraw = true;
+
+    // ── verificar allocación de sprites ──
+    Serial.printf("header    creado: %s\n", header.width()    > 0 ? "OK" : "FALLO");
+    Serial.printf("mainArea  creado: %s\n", mainArea.width()  > 0 ? "OK" : "FALLO");
+    Serial.printf("vuSprite  creado: %s\n", vuSprite.width()  > 0 ? "OK" : "FALLO");
+    Serial.printf("vPotSprite creado: %s\n",vPotSprite.width()> 0 ? "OK" : "FALLO");
+    Serial.printf("Heap libre:  %u bytes\n", ESP.getFreeHeap());
+    Serial.printf("PSRAM libre: %u bytes\n", ESP.getFreePsram());
     Serial.println("[SETUP] Display iniciado - LovyanGFX");
+
+    needsTOTALRedraw = true;
+    // reset connected_init forzando redibujo
+    extern void resetDisplayState();
 }
 
 // ════════════════════════════════════════════════════════════
@@ -88,45 +125,38 @@ void setVPotLevel(int8_t level) {
 void updateDisplay() {
     setScreenBrightness(screenBrightness);
     switch (logicConnectionState) {
-
-        case ConnectionState::DISCONNECTED: {
-            static bool offline_drawn = false;
-            if (!offline_drawn || needsTOTALRedraw) {
-                drawOfflineScreen();
-                offline_drawn    = true;
-                needsTOTALRedraw = false;
-            }
-            return;
-        }
-        case ConnectionState::INITIALIZING: {
-            static bool init_drawn = false;
-            if (!init_drawn || needsTOTALRedraw) {
-                drawInitializingScreen();
-                init_drawn       = true;
-                needsTOTALRedraw = false;
-            }
-            return;
-        }
         case ConnectionState::CONNECTED: {
             static bool connected_init = false;
+            //Serial.printf("updateDisplay: connected_init=%d needsTOTALRedraw=%d\n", 
+            //              connected_init, needsTOTALRedraw);  // ← añade
             if (!connected_init || needsTOTALRedraw) {
+                // Primero verifica que el TFT responde directamente
+                tft.fillScreen(TFT_RED);
+                delay(500);
+                tft.fillScreen(TFT_BG_COLOR);
+
+                Serial.println("→ Dibujando todo...");         // ← añade
                 drawHeaderSprite();
                 drawMainArea();
                 drawVUMeters();
                 drawVPotDisplay();
                 needsTOTALRedraw    = false;
-                needsHeaderRedraw   = false;
                 needsMainAreaRedraw = false;
+                needsHeaderRedraw   = false;
                 needsVUMetersRedraw = false;
                 needsVPotRedraw     = false;
                 connected_init      = true;
+                Serial.println("→ Dibujo completo OK");       // ← añade
+
+                Serial.printf("Después de push - test directo TFT\n");
+                tft.fillRect(0, 0, 20, 20, TFT_GREEN);  // cuadrado verde esquina superior izquierda
             }
-            if (needsHeaderRedraw)   { drawHeaderSprite();  needsHeaderRedraw   = false; }
-            if (needsMainAreaRedraw) { drawMainArea();       needsMainAreaRedraw = false; }
-            if (needsVUMetersRedraw) { drawVUMeters();       needsVUMetersRedraw = false; }
-            if (needsVPotRedraw)     { drawVPotDisplay();    needsVPotRedraw     = false; }
             break;
         }
+        default:
+            Serial.printf("updateDisplay: estado=%d (no CONNECTED)\n", 
+                          (int)logicConnectionState);          // ← añade
+            break;
     }
 }
 
@@ -197,17 +227,19 @@ void drawMainArea() {
 
     drawButton(mainArea, 10, 7, BUTTON_WIDTH, BUTTON_HEIGHT, "REC",  recStates,  TFT_REC_COLOR);
     drawButton(mainArea, 10 + BUTTON_WIDTH + 2, 7, BUTTON_WIDTH, BUTTON_HEIGHT, "SOLO", soloStates, TFT_SOLO_COLOR);
-    drawButton(mainArea, 10 + BUTTON_WIDTH + 2 + BUTTON_WIDTH + 2, 7, BUTTON_WIDTH, BUTTON_HEIGHT, "MUTE", muteStates, TFT_MUTE_COLOR);
+    drawButton(mainArea, 10 + BUTTON_WIDTH*2 + 4, 7, BUTTON_WIDTH, BUTTON_HEIGHT, "MUTE", muteStates, TFT_MUTE_COLOR);
 
-    #ifdef LOAD_GFXFF
-        mainArea.setTextColor(TFT_WHITE);
-        mainArea.setFreeFont(&FreeSans24pt7b);
-        mainArea.setCursor(7, 115);
-        mainArea.print(trackName);
-        mainArea.setFreeFont(&FreeSans18pt7b);
-        mainArea.setCursor(7, 155);
-        mainArea.print("-60 dB");
-    #endif
+    // ── trackName con LovyanGFX (reemplaza LOAD_GFXFF) ──
+    mainArea.setTextDatum(TL_DATUM);
+    mainArea.setTextColor(TFT_WHITE, TFT_BG_COLOR);
+    mainArea.setTextFont(4);       // fuente built-in ~26px
+    mainArea.setCursor(7, 80);
+    mainArea.print(trackName);
+
+    mainArea.setTextFont(2);       // fuente built-in ~16px
+    mainArea.setTextColor(TFT_DARKGREY, TFT_BG_COLOR);
+    mainArea.setCursor(7, 120);
+    mainArea.print("-60 dB");
 
     mainArea.pushSprite(0, HEADER_HEIGHT);
 }
