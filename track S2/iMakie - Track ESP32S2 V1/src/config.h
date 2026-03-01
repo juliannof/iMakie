@@ -44,8 +44,8 @@ enum class ConnectionState {
 
 // --- BOTONES FÍSICOS ---
 #define BUTTON_PIN_REC      37
-#define BUTTON_PIN_SOLO     38
-#define BUTTON_PIN_MUTE     39
+#define BUTTON_PIN_SOLO     39
+#define BUTTON_PIN_MUTE     38
 #define BUTTON_PIN_SELECT   40
 #define BUTTON_USE_INTERNAL_PULLUP true // Usar pull-up internos para los botones
 

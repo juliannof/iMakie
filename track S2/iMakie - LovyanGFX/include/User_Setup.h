@@ -9,7 +9,7 @@
 #define TFT_HEIGHT 280
 
 
-#define TFT_SCLK 7  // SCK/SCL
+#define TFT_SCLK 7  // SCK/SC                                                                                                                                                                                                                                                                                                                                       L
 #define TFT_MOSI 4  // SDA
 #define TFT_RST  33  // RST     Reset pin (could connect to RST pin) -  ew q 
 #define TFT_DC   6  // RS  Data Command control pin
