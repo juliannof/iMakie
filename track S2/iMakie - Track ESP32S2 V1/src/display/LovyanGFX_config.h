@@ -1,4 +1,5 @@
-#include <Arduino.h>
+// src/display/LovyanGFX_config.h
+#pragma once
 #include <LovyanGFX.hpp>
 
 class LGFX : public lgfx::LGFX_Device {
@@ -56,73 +57,3 @@ public:
         setPanel(&_panel_instance);
     }
 };
-
-LGFX tft;
-
-void setup() {
-    Serial.begin(115200);
-    delay(2000);
-    Serial.println("=== TEST BRILLO ===");
-
-    // Reset manual
-    pinMode(33, OUTPUT);
-    digitalWrite(33, LOW);
-    delay(100);
-    digitalWrite(33, HIGH);
-    delay(200);
-
-    tft.init();
-    tft.setRotation(0);
-    tft.fillScreen(TFT_WHITE);
-
-    tft.setTextDatum(MC_DATUM);
-    tft.setTextFont(4);
-    tft.setTextColor(TFT_BLACK, TFT_WHITE);
-    tft.drawString("TEST BRILLO", 120, 130);
-
-    delay(1000);
-
-    // --- Fade OUT ---
-    Serial.println("Fade OUT...");
-    for (int b = 255; b >= 0; b -= 3) {
-        tft.setBrightness(b);
-        Serial.printf("BL: %d\n", b);
-        delay(15);
-    }
-    delay(500);
-
-    // --- Fade IN ---
-    Serial.println("Fade IN...");
-    for (int b = 0; b <= 255; b += 3) {
-        tft.setBrightness(b);
-        Serial.printf("BL: %d\n", b);
-        delay(15);
-    }
-    delay(500);
-
-    // --- Niveles fijos ---
-    Serial.println("25%");
-    tft.setBrightness(64);
-    tft.fillScreen(TFT_WHITE);
-    tft.drawString("25%", 120, 130);
-    delay(1500);
-
-    Serial.println("50%");
-    tft.setBrightness(128);
-    tft.fillScreen(TFT_WHITE);
-    tft.drawString("50%", 120, 130);
-    delay(1500);
-
-    Serial.println("100%");
-    tft.setBrightness(255);
-    tft.fillScreen(TFT_WHITE);
-    tft.drawString("100%", 120, 130);
-    delay(1500);
-
-    Serial.println("=== FIN TEST BRILLO ===");
-}
-
-void loop() {
-    Serial.println("OK");
-    delay(2000);
-}

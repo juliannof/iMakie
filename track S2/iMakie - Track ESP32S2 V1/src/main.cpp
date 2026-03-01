@@ -8,10 +8,10 @@
 #include "hardware/Hardware.h" // <<<<<<<<<<<<<<<<< ¡Incluye tu nuevo módulo de hardware!
 
 
-
-// --- INSTANCIAS GLOBALES PARA LA PANTALLA ---
-TFT_eSPI tft = TFT_eSPI(); // Objeto principal de la pantalla
-TFT_eSprite header(&tft), mainArea(&tft), vuSprite(&tft), vPotSprite(&tft); // Sprites para dibujar
+// AHORA:
+#include "display/LovyanGFX_config.h"
+LGFX        tft;
+LGFX_Sprite header(&tft), mainArea(&tft), vuSprite(&tft), vPotSprite(&tft);
 
 // --- DECLARACIONES EXTERNAS PARA FUNCIONES DE PANTALLA (desde display/Display.cpp) ---
 // Estas se incluyen por "display/Display.h" si están declaradas allí.

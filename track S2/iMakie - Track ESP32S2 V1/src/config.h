@@ -1,7 +1,9 @@
 // src/config.h
 #pragma once
 #include <Arduino.h>
-#include <TFT_eSPI.h> // Se mantiene.
+#include "display/LovyanGFX_config.h"
+extern LGFX tft;
+extern LGFX_Sprite header, mainArea, vuSprite, vPotSprite;
 
 // ===================================
 // --- ENUMERACIONES (Tipos de Datos) ---
@@ -122,6 +124,8 @@ enum class ConnectionState {
 
 
 // --- INTERFAZ GRÁFICA (TFT) ---
+#define TFT_WIDTH  240
+#define TFT_HEIGHT 280
 #define MAINAREA_WIDTH 190          // Reducido
 #define MAINAREA_HEIGHT 220          // Reducido
 
@@ -199,10 +203,6 @@ enum class ConnectionState {
 
 // ===================================
 // --- 2. DECLARACIONES GLOBALES (con 'extern') ---
-
-// --- OBJETOS TFT (Declarados en main.cpp, usados en Display.cpp) ---
-extern TFT_eSPI tft;
-extern TFT_eSprite header, mainArea, vuSprite, vPotSprite; 
 
 // --- VARIABLES DE ESTADO DE CANAL (Declaradas en Display.cpp, usadas en main.cpp) ---
 extern String trackName; // Corregido a singular
