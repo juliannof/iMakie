@@ -19,6 +19,7 @@ extern void initDisplay();
 extern void updateDisplay();
 extern void setScreenBrightness(uint8_t brightness);
 extern void setVPotLevel(int8_t level);
+extern void handleVUMeterDecay();   // decay VU en loop
 extern int  currentVPotLevel;
 extern bool needsVPotRedraw;
 
@@ -100,12 +101,14 @@ void myButtonEventHandler(ButtonId id) {
 }
 
 
+// Para llamar handleButtonLedState desde main.cpp
+extern void handleButtonLedState(ButtonId id);
+
 // ===================================
 // --- HANDLER DE DATOS RS485 ---
-// ← RS485: cuando llega un MasterPacket, actualizar estado del canal
 // ===================================
 static void onMasterData(const MasterPacket& pkt) {
-    // --- Nombre de pista ---
+    // --- Nombre de pista → header ---
     char nameBuf[8] = {};
     memcpy(nameBuf, pkt.trackName, 7);
     nameBuf[7] = '\0';
@@ -114,19 +117,31 @@ static void onMasterData(const MasterPacket& pkt) {
         needsHeaderRedraw = true;
     }
 
-    // --- Flags REC/SOLO/MUTE/SELECT ---
+    // --- Flags → display + neopixel por botón ---
     bool newRec    = (pkt.flags & FLAG_REC)    != 0;
     bool newSolo   = (pkt.flags & FLAG_SOLO)   != 0;
     bool newMute   = (pkt.flags & FLAG_MUTE)   != 0;
     bool newSelect = (pkt.flags & FLAG_SELECT) != 0;
 
-    if (recStates != newRec || soloStates != newSolo ||
-        muteStates != newMute || selectStates != newSelect) {
-        recStates    = newRec;
-        soloStates   = newSolo;
-        muteStates   = newMute;
-        selectStates = newSelect;
+    if (recStates != newRec) {
+        recStates = newRec;
+        handleButtonLedState(ButtonId::REC);
         needsMainAreaRedraw = true;
+    }
+    if (soloStates != newSolo) {
+        soloStates = newSolo;
+        handleButtonLedState(ButtonId::SOLO);
+        needsMainAreaRedraw = true;
+    }
+    if (muteStates != newMute) {
+        muteStates = newMute;
+        handleButtonLedState(ButtonId::MUTE);
+        needsMainAreaRedraw = true;
+    }
+    if (selectStates != newSelect) {
+        selectStates = newSelect;
+        handleButtonLedState(ButtonId::SELECT);
+        needsHeaderRedraw = true;
     }
 
     // --- VU level (0-127 → 0.0-1.0) ---
@@ -137,6 +152,7 @@ static void onMasterData(const MasterPacket& pkt) {
             vuPeakLevels = vuLevels;
             vuPeakLastUpdateTime = millis();
         }
+        vuLastUpdateTime = millis();
         needsVUMetersRedraw = true;
     }
 
@@ -144,12 +160,11 @@ static void onMasterData(const MasterPacket& pkt) {
     float newFader = pkt.faderTarget / 16383.0f;
     if (abs(faderPositions - newFader) > 0.001f) {
         faderPositions = newFader;
-        needsMainAreaRedraw = true;
-        // TODO: activar motor cuando esté integrado
+        // TODO: activar motor
     }
 
     Serial.printf("[RS485] RX | track:%.7s fader:%u vu:%u flags:0x%02X\n",
-                     pkt.trackName, pkt.faderTarget, pkt.vuLevel, pkt.flags);
+                  pkt.trackName, pkt.faderTarget, pkt.vuLevel, pkt.flags);
 }
 
 
@@ -214,6 +229,9 @@ void loop() {
 
     // --- Botones ---
     updateButtons();
+
+    // --- VU decay ---
+    handleVUMeterDecay();
 
     // --- Display ---
     updateDisplay();
