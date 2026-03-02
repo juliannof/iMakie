@@ -17,7 +17,10 @@ USBMIDI MIDI;
 LGFX tft;
 LGFX_Sprite header(&tft), mainArea(&tft), vuSprite(&tft);
 
-Adafruit_NeoTrellis t_array[Y_DIM / 4][X_DIM / 4] = {{ Adafruit_NeoTrellis(0x2F), Adafruit_NeoTrellis(0x2E) }};
+Adafruit_NeoTrellis t_array[Y_DIM/4][X_DIM/4] = {{ 
+    Adafruit_NeoTrellis(0x2F),   // ← izquierdo
+    Adafruit_NeoTrellis(0x2E)    // ← derecho
+}};
 Adafruit_MultiTrellis trellis((Adafruit_NeoTrellis *)t_array, Y_DIM / 4, X_DIM / 4);
 
 // Arrays de estado para los botones de las pistas

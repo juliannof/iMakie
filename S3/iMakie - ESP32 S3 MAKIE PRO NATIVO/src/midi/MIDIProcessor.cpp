@@ -422,7 +422,7 @@ void processMackieSysEx(byte* payload, int len) {
             unsigned long now = millis();
             if (now - lastVersionReplyTime > VERSION_REPLY_COOLDOWN_MS) {
                 byte version_reply[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x14,
-                                        '1', '.', '2', '.', '0', 0xF7};
+                        '1', '.', '2', '.', '0', 0xF7};
                 sendMIDIBytes(version_reply, sizeof(version_reply));
                 lastVersionReplyTime = now;
             }

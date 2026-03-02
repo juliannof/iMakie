@@ -295,6 +295,9 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
     int key      = evt.bit.NUM;
     bool isPress = (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_RISING);
 
+    if (isPress) log_e("TRELLIS key=%d note=0x%02X", key, 
+                       (currentPage==1?MIDI_NOTES_PG1:MIDI_NOTES_PG2)[key]);
+
     // ── Botón de página ──────────────────────────────────────────
     if (key == 31 && isPress) {
         currentPage = (currentPage % 3) + 1;
