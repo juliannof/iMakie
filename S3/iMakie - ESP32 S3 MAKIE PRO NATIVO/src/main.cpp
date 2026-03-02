@@ -6,6 +6,7 @@
 #include "midi/MIDIProcessor.h"
 #include "display/Display.h"
 #include "hardware/Hardware.h"
+#include "RS485/RS485.h"          // ← RS485 NUEVO
 
 /* =========================================================
    USB MIDI
@@ -77,11 +78,60 @@ TaskHandle_t taskCore0Handle = NULL;
 TaskHandle_t taskCore1Handle = NULL;
 
 /* =========================================================
-   TAREA CORE 0 — MIDI (tiempo real)
+   HELPER RS485 → MIDI
+   Convierte respuesta de un slave en mensajes MIDI para Logic
+   ========================================================= */
+static void processSlaveResponse(uint8_t slaveId) {
+    const ChannelData& ch = rs485.getChannel(slaveId);
+    uint8_t midiCh = slaveId - 1;  // MIDI channels 0-based
+
+    // --- Fader → Pitch Bend (solo si el usuario lo toca) ---
+    if (ch.touchState) {
+        uint16_t pb = map(ch.faderPos, 0, 4095, 0, 16383);
+        // Pitch Bend: 0xE0 | channel, LSB, MSB
+        byte msg[3] = { (byte)(0xE0 | midiCh), (byte)(pb & 0x7F), (byte)(pb >> 7) };
+        extern void sendMIDIBytes(const byte* data, size_t len);
+        sendMIDIBytes(msg, 3);
+        log_v("[RS485→MIDI] PitchBend ch%u: %u", slaveId, pb);
+    }
+
+    // --- Botones físicos → Note On/Off ---
+    uint8_t changed = ch.buttons ^ ch.prevButtons;
+    if (changed) {
+        // Mapeo botones a notas Mackie: REC=0-7, SOLO=8-15, MUTE=16-23, SELECT=24-31
+        const uint8_t noteBase[4] = { 0, 8, 16, 24 };
+        for (uint8_t bit = 0; bit < 4; bit++) {
+            if (changed & (1 << bit)) {
+                bool isOn     = (ch.buttons & (1 << bit)) != 0;
+                uint8_t note  = noteBase[bit] + midiCh;
+                uint8_t vel   = isOn ? 127 : 0;
+                byte msg[3]   = { (byte)(isOn ? 0x90 : 0x80), note, vel };
+                extern void sendMIDIBytes(const byte* data, size_t len);
+                sendMIDIBytes(msg, 3);
+                log_v("[RS485→MIDI] Note %s ch%u note=%u", isOn ? "On" : "Off", slaveId, note);
+            }
+        }
+    }
+
+    // --- Encoder → CC (modo relativo Mackie) ---
+    if (ch.encoderDelta != 0) {
+        uint8_t cc  = 16 + midiCh;
+        uint8_t val = (ch.encoderDelta > 0) ? 65 : 63;
+        byte msg[3] = { (byte)(0xB0 | midiCh), cc, val };
+        extern void sendMIDIBytes(const byte* data, size_t len);
+        sendMIDIBytes(msg, 3);
+        log_v("[RS485→MIDI] Encoder ch%u delta=%d CC=%u val=%u",
+              slaveId, ch.encoderDelta, cc, val);
+    }
+}
+
+/* =========================================================
+   TAREA CORE 0 — MIDI (tiempo real) + leer slaves RS485
    ========================================================= */
 void taskCore0(void* pvParameters) {
     log_e("MIDI task arrancando en Core %d", xPortGetCoreID());
     for (;;) {
+        // --- MIDI IN desde Logic ---
         uint8_t rx_buf[64];
         uint32_t count = tud_midi_stream_read(rx_buf, sizeof(rx_buf));
         if (count > 0) {
@@ -90,6 +140,16 @@ void taskCore0(void* pvParameters) {
                 processMidiByte(rx_buf[i]);
             }
         }
+
+        // --- RS485: leer respuestas de slaves → enviar a Logic ---
+        if (logicConnectionState == ConnectionState::CONNECTED) {
+            for (uint8_t id = 1; id <= NUM_SLAVES; id++) {
+                if (rs485.hasNewSlaveData(id)) {
+                    processSlaveResponse(id);
+                }
+            }
+        }
+
         vTaskDelay(1);
     }
 }
@@ -98,7 +158,6 @@ void taskCore0(void* pvParameters) {
    TAREA CORE 1 — UI
    ========================================================= */
 void taskCore1(void* pvParameters) {
-    //log_e("MIDI task arrancando en Core %d", xPortGetCoreID());
     for (;;) {
         static bool wasConnected = false;
 
@@ -152,6 +211,10 @@ void setup() {
     initHardware();
     log_e("initHardware() completado.");
 
+    // ← RS485 NUEVO: iniciar tras hardware, antes de crear tareas
+    rs485.begin(NUM_SLAVES);
+    log_e("rs485.begin() completado. Slaves: %d", NUM_SLAVES);
+
     log_e("PSRAM: %d bytes total, %d bytes libre",
           ESP.getPsramSize(), ESP.getFreePsram());
     log_e("Flash: %d bytes", ESP.getFlashChipSize());
@@ -166,7 +229,7 @@ void setup() {
     xTaskCreatePinnedToCore(taskCore0, "MIDI", 4096, NULL, 2, &taskCore0Handle, 0);
     xTaskCreatePinnedToCore(taskCore1, "UI",   8192, NULL, 1, &taskCore1Handle, 1);
 
-    log_e("--- V0.1 * Dual core activo. USB MIDI activo. ---");
+    log_e("--- V0.2 * Dual core + RS485 activo. ---");
 }
 
 void loop() { vTaskDelay(portMAX_DELAY); }

@@ -1,0 +1,95 @@
+#pragma once
+#include <Arduino.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#include "protocol.h"
+
+// ============================================================
+//  RS485.h  –  Master ESP32-S3  (integrado en iMakie)
+//  Core 1: RS485 polling task (prioridad 5)
+//  Core 0: MIDI + leer respuestas de slaves
+// ============================================================
+
+// --- Pines ---
+#define RS485_TX_PIN          15
+#define RS485_RX_PIN          16
+#define RS485_ENABLE_PIN       1
+
+// --- Protocolo ---
+#define RS485_BAUD        500000
+#define NUM_SLAVES              1   // ← actualizar al añadir hardware
+
+// --- Timing (µs) ---
+#define RS485_TX_ENABLE_US     10
+#define RS485_TX_DONE_US       10
+#define RS485_RESP_TIMEOUT_US 1500
+#define RS485_GAP_US           300
+#define POLL_CYCLE_MS          20
+
+// Base de datos por canal (acceso thread-safe desde Core 0)
+struct ChannelData {
+    // Master → Slave (escrito desde Core 0 via MIDI)
+    char     trackName[8] = {};
+    uint8_t  flags        = 0;
+    uint16_t faderTarget  = 8192;
+    uint8_t  vuLevel      = 0;
+    bool     dirty        = true;
+
+    // Slave → Master (leído desde Core 0 para enviar a Logic)
+    uint16_t faderPos      = 0;
+    uint8_t  touchState    = 0;
+    uint8_t  buttons       = 0;
+    uint8_t  prevButtons   = 0;
+    int8_t   encoderDelta  = 0;
+    uint8_t  encoderButton = 0;
+    bool     responded     = false;
+};
+
+class RS485Master {
+public:
+    void begin(uint8_t numSlaves = NUM_SLAVES);
+
+    // FreeRTOS task (Core 1)
+    static void taskEntry(void* param);
+    void        runTask();
+
+    // API Core 0 → RS485 (MIDI → slaves)
+    void setTrackName  (uint8_t id, const char* name);
+    void setFlags      (uint8_t id, uint8_t flags);
+    void setFaderTarget(uint8_t id, uint16_t value14bit);
+    void setVuLevel    (uint8_t id, uint8_t value);
+
+    // API RS485 → Core 0 (slaves → MIDI)
+    bool               hasNewSlaveData(uint8_t id);
+    const ChannelData& getChannel     (uint8_t id);
+
+    void printStats() const;
+    void resetStats();
+
+private:
+    uint8_t           _numSlaves  = NUM_SLAVES;
+    uint8_t           _currentId  = 1;
+    SemaphoreHandle_t _mutex      = nullptr;
+    ChannelData       _ch[NUM_SLAVES + 1];
+
+    enum class BusState : uint8_t { SEND, WAIT_RESP, GAP };
+    BusState _busState   = BusState::SEND;
+    uint32_t _stateTimer = 0;
+    uint32_t _cycleStart = 0;
+
+    uint8_t  _rxBuf[sizeof(SlavePacket)];
+    uint8_t  _rxGot    = 0;
+    bool     _rxHeader = false;
+
+    uint32_t _txCount   = 0;
+    uint32_t _rxCount   = 0;
+    uint32_t _timeouts  = 0;
+    uint32_t _crcErrors = 0;
+
+    void _sendPacket   (uint8_t id);
+    bool _readResponse ();
+    void _handleResponse();
+    void _nextSlave    ();
+};
+
+extern RS485Master rs485;

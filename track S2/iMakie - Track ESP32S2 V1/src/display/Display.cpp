@@ -131,8 +131,8 @@ void updateDisplay() {
             //              connected_init, needsTOTALRedraw);  // ← añade
             if (!connected_init || needsTOTALRedraw) {
                 // Primero verifica que el TFT responde directamente
-                tft.fillScreen(TFT_RED);
-                delay(500);
+                //tft.fillScreen(TFT_RED);
+                //delay(500);
                 tft.fillScreen(TFT_BG_COLOR);
 
                 Serial.println("→ Dibujando todo...");         // ← añade
@@ -149,7 +149,7 @@ void updateDisplay() {
                 Serial.println("→ Dibujo completo OK");       // ← añade
 
                 Serial.printf("Después de push - test directo TFT\n");
-                tft.fillRect(0, 0, 20, 20, TFT_GREEN);  // cuadrado verde esquina superior izquierda
+                //tft.fillRect(0, 0, 20, 20, TFT_GREEN);  // cuadrado verde esquina superior izquierda
             }
             break;
         }
@@ -194,7 +194,7 @@ void drawHeaderSprite() {
     int rectY = (HEADER_HEIGHT - rectHeight) / 2;
 
     if (selectStates) {
-        header.fillRoundRect(rectX, rectY, rectWidth, rectHeight, 3, TFT_MCU_BLUE);
+        //header.fillRoundRect(rectX, rectY, rectWidth, rectHeight, 3, TFT_MCU_BLUE);
         screenBrightness = 255;
     } else {
         header.fillRoundRect(rectX, rectY, rectWidth, rectHeight, 3, TFT_MCU_GRAY);

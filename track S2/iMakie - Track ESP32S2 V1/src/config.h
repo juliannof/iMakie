@@ -22,6 +22,19 @@ enum class ConnectionState {
 // ===================================
 
 // --- PINES Y HARDWARE ---
+
+// ===================================
+// --- RS485 ---
+// ===================================
+#define MY_SLAVE_ID              1   // ← cambiar por cada unidad (1-17)
+
+#define RS485_RX_PIN             9
+#define RS485_TX_PIN             8
+#define RS485_ENABLE_PIN        17
+#define RS485_BAUD          500000
+
+#define RS485_START_BYTE      0xAA
+#define RS485_RESP_BYTE       0xBB
 // --- LED INTEGRADO ---
 #define LED_BUILTIN_PIN 15 // Pin del LED integrado en la Lolin D1 ESP32 S2 (GPIO15)
                           // Verifica el diagrama de pines de tu placa si tienes dudas.
