@@ -231,7 +231,7 @@ void loop() {
     updateButtons();
 
     // --- VU decay ---
-    handleVUMeterDecay();
+    //handleVUMeterDecay();
 
     // --- Display ---
     updateDisplay();

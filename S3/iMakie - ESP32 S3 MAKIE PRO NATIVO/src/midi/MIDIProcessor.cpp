@@ -561,9 +561,13 @@ void processNote(byte status, byte note, byte velocity) {
 // processPitchBend — ← RS485: enviar faderTarget al slave
 // ****************************************************************************
 void processPitchBend(byte channel, int bendValue) {
+    // bendValue ya llega como 0-16383 desde el parser — NO sumar 8192
+    log_e("PB ch%d raw:%d", channel, bendValue);
+
     if (channel > 9) return;
 
-    if (bendValue == -8192) {
+    // --- Detección de desconexión: fader mínimo = 0 ---
+    if (bendValue == 0) {
         if (logicConnectionState == ConnectionState::CONNECTED) {
             unsigned long now = millis();
             if (fadersAtMinMask == 0) firstFaderMinTime = now;
@@ -576,7 +580,7 @@ void processPitchBend(byte channel, int bendValue) {
                 needsTOTALRedraw = true;
                 fadersAtMinMask = 0;
                 firstFaderMinTime = 0;
-                log_d("[DISCONNECT] %d faders en -8192 en %lums.", bitsSet, elapsed);
+                log_d("[DISCONNECT] %d faders en 0 en %lums.", bitsSet, elapsed);
                 return;
             }
             if ((now - firstFaderMinTime) > DISCONNECT_WINDOW_MS) {
@@ -588,6 +592,7 @@ void processPitchBend(byte channel, int bendValue) {
         fadersAtMinMask &= ~(1 << channel);
     }
 
+    // --- Transición HANDSHAKE_COMPLETE → CONNECTED ---
     if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) {
         logicConnectionState = ConnectionState::CONNECTED;
         needsTOTALRedraw = true;
@@ -595,10 +600,10 @@ void processPitchBend(byte channel, int bendValue) {
         log_d("DAW conectado: Primer PitchBend Track %d -> CONNECTED.", channel + 1);
     }
 
+    // --- Actualizar posición fader ---
     if (channel < 9) {
-        uint16_t fader14bit = (uint16_t)(bendValue + 8192);
+        uint16_t fader14bit = (uint16_t)bendValue;  // ya es 0-16383
 
-        // ← RS485 NUEVO: enviar posición de fader al slave (canales 1-8, no master)
         if (channel < 8) {
             rs485.setFaderTarget(channel + 1, fader14bit);
         }
@@ -610,7 +615,6 @@ void processPitchBend(byte channel, int bendValue) {
         }
     }
 }
-
 
 void checkMidiTimeout() {
     if (logicConnectionState == ConnectionState::CONNECTED) {
