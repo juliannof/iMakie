@@ -142,8 +142,8 @@ void SatMenu::update() {
 SatMenu::Btn SatMenu::_readBtn() {
     unsigned long n = millis();
     if (n - _debT < SAT_DEB_MS) return Btn::NONE;
-    if (digitalRead(BUTTON_PIN_SOLO)   == LOW) { _debT=n; return Btn::UP;    }
-    if (digitalRead(BUTTON_PIN_REC)    == LOW) { _debT=n; return Btn::DOWN;  }
+    if (digitalRead(BUTTON_PIN_REC)    == LOW) { _debT=n; return Btn::UP;    }
+    if (digitalRead(BUTTON_PIN_SOLO)   == LOW) { _debT=n; return Btn::DOWN;  }
     if (digitalRead(BUTTON_PIN_MUTE)   == LOW) { _debT=n; return Btn::BACK;  }
     if (digitalRead(BUTTON_PIN_SELECT) == LOW) { _debT=n; return Btn::ENTER; }
     return Btn::NONE;
@@ -1003,7 +1003,7 @@ void SatMenu::_drawHints(const char* u, const char* d, const char* b, const char
     _tft->drawFastHLine(0, y, W, C_DARK);
     _tft->setTextSize(1); _tft->setTextColor(C_GRAY, C_BLACK);
     const char* lbs[4]  = { u, d, b, e };
-    const char* bns[4]  = { "SOL","REC","MUT","SEL" };
+    const char* bns[4]  = { "REC","SOL","MUT","SEL" };
     int w4 = W / 4;
     for (int i = 0; i < 4; i++) {
         if (lbs[i] && lbs[i][0]) {

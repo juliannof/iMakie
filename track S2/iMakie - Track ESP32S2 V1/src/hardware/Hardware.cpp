@@ -147,13 +147,6 @@ void initHardware() {
     pinMode(LED_BUILTIN_PIN, OUTPUT);
     digitalWrite(LED_BUILTIN_PIN, LOW); // Asegurarse de que esté apagado al inicio (LOW = apagado para la mayoría de los LEDs incorporados)
    
-
-    // --- Calibración del Sensor Táctil del Fader ---
-    //Serial.print("Calibrando sensor táctil del fader...");
-    //delay(5); // Pequeño retardo antes de leer el sensor
-    //faderTouchBaseLine = touchRead(FADER_TOUCH_PIN);
-    //faderTouchThreshold = faderTouchBaseLine * FADER_TOUCH_THRESHOLD_PERCENTAGE / 100;
-    //Serial.printf("BaseLine: %u, Threshold: %u\n", faderTouchBaseLine, faderTouchThreshold);
 }
 
 

@@ -39,15 +39,7 @@ void initDisplay() {
     esp_reset_reason_t reason = esp_reset_reason();
     Serial.printf("Reset reason: %d\n", (int)reason);
 
-    if (reason == ESP_RST_POWERON) {
-        Serial.println("Power-on: reset manual del panel");
-        pinMode(33, OUTPUT);
-        digitalWrite(33, LOW);
-        delay(100);
-        digitalWrite(33, HIGH);
-        delay(200);
-    }
-
+    
     tft.init();
     tft.setRotation(0);
     tft.setBrightness(screenBrightness);
