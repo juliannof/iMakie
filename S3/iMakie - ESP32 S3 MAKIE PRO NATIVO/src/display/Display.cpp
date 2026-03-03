@@ -10,6 +10,9 @@ namespace {
 }
 
 
+volatile ConnectionState logicConnectionState = ConnectionState::DISCONNECTED;
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // INIT DISPLAY
 // ─────────────────────────────────────────────────────────────────────────────

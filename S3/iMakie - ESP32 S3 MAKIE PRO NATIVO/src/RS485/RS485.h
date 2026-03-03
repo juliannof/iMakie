@@ -26,6 +26,8 @@
 #define RS485_GAP_US           300
 #define POLL_CYCLE_MS          20
 
+
+
 // Base de datos por canal (acceso thread-safe desde Core 0)
 struct ChannelData {
     // Master → Slave (escrito desde Core 0 via MIDI)

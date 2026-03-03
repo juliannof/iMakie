@@ -11,6 +11,7 @@ extern USBMIDI MIDI;
 extern void updateLeds();
 extern bool btnStatePG1[32];
 extern bool btnStatePG2[32];
+extern uint8_t g_logicConnected;
 
 
 // --- Variables internas del parser MIDI ---
@@ -577,6 +578,8 @@ void processPitchBend(byte channel, int bendValue) {
                 (now - firstFaderMinTime) <= DISCONNECT_WINDOW_MS) {
                 unsigned long elapsed = now - firstFaderMinTime;
                 logicConnectionState = ConnectionState::DISCONNECTED;
+                g_logicConnected = 0;
+
                 needsTOTALRedraw = true;
                 fadersAtMinMask = 0;
                 firstFaderMinTime = 0;
@@ -595,6 +598,7 @@ void processPitchBend(byte channel, int bendValue) {
     // --- Transición HANDSHAKE_COMPLETE → CONNECTED ---
     if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) {
         logicConnectionState = ConnectionState::CONNECTED;
+        g_logicConnected = 1;  // ← NUEVO
         needsTOTALRedraw = true;
         fadersAtMinMask = 0;
         log_d("DAW conectado: Primer PitchBend Track %d -> CONNECTED.", channel + 1);

@@ -26,7 +26,7 @@ enum class ConnectionState {
 // ===================================
 // --- RS485 ---
 // ===================================
-#define MY_SLAVE_ID              1   // ← cambiar por cada unidad (1-17)
+#define MY_SLAVE_ID              2   // ← cambiar por cada unidad (1-17)
 
 #define RS485_RX_PIN             9
 #define RS485_TX_PIN             8

@@ -9,7 +9,7 @@
 #define RS485_START_BYTE  0xAA
 #define RS485_RESP_BYTE   0xBB
 
-// --- FLAGS (coinciden con grupos Mackie Note 0-31) ---
+// --- FLAGS ---
 #define FLAG_REC    (1 << 0)
 #define FLAG_SOLO   (1 << 1)
 #define FLAG_MUTE   (1 << 2)
@@ -35,9 +35,10 @@ struct __attribute__((packed)) MasterPacket {
     uint8_t  flags;         // FLAG_REC | FLAG_SOLO | FLAG_MUTE | FLAG_SELECT
     uint16_t faderTarget;   // Pitch Bend 14-bit: 0-16383
     uint8_t  vuLevel;       // 0-127
+    uint8_t  connected;     // ← NUEVO: 1=CONNECTED, 0=DISCONNECTED
     uint8_t  crc;
 };
-static_assert(sizeof(MasterPacket) == 14, "MasterPacket debe ser 14 bytes");
+static_assert(sizeof(MasterPacket) == 15, "MasterPacket debe ser 15 bytes");
 
 // --- Slave → Master (9 bytes) ---
 struct __attribute__((packed)) SlavePacket {

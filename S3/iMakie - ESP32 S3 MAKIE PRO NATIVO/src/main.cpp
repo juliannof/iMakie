@@ -49,7 +49,7 @@ bool needsHeaderRedraw = true;
 bool needsVUMetersRedraw = true;
 
 // Estado de conexión
-volatile ConnectionState logicConnectionState = ConnectionState::DISCONNECTED;
+extern volatile ConnectionState logicConnectionState;
 
 // BPM y Time Display
 float projectTempo = 120.0f;
@@ -75,6 +75,8 @@ bool globalShiftPressed = false;
 int currentPage = 1;
 int currentMasterFader = 0;
 int currentMeterValue = 0;
+
+uint8_t g_logicConnected = 0;
 
 // Handles de tareas dual core
 TaskHandle_t taskCore0Handle = NULL;

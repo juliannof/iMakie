@@ -87,6 +87,8 @@ void RS485Master::_sendPacket(uint8_t id) {
         pkt.flags       = _ch[id].flags;
         pkt.faderTarget = _ch[id].faderTarget;
         pkt.vuLevel     = _ch[id].vuLevel;
+        extern uint8_t g_logicConnected;  // 0=desconectado, 1=conectado
+        pkt.connected = g_logicConnected;
         _ch[id].dirty   = false;
         xSemaphoreGive(_mutex);
     } else {

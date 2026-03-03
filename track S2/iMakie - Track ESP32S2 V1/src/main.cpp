@@ -108,6 +108,15 @@ extern void handleButtonLedState(ButtonId id);
 // --- HANDLER DE DATOS RS485 ---
 // ===================================
 static void onMasterData(const MasterPacket& pkt) {
+    // --- Estado de conexión comandado por master ---
+    ConnectionState newState = pkt.connected ? 
+        ConnectionState::CONNECTED : ConnectionState::DISCONNECTED;
+    if (newState != logicConnectionState) {
+        logicConnectionState = newState;
+        needsTOTALRedraw = true;
+    }
+    if (logicConnectionState != ConnectionState::CONNECTED) return;
+
     // --- Nombre de pista → header ---
     char nameBuf[8] = {};
     memcpy(nameBuf, pkt.trackName, 7);
@@ -163,8 +172,8 @@ static void onMasterData(const MasterPacket& pkt) {
         // TODO: activar motor
     }
 
-    Serial.printf("[RS485] RX | track:%.7s fader:%u vu:%u flags:0x%02X\n",
-                  pkt.trackName, pkt.faderTarget, pkt.vuLevel, pkt.flags);
+    Serial.printf("[RS485] RX | track:%.7s fader:%u vu:%u flags:0x%02X connected:%u\n",
+                  pkt.trackName, pkt.faderTarget, pkt.vuLevel, pkt.flags, pkt.connected);
 }
 
 
@@ -199,7 +208,17 @@ void loop() {
     rs485.update();
 
     // ← RS485: si hay datos nuevos del master
+    static unsigned long lastRxTime = 0;
+
     if (rs485.hasNewData()) {
+        lastRxTime = millis();
+
+        // Reconectar si estaba desconectado
+        if (logicConnectionState != ConnectionState::CONNECTED) {
+            logicConnectionState = ConnectionState::CONNECTED;
+            needsTOTALRedraw = true;
+        }
+
         const MasterPacket& pkt = rs485.getData();
         onMasterData(pkt);
 
@@ -214,6 +233,22 @@ void loop() {
 
         // Reset encoder delta tras enviarlo
         Encoder::reset();
+        //Serial.printf("[RS485] RX | track:%.7s fader:%u vu:%u flags:0x%02X connected:%u state:%d\n",
+        //      pkt.trackName, pkt.faderTarget, pkt.vuLevel, pkt.flags, 
+        //      pkt.connected, (int)logicConnectionState);
+    }
+
+    // Timeout RS485: sin datos en 500ms → desconectar
+    if (millis() - lastRxTime > 500) {
+        if (vuLevels > 0.0f) {
+            vuLevels = 0.0f;
+            vuPeakLevels = 0.0f;
+            needsVUMetersRedraw = true;
+        }
+        if (logicConnectionState != ConnectionState::DISCONNECTED) {
+            logicConnectionState = ConnectionState::DISCONNECTED;
+            needsTOTALRedraw = true;
+        }
     }
 
     // --- Encoder ---

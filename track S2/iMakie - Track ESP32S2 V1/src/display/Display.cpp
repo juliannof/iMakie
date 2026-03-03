@@ -28,7 +28,7 @@ bool needsMainAreaRedraw = false;
 bool needsHeaderRedraw   = false;
 bool needsVUMetersRedraw = false;
 bool needsVPotRedraw     = false;
-volatile ConnectionState logicConnectionState = ConnectionState::CONNECTED;
+volatile ConnectionState logicConnectionState = ConnectionState::DISCONNECTED;
 
 static int8_t currentVPotLevel = VPOT_DEFAULT_LEVEL;
 
@@ -108,7 +108,7 @@ void setVPotLevel(int8_t level) {
 void updateDisplay() {
     // Sin conexión RS485: pantalla offline
     if (logicConnectionState != ConnectionState::CONNECTED) {
-        static ConnectionState lastState = ConnectionState::DISCONNECTED;
+        static ConnectionState lastState = ConnectionState::CONNECTED;
         if (logicConnectionState != lastState) {
             tft.fillScreen(TFT_BG_COLOR);
             drawOfflineScreen();
@@ -156,11 +156,7 @@ void updateDisplay() {
 //  Pantallas de estado
 // ════════════════════════════════════════════════════════════
 void drawOfflineScreen() {
-    tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_DARKGREY);
-    tft.drawString("iMakie Control", tft.width() / 2, tft.height() / 2 - 20);
-    tft.setTextColor(TFT_ORANGE);
-    tft.drawString("Conectando...",  tft.width() / 2, tft.height() / 2 + 10);
+    tft.setBrightness(0);
 }
 
 void drawInitializingScreen() {

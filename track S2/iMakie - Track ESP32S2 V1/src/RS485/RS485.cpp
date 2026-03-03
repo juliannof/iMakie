@@ -5,6 +5,7 @@
 #include "RS485.h"
 #include "../config.h"
 
+
 RS485Slave rs485;
 
 void RS485Slave::begin(uint8_t myId) {
