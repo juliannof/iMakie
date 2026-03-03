@@ -1,115 +1,91 @@
-// src/main.cpp  –  iMakie Slave ESP32-S2
-// RS485 integrado — cambios marcados con // ← RS485
-
+// ============================================================
+//  main.cpp  —  iMakie PTxx Track S2
+//  REC long-press 1 s → SAT (gestionado en ButtonManager)
+//  Sin Serial. Todo el feedback en display.
+// ============================================================
 #include <Arduino.h>
 #include "config.h"
 #include "display/Display.h"
+#include "display/LovyanGFX_config.h"
 #include "hardware/encoder/Encoder.h"
 #include "hardware/Hardware.h"
-#include "RS485/RS485.h"        // ← RS485
-#include "protocol.h"           // ← RS485
+#include "RS485/RS485.h"
+#include "protocol.h"
+#include "button/ButtonManager.h"
+#include "menu/SatMenu.h"
+#include <driver/touch_sensor.h>   // touch_pad_init, touch_pad_read_raw_data
 
-// ---- Display objects ----
-#include "display/LovyanGFX_config.h"
+// ─── Display objects ──────────────────────────────────────────
 LGFX        tft;
 LGFX_Sprite header(&tft), mainArea(&tft), vuSprite(&tft), vPotSprite(&tft);
 
-// --- DECLARACIONES EXTERNAS ---
+// ─── Externs de Display.cpp ───────────────────────────────────
 extern void initDisplay();
 extern void updateDisplay();
-extern void setScreenBrightness(uint8_t brightness);
 extern void setVPotLevel(int8_t level);
-extern void handleVUMeterDecay();   // decay VU en loop
 extern int  currentVPotLevel;
 extern bool needsVPotRedraw;
 
-// --- VARIABLES DE ESTADO DE CANAL ---
+// ─── Variables de estado de canal ─────────────────────────────
 String assignmentString = "CH-01 ";
 String trackName        = "Track  ";
-bool recStates    = false;
-bool soloStates   = false;
-bool muteStates   = false;
-bool selectStates = true;
-bool vuClipState  = false;
-float vuPeakLevels   = 0.0f;
-float faderPositions = 0.0f;
-float vuLevels       = 0.0f;
+bool  recStates    = false;
+bool  soloStates   = false;
+bool  muteStates   = false;
+bool  selectStates = true;
+bool  vuClipState  = false;
+float vuPeakLevels    = 0.0f;
+float faderPositions  = 0.0f;
+float vuLevels        = 0.0f;
 unsigned long vuLastUpdateTime     = 0;
 unsigned long vuPeakLastUpdateTime = 0;
 
-// ← RS485: estado de respuesta al master (actualizado desde hardware y callbacks)
+// ─── RS485 response packet ────────────────────────────────────
 static SlavePacket _resp = {};
 
-// ← RS485: leer ADC del fader (stub — conectar a tu ADC real)
-static uint16_t readFaderADC() {
-    // TODO: sustituir por lectura ADC real
-    // return analogRead(FADER_POT);
-    return 2048;
-}
+// ─── Flag: suspendido por SAT ─────────────────────────────────
+static bool _suspended = false;
 
-// ← RS485: leer estado táctil del fader (stub)
-static uint8_t readFaderTouch() {
-    // TODO: leer pin táctil real
-    // return (touchRead(FADER_TOUCH_PIN) < threshold) ? 1 : 0;
-    return 0;
-}
+// ─── SAT menu ─────────────────────────────────────────────────
+static SatMenu* satMenu = nullptr;
 
-
-// ===================================
-// --- CALLBACK DE BOTONES ---
-// ===================================
-void myButtonEventHandler(ButtonId id) {
-    Serial.print("Evento de boton: ");   // ← RS485: Serial en S2
-
-    switch (id) {
-        case ButtonId::REC:
-            recStates = !recStates;
-            Serial.printf("REC -> %s\n", recStates ? "ON" : "OFF");
-            needsMainAreaRedraw = true;
-            break;
-        case ButtonId::SOLO:
-            soloStates = !soloStates;
-            Serial.printf("SOLO -> %s\n", soloStates ? "ON" : "OFF");
-            needsMainAreaRedraw = true;
-            break;
-        case ButtonId::MUTE:
-            muteStates = !muteStates;
-            Serial.printf("MUTE -> %s\n", muteStates ? "ON" : "OFF");
-            needsMainAreaRedraw = true;
-            break;
-        case ButtonId::SELECT:
-            selectStates = !selectStates;
-            Serial.printf("SELECT -> %s\n", selectStates ? "ON" : "OFF");
-            needsHeaderRedraw = true;
-            break;
-        case ButtonId::ENCODER_SELECT:
-            Serial.println("ENCODER SELECT");
-            Encoder::reset();
-            needsVPotRedraw = true;
-            break;
-        case ButtonId::UNKNOWN:
-            Serial.println("Boton desconocido");
-            break;
-    }
-
-    // ← RS485: reconstruir byte de flags tras cualquier cambio de botón
-    _resp.buttons = 0;
-    if (recStates)    _resp.buttons |= FLAG_REC;
-    if (soloStates)   _resp.buttons |= FLAG_SOLO;
-    if (muteStates)   _resp.buttons |= FLAG_MUTE;
-    if (selectStates) _resp.buttons |= FLAG_SELECT;
-}
-
-
-// Para llamar handleButtonLedState desde main.cpp
+// ─── Forward ──────────────────────────────────────────────────
 extern void handleButtonLedState(ButtonId id);
 
-// ===================================
-// --- HANDLER DE DATOS RS485 ---
-// ===================================
+// ─── Motor helpers ────────────────────────────────────────────
+static void motorStop() {
+    digitalWrite(MOTOR_EN,  LOW);
+    digitalWrite(MOTOR_IN1, LOW);
+    digitalWrite(MOTOR_IN2, LOW);
+}
+static void motorDrive(int pwm) {
+    if (pwm == 0) { motorStop(); return; }
+    digitalWrite(MOTOR_EN, HIGH);
+    if (pwm > 0) {
+        analogWrite(MOTOR_IN1, constrain( pwm, 0, 255));
+        digitalWrite(MOTOR_IN2, LOW);
+    } else {
+        digitalWrite(MOTOR_IN1, LOW);
+        analogWrite(MOTOR_IN2, constrain(-pwm, 0, 255));
+    }
+}
+
+// ─── Stubs ADC / Touch ────────────────────────────────────────
+static uint16_t readFaderADC() { return analogRead(FADER_POT); }
+static uint8_t  readFaderTouch() {
+    // touchRead() es la API Arduino del ESP32-S2 para capacitive touch.
+    // Valor alto = sin contacto, valor bajo = tocado.
+    uint32_t v = touchRead(FADER_TOUCH_PIN);   // GPIO1 / Touch1
+    static uint32_t base = 0;
+    if (base == 0 && v > 100) base = v;
+    return (base > 0 && v < base * 0.80f) ? 1 : 0;
+}
+
+// =============================================================
+//  onMasterData  —  RS485
+// =============================================================
 static void onMasterData(const MasterPacket& pkt) {
-    // --- Estado de conexión comandado por master ---
-    ConnectionState newState = pkt.connected ? 
+    ConnectionState newState = pkt.connected ?
         ConnectionState::CONNECTED : ConnectionState::DISCONNECTED;
     if (newState != logicConnectionState) {
         logicConnectionState = newState;
@@ -117,158 +93,143 @@ static void onMasterData(const MasterPacket& pkt) {
     }
     if (logicConnectionState != ConnectionState::CONNECTED) return;
 
-    // --- Nombre de pista → header ---
     char nameBuf[8] = {};
-    memcpy(nameBuf, pkt.trackName, 7);
-    nameBuf[7] = '\0';
-    if (trackName != nameBuf) {
-        trackName = String(nameBuf);
-        needsHeaderRedraw = true;
-    }
+    memcpy(nameBuf, pkt.trackName, 7); nameBuf[7] = '\0';
+    if (trackName != nameBuf) { trackName = String(nameBuf); needsHeaderRedraw = true; }
 
-    // --- Flags → display + neopixel por botón ---
-    bool newRec    = (pkt.flags & FLAG_REC)    != 0;
-    bool newSolo   = (pkt.flags & FLAG_SOLO)   != 0;
-    bool newMute   = (pkt.flags & FLAG_MUTE)   != 0;
-    bool newSelect = (pkt.flags & FLAG_SELECT) != 0;
+    bool nr = (pkt.flags & FLAG_REC)    != 0;
+    bool ns = (pkt.flags & FLAG_SOLO)   != 0;
+    bool nm = (pkt.flags & FLAG_MUTE)   != 0;
+    bool nq = (pkt.flags & FLAG_SELECT) != 0;
+    if (recStates    != nr) { recStates    = nr; handleButtonLedState(ButtonId::REC);    needsMainAreaRedraw = true; }
+    if (soloStates   != ns) { soloStates   = ns; handleButtonLedState(ButtonId::SOLO);   needsMainAreaRedraw = true; }
+    if (muteStates   != nm) { muteStates   = nm; handleButtonLedState(ButtonId::MUTE);   needsMainAreaRedraw = true; }
+    if (selectStates != nq) { selectStates = nq; handleButtonLedState(ButtonId::SELECT); needsHeaderRedraw   = true; }
 
-    if (recStates != newRec) {
-        recStates = newRec;
-        handleButtonLedState(ButtonId::REC);
-        needsMainAreaRedraw = true;
-    }
-    if (soloStates != newSolo) {
-        soloStates = newSolo;
-        handleButtonLedState(ButtonId::SOLO);
-        needsMainAreaRedraw = true;
-    }
-    if (muteStates != newMute) {
-        muteStates = newMute;
-        handleButtonLedState(ButtonId::MUTE);
-        needsMainAreaRedraw = true;
-    }
-    if (selectStates != newSelect) {
-        selectStates = newSelect;
-        handleButtonLedState(ButtonId::SELECT);
-        needsHeaderRedraw = true;
-    }
-
-    // --- VU level (0-127 → 0.0-1.0) ---
     float newVu = pkt.vuLevel / 127.0f;
-    if (abs(vuLevels - newVu) > 0.01f) {
+    if (fabsf(vuLevels - newVu) > 0.01f) {
         vuLevels = newVu;
-        if (vuLevels > vuPeakLevels) {
-            vuPeakLevels = vuLevels;
-            vuPeakLastUpdateTime = millis();
-        }
+        if (vuLevels > vuPeakLevels) { vuPeakLevels = vuLevels; vuPeakLastUpdateTime = millis(); }
         vuLastUpdateTime = millis();
         needsVUMetersRedraw = true;
     }
 
-    // --- Posición de fader objetivo (14-bit → 0.0-1.0) ---
     float newFader = pkt.faderTarget / 16383.0f;
-    if (abs(faderPositions - newFader) > 0.001f) {
+    if (!_suspended && fabsf(faderPositions - newFader) > 0.001f) {
         faderPositions = newFader;
-        // TODO: activar motor
+        // TODO: controlador de motor
     }
-
-    Serial.printf("[RS485] RX | track:%.7s fader:%u vu:%u flags:0x%02X connected:%u\n",
-                  pkt.trackName, pkt.faderTarget, pkt.vuLevel, pkt.flags, pkt.connected);
 }
 
-
-// ===================================
-// --- SETUP ---
-// ===================================
+// =============================================================
+//  SETUP
+// =============================================================
 void setup() {
-    Serial.begin(115200);    // ← RS485: Serial en lugar de Serial
-    delay(1000);
+    pinMode(MOTOR_IN1, OUTPUT);
+    pinMode(MOTOR_IN2, OUTPUT);
+    pinMode(MOTOR_EN,  OUTPUT);
+    motorStop();
+
+    // touchRead() no requiere init explícito en Arduino ESP32
 
     initDisplay();
-    Serial.println("[SLAVE] Display OK");
-
-    initHardware();
-    Serial.println("[SLAVE] Hardware OK");
-
+    initHardware();           // Crea instancias Button2, incluyendo buttonRec
     setVPotLevel(VPOT_DEFAULT_LEVEL);
-    registerButtonEventCallback(myButtonEventHandler);
     Encoder::begin();
+    // SAT Menu — se crea ANTES de RS485 para poder leer trackId desde NVS
+    satMenu = new SatMenu(&tft);
+    satMenu->onMotorOff  ([]{ motorStop(); _suspended = true;  });
+    satMenu->onMotorOn   ([]{ motorStop(); _suspended = false; needsTOTALRedraw = true; });
+    satMenu->onMotorDrive([](int pwm){ motorDrive(pwm); });
+    satMenu->onRS485Off  ([]{ _suspended = true;  });
+    satMenu->onRS485On   ([]{ _suspended = false; needsTOTALRedraw = true; });
+    satMenu->onReboot    ([]{ ESP.restart(); });
+    satMenu->onWiFiLaunch([]{ /* WiFiManager.startConfigPortal() */ });
+    satMenu->onConfigSaved([](const SatConfig& cfg){
+        rs485.begin(cfg.trackId);
+    });
+    // Brillo máximo al entrar en SAT, restaura a 200 al salir
+    satMenu->onBrightness([](uint8_t v){ setScreenBrightness(v); }, 200);
 
-    // ← RS485: iniciar bus
-    rs485.begin(MY_SLAVE_ID);
-    Serial.printf("[SLAVE] RS485 OK | ID:%d\n", MY_SLAVE_ID);
+    // RS485: usar trackId guardado en NVS (leído por SatMenu en su constructor)
+    uint8_t slaveId = satMenu->getConfig().trackId;
+    rs485.begin(slaveId);
+
+    // Si trackId no está configurado (valor 0 = nunca guardado),
+    // entrar en SAT directamente para forzar la identificación del módulo.
+    if (slaveId == 0) {
+        satMenu->open();
+    }
+
+    // ButtonManager: gestiona todos los botones + long-press REC → SAT
+    // Debe llamarse DESPUÉS de initHardware() (necesita buttonRec ya creado)
+    ButtonManager::begin(&tft, satMenu);
 }
 
-
-// ===================================
-// --- LOOP ---
-// ===================================
+// =============================================================
+//  LOOP
+// =============================================================
 void loop() {
-    // ← RS485: procesar buffer de recepción
-    rs485.update();
-
-    // ← RS485: si hay datos nuevos del master
-    static unsigned long lastRxTime = 0;
-
-    if (rs485.hasNewData()) {
-        lastRxTime = millis();
-
-        // Reconectar si estaba desconectado
-        if (logicConnectionState != ConnectionState::CONNECTED) {
-            logicConnectionState = ConnectionState::CONNECTED;
-            needsTOTALRedraw = true;
-        }
-
-        const MasterPacket& pkt = rs485.getData();
-        onMasterData(pkt);
-
-        // Preparar respuesta con estado actual del hardware
-        _resp.faderPos      = readFaderADC();
-        _resp.touchState    = readFaderTouch();
-        // _resp.buttons ya se actualiza en myButtonEventHandler
-        _resp.encoderDelta  = (int8_t)constrain(Encoder::getCount(), -127, 127);
-        _resp.encoderButton = 0;  // TODO: leer botón encoder si procede
-
-        rs485.sendResponse(_resp);
-
-        // Reset encoder delta tras enviarlo
-        Encoder::reset();
-        //Serial.printf("[RS485] RX | track:%.7s fader:%u vu:%u flags:0x%02X connected:%u state:%d\n",
-        //      pkt.trackName, pkt.faderTarget, pkt.vuLevel, pkt.flags, 
-        //      pkt.connected, (int)logicConnectionState);
+    // SAT abierto: solo menú
+    if (satMenu && satMenu->isOpen()) {
+        satMenu->update();
+        return;
     }
 
-    // Timeout RS485: sin datos en 500ms → desconectar
-    if (millis() - lastRxTime > 500) {
-        if (vuLevels > 0.0f) {
-            vuLevels = 0.0f;
-            vuPeakLevels = 0.0f;
-            needsVUMetersRedraw = true;
+    // Actualizar barra de progreso del long-press REC
+    ButtonManager::update();
+    if (satMenu && satMenu->isOpen()) return;
+
+    // RS485
+    if (!_suspended) {
+        rs485.update();
+        static unsigned long lastRxTime = 0;
+
+        if (rs485.hasNewData()) {
+            lastRxTime = millis();
+            if (logicConnectionState != ConnectionState::CONNECTED) {
+                logicConnectionState = ConnectionState::CONNECTED;
+                needsTOTALRedraw = true;
+            }
+            onMasterData(rs485.getData());
+
+            _resp.faderPos      = readFaderADC();
+            _resp.touchState    = readFaderTouch();
+            _resp.buttons       = ButtonManager::getButtonFlags();
+            _resp.encoderDelta  = (int8_t)constrain(Encoder::getCount(), -127, 127);
+            _resp.encoderButton = 0;
+            rs485.sendResponse(_resp);
+
+            ButtonManager::clearButtonFlags();
+            Encoder::reset();
         }
-        if (logicConnectionState != ConnectionState::DISCONNECTED) {
-            logicConnectionState = ConnectionState::DISCONNECTED;
-            needsTOTALRedraw = true;
+
+        if (millis() - lastRxTime > 500) {
+            if (vuLevels > 0.0f) {
+                vuLevels = 0.0f; vuPeakLevels = 0.0f;
+                needsVUMetersRedraw = true;
+            }
+            if (logicConnectionState != ConnectionState::DISCONNECTED) {
+                logicConnectionState = ConnectionState::DISCONNECTED;
+                needsTOTALRedraw = true;
+            }
         }
     }
 
-    // --- Encoder ---
+    // Encoder
     Encoder::update();
     if (Encoder::hasChanged()) {
-        long value = Encoder::getCount();
-        int newVPotLevel = constrain(value, -7, 7);
-        if (newVPotLevel != Encoder::currentVPotLevel) {
-            Encoder::currentVPotLevel = newVPotLevel;
+        int newLevel = constrain((int)Encoder::getCount(), -7, 7);
+        if (newLevel != Encoder::currentVPotLevel) {
+            Encoder::currentVPotLevel = newLevel;
             needsVPotRedraw = true;
         }
     }
 
-    // --- Botones ---
+    // Botones (Button2 tick — necesario para que Button2 detecte eventos)
     updateButtons();
 
-    // --- VU decay ---
-    //handleVUMeterDecay();
-
-    // --- Display ---
+    // Display
     updateDisplay();
 
     delay(1);

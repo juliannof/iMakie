@@ -44,6 +44,11 @@ enum class ConnectionState {
 #define ENCODER_SW_PIN      11 // GPIO para el Switch (botón) del encoder
 #define ENCODER_DEBOUNCE_DELAY_MS 5
 
+#define FADER_POT    10   // ADC1_CH9
+#define MOTOR_IN1    18
+#define MOTOR_IN2    16
+#define MOTOR_EN     14
+
 
 // <<<<<<<<<<<<<<<<<<<<<<<< DEFINICIONES DEL ENCODER ROTATIVO >>>>>>>>>>>>>>>>>>>>>>>>>>
 // Retardo de rebote para la rotación del encoder en ms. Se usará como valor inicial para la variable global.
