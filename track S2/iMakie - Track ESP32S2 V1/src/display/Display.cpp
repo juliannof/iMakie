@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include "Display.h"
 #include "hardware/encoder/Encoder.h"
+#include "../hardware/Hardware.h"
 #include "../config.h"
 
 extern LGFX        tft;
@@ -174,7 +175,7 @@ void drawHeaderSprite() {
         screenBrightness = 255;
     } else {
         header.fillRoundRect(rectX, rectY, rectWidth, rectHeight, 3, TFT_MCU_GRAY);
-        screenBrightness = 30;
+        screenBrightness = 70;
     }
     setScreenBrightness(screenBrightness);
     header.pushSprite(0, 0);
@@ -206,6 +207,7 @@ void drawMainArea() {
     drawButton(mainArea, 10 + BUTTON_WIDTH + 2,     7, BUTTON_WIDTH, BUTTON_HEIGHT, "SOLO", soloStates, TFT_SOLO_COLOR);
     drawButton(mainArea, 10 + BUTTON_WIDTH * 2 + 4, 7, BUTTON_WIDTH, BUTTON_HEIGHT, "MUTE", muteStates, TFT_MUTE_COLOR);
 
+
     // --- Track name ---
     mainArea.setTextDatum(TL_DATUM);
     mainArea.setTextColor(TFT_WHITE, TFT_BG_COLOR);
@@ -231,6 +233,8 @@ void drawMainArea() {
     mainArea.print(faderDbStr);
 
     mainArea.pushSprite(0, HEADER_HEIGHT);
+    updateAllNeopixels();
+    
 }
 
 // ════════════════════════════════════════════════════════════

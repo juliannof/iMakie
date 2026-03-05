@@ -432,37 +432,49 @@ void processMackieSysEx(byte* payload, int len) {
 
         // ← RS485 NUEVO: enviar trackName al slave
         case 0x12: {
-            if (len < 6) break;
-            byte startOffset = payload[5];
-            int text_len = len - 6;
-            if (text_len <= 0) break;
+    if (len < 6) break;
+    byte startOffset = payload[5];
+    int  text_len    = len - 6;
+    if (text_len <= 0) break;
 
-            for (int i = 0; i < text_len; i++) {
-                byte currentOffset = startOffset + i;
-                if (currentOffset % 7 != 0) continue;
-                if (currentOffset >= 56) continue;
+    // Buffers temporales inicializados con los nombres actuales
+    char nameBufs[8][8] = {};
+    bool nameChanged[8] = {};
+    for (int t = 0; t < 8; t++) {
+        strncpy(nameBufs[t], trackNames[t].c_str(), 7);
+        nameBufs[t][7] = '\0';
+    }
 
-                int track_idx = currentOffset / 7;
-                if (track_idx >= 8) continue;
+    for (int i = 0; i < text_len; i++) {
+        byte currentOffset = startOffset + i;
+        if (currentOffset >= 56) break;          // 8 pistas × 7 chars = 56
 
-                int charsToCopy = min((size_t)6, (size_t)(text_len - i));
-                char name_buf[8] = {};
-                strncpy(name_buf, (const char*)&payload[6 + i], charsToCopy);
-                name_buf[charsToCopy] = '\0';
-                for (int j = strlen(name_buf) - 1; j >= 0; j--) {
-                    if (name_buf[j] == ' ') name_buf[j] = '\0'; else break;
-                }
+        int track_idx = currentOffset / 7;       // qué pista
+        int char_pos  = currentOffset % 7;       // qué carácter dentro del nombre
 
-                if (trackNames[track_idx] != name_buf) {
-                    trackNames[track_idx] = String(name_buf);
-                    needsMainAreaRedraw = true;
-                }
+        if (track_idx >= 8) break;
 
-                // ← RS485 NUEVO: slave 1-indexed
-                rs485.setTrackName(track_idx + 1, name_buf);
-            }
-            break;
+        nameBufs[track_idx][char_pos] = (char)payload[6 + i];
+        nameChanged[track_idx] = true;
+    }
+
+    for (int t = 0; t < 8; t++) {
+        if (!nameChanged[t]) continue;
+
+        // Trim espacios finales
+        for (int j = 6; j >= 0; j--) {
+            if (nameBufs[t][j] == ' ' || nameBufs[t][j] == '\0') nameBufs[t][j] = '\0';
+            else break;
         }
+
+        if (trackNames[t] != nameBufs[t]) {
+            trackNames[t] = String(nameBufs[t]);
+            needsMainAreaRedraw = true;
+        }
+        rs485.setTrackName(t + 1, nameBufs[t]);
+    }
+    break;
+}
 
         case 0x11: {
             if (len < 7) break;

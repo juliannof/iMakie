@@ -125,6 +125,7 @@ static void onMasterData(const MasterPacket& pkt) {
 //  SETUP
 // =============================================================
 void setup() {
+    
     pinMode(MOTOR_IN1, OUTPUT);
     pinMode(MOTOR_IN2, OUTPUT);
     pinMode(MOTOR_EN,  OUTPUT);
@@ -164,6 +165,14 @@ void setup() {
     // ButtonManager: gestiona todos los botones + long-press REC → SAT
     // Debe llamarse DESPUÉS de initHardware() (necesita buttonRec ya creado)
     ButtonManager::begin(&tft, satMenu);
+
+    if (psramFound()) {
+        Serial.printf("PSRAM: %u KB total, %u KB libre\n",
+        ESP.getPsramSize() / 1024,
+        ESP.getFreePsram() / 1024);
+    } else {
+        Serial.println("ERROR: PSRAM no detectada");
+    }
 }
 
 // =============================================================
@@ -175,6 +184,7 @@ void loop() {
         satMenu->update();
         return;
     }
+
 
     // Actualizar barra de progreso del long-press REC
     ButtonManager::update();
@@ -232,5 +242,7 @@ void loop() {
     // Display
     updateDisplay();
 
-    delay(1);
+    delay(2);
+
+    updateAllNeopixels();
 }

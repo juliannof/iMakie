@@ -55,5 +55,7 @@ void registerFaderReleaseCallback(ButtonPressCallback callback);
 void setNeopixelState(int neopixelIndex, uint8_t r, uint8_t g, uint8_t b);
 void showNeopixels(); // Envía los colores actualizados a los Neopixels
 void setNeopixelGlobalBrightness(uint8_t brightness);
+void handleButtonLedState(ButtonId id); // ← añadir
+void updateAllNeopixels();
 
 // void updateNeopixelSequence(); // Descomentar si quieres iniciar la secuencia desde main.cpp

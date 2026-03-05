@@ -107,6 +107,7 @@ void initHardware() {
 
     // --- Inicialización de Neopixels ---
     neopixels.begin();
+    neopixels.setBrightness(NEOPIXEL_DEFAULT_BRIGHTNESS);
     // --- NUEVO: Encender LEDs 1 al 4 en Blanco ---
     // Usamos un bucle para recorrer los índices 0, 1, 2 y 3
     for(int i = 0; i < 4; i++) {
@@ -116,7 +117,7 @@ void initHardware() {
     
     neopixels.show(); // ¡Importante! Envía los datos actualizados a la tira de LEDs para que se refleje el cambio.
     delay(500); // Mantén los LEDs encendidos por un momento para verificar que funcionan (500ms)
-    neopixels.setBrightness(NEOPIXEL_DEFAULT_BRIGHTNESS);
+    
     neopixels.clear(); // Apaga todos los píxeles al inicio.
     neopixels.show();  // Confirma el apagado.
     
@@ -188,12 +189,14 @@ void updateButtons() {
 // === setNeopixelState: Configura el color de un Neopixel individual ===
 void setNeopixelState(int neopixelIndex, uint8_t r, uint8_t g, uint8_t b) {
     if (neopixelIndex >= 0 && neopixelIndex < NEOPIXEL_COUNT) {
-       neopixels.setPixelColor(neopixelIndex, neopixels.Color(r, g, b)); // Usa neopixels.Color() para claridad
+        Serial.printf("[NEO] pixel=%d R=%d G=%d B=%d\n", neopixelIndex, r, g, b);
+        neopixels.setPixelColor(neopixelIndex, neopixels.Color(r, g, b)); // Usa neopixels.Color() para claridad
     }
 }
 
 // === showNeopixels: Envía los colores configurados a los LEDs físicos ===
 void showNeopixels() {
+    Serial.println("show()");  // ← ¿aparece en monitor cuando pulsas un botón?
     neopixels.show();
 }
 
@@ -233,23 +236,21 @@ static ButtonId getButtonIdFromInstance(Button2& btn) {
 // === handleButtonEvent: Manejador unificado para los eventos de Button2 ===
 static void handleButtonEvent(Button2& btn, bool isPressed) {
     ButtonId id = getButtonIdFromInstance(btn);
-    if (id == ButtonId::UNKNOWN) return; // Si no conocemos el ID, ignorar
-
-    handleButtonLedState(id); // Gestionar el LED asociado al botón
-
-    if (isPressed) { // Si se acaba de presionar
-        // Llamar al callback específico de pulsación si está registrado
-        // Se comprueba el rango para evitar acceder fuera de onButtonPressCallbacks
-        if (static_cast<int>(id) >= 0 && static_cast<int>(id) <= static_cast<int>(ButtonId::ENCODER_SELECT) && onButtonPressCallbacks[static_cast<int>(id)] != nullptr) {
-            onButtonPressCallbacks[static_cast<int>(id)]();
+    
+    if (isPressed) {  // ← solo toggle al presionar
+        switch (id) {
+            case ButtonId::REC:    recStates    = !recStates;    break;
+            case ButtonId::SOLO:   soloStates   = !soloStates;   break;
+            case ButtonId::MUTE:   muteStates   = !muteStates;   break;
+            case ButtonId::SELECT: selectStates = !selectStates; break;
+            default: break;
         }
-        // Llamar al callback global
-        if (globalButtonEventCallback != nullptr) {
-            globalButtonEventCallback(id);
-        }
-    } else { // Si se acaba de soltar
-        // Por ahora, no hay callbacks específicos para "soltar" para los Button2 primarios.
-        // Si se necesitan, se deberían añadir.
+    }
+    
+    handleButtonLedState(id);  // actualiza LED en press y release (sin problema)
+    
+    if (globalButtonEventCallback != nullptr) {
+        globalButtonEventCallback(id);
     }
 }
 
@@ -289,46 +290,64 @@ static void handleButtonRelease(Button2& btn) {
 //  Esta función AHORA NO TOMA `turnOn` como parámetro.
 //  Decide el estado del LED leyendo directamente `recStates`, `soloStates`, etc.
 // =========================================================================
-void handleButtonLedState(ButtonId id) { // <<<< ELIMINADO EL PARÁMETRO `bool turnOn`
-    // Obtener el estado lógico actual que el LED debe reflejar
+void handleButtonLedState(ButtonId id) {
     bool shouldBeOn = false;
     uint8_t r=0, g=0, b=0;
     int neopixelIndex = -1;
 
     switch (id) {
         case ButtonId::REC:
-            shouldBeOn = recStates; // <<<< LEYENDO EL ESTADO LÓGICO GLOBAL (toggle)
+            shouldBeOn = recStates;
             neopixelIndex = NEOPIXEL_FOR_REC;
             r = BUTTON_REC_LED_COLOR_R; g = BUTTON_REC_LED_COLOR_G; b = BUTTON_REC_LED_COLOR_B;
             break;
         case ButtonId::SOLO:
-            shouldBeOn = soloStates; // <<<< LEYENDO EL ESTADO LÓGICO GLOBAL (toggle)
+            shouldBeOn = soloStates;
             neopixelIndex = NEOPIXEL_FOR_SOLO;
             r = BUTTON_SOLO_LED_COLOR_R; g = BUTTON_SOLO_LED_COLOR_G; b = BUTTON_SOLO_LED_COLOR_B;
             break;
         case ButtonId::MUTE:
-            shouldBeOn = muteStates; // <<<< LEYENDO EL ESTADO LÓGICO GLOBAL (toggle)
+            shouldBeOn = muteStates;
             neopixelIndex = NEOPIXEL_FOR_MUTE;
             r = BUTTON_MUTE_LED_COLOR_R; g = BUTTON_MUTE_LED_COLOR_G; b = BUTTON_MUTE_LED_COLOR_B;
             break;
-        case ButtonId::SELECT:
-            shouldBeOn = selectStates; // <<<< LEYENDO EL ESTADO LÓGICO GLOBAL (toggle)
+        case ButtonId::SELECT: {
+            shouldBeOn = selectStates;
             neopixelIndex = NEOPIXEL_FOR_SELECT;
-            // Para SELECT, el color se define como blanco al 15%
-            uint8_t scaled_brightness_for_select_pixel = (uint16_t)255 * NEOPIXEL_COLOR_3_BRIGHTNESS_FACTOR / 50;
-            r = g = b = scaled_brightness_for_select_pixel;
+            uint8_t bri = (uint16_t)255 * NEOPIXEL_COLOR_3_BRIGHTNESS_FACTOR / 100;
+            r = g = b = bri;
             break;
-        
+        }
+        default: return;
     }
 
-    if (neopixelIndex != -1) { // Si el botón tiene un Neopixel asociado
-        if (shouldBeOn) {
-            setNeopixelState(neopixelIndex, r, g, b); // Encender con su color
-        } else {
-            setNeopixelState(neopixelIndex, 0, 0, 0); // Apagar
-        }
-        showNeopixels();
+    if (neopixelIndex != -1) {
+        setNeopixelState(neopixelIndex, shouldBeOn ? r : 0, shouldBeOn ? g : 0, shouldBeOn ? b : 0);
+        // ← SIN showNeopixels() aquí
     }
+}
+
+void updateAllNeopixels() {
+    static bool lastRec    = false;
+    static bool lastSolo   = false;
+    static bool lastMute   = false;
+    static bool lastSelect = false;
+
+    if (recStates    == lastRec    &&
+        soloStates   == lastSolo   &&
+        muteStates   == lastMute   &&
+        selectStates == lastSelect) return;
+
+    lastRec    = recStates;
+    lastSolo   = soloStates;
+    lastMute   = muteStates;
+    lastSelect = selectStates;
+
+    handleButtonLedState(ButtonId::REC);
+    handleButtonLedState(ButtonId::SOLO);
+    handleButtonLedState(ButtonId::MUTE);
+    handleButtonLedState(ButtonId::SELECT);
+    showNeopixels();
 }
 
 // =========================================================================
