@@ -125,6 +125,8 @@ static void onMasterData(const MasterPacket& pkt) {
 //  SETUP
 // =============================================================
 void setup() {
+    Serial.begin(115200);
+    delay(500); // Tiempo para que el CDC USB enumere
     
     pinMode(MOTOR_IN1, OUTPUT);
     pinMode(MOTOR_IN2, OUTPUT);
