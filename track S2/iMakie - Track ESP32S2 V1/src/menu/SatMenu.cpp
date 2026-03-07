@@ -720,7 +720,7 @@ void SatMenu::_tickTestFader(Btn b) {
         _fadT = now;
         // Múltiples lecturas y promedio
         int sum = 0;
-        for (int i = 0; i < 8; i++) sum += analogRead(FADER_POT);
+        for (int i = 0; i < 8; i++) sum += analogRead(FADER_POT_PIN);
         _fadRaw = sum / 8;
         if (_fadRaw < _fadCalMin) _fadCalMin = _fadRaw;
         if (_fadRaw > _fadCalMax) _fadCalMax = _fadRaw;

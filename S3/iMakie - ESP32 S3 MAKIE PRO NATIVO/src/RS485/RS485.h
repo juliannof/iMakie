@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "../config.h"
 #include "protocol.h"
 
 // ============================================================
@@ -9,22 +10,6 @@
 //  Core 1: RS485 polling task (prioridad 5)
 //  Core 0: MIDI + leer respuestas de slaves
 // ============================================================
-
-// --- Pines ---
-#define RS485_TX_PIN          15
-#define RS485_RX_PIN          16
-#define RS485_ENABLE_PIN       1
-
-// --- Protocolo ---
-#define RS485_BAUD        500000
-#define NUM_SLAVES             3   // ← actualizar al añadir hardware
-
-// --- Timing (µs) ---
-#define RS485_TX_ENABLE_US     10
-#define RS485_TX_DONE_US       10
-#define RS485_RESP_TIMEOUT_US 1500
-#define RS485_GAP_US           300
-#define POLL_CYCLE_MS          20
 
 
 

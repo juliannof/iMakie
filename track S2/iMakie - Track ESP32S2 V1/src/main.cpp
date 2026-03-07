@@ -14,10 +14,13 @@
 #include "button/ButtonManager.h"
 #include "menu/SatMenu.h"
 #include <driver/touch_sensor.h>   // touch_pad_init, touch_pad_read_raw_data
+#include "fader/FaderADC.h"
 
 // ─── Display objects ──────────────────────────────────────────
 LGFX        tft;
 LGFX_Sprite header(&tft), mainArea(&tft), vuSprite(&tft), vPotSprite(&tft);
+
+FaderADC faderADC;
 
 // ─── Externs de Display.cpp ───────────────────────────────────
 extern void initDisplay();
@@ -71,7 +74,7 @@ static void motorDrive(int pwm) {
 }
 
 // ─── Stubs ADC / Touch ────────────────────────────────────────
-static uint16_t readFaderADC() { return analogRead(FADER_POT); }
+static uint16_t readFaderADC() { return analogRead(FADER_POT_PIN); }
 static uint8_t  readFaderTouch() {
     // touchRead() es la API Arduino del ESP32-S2 para capacitive touch.
     // Valor alto = sin contacto, valor bajo = tocado.
@@ -127,11 +130,12 @@ static void onMasterData(const MasterPacket& pkt) {
 void setup() {
     Serial.begin(115200);
     delay(500); // Tiempo para que el CDC USB enumere
-    
+
     pinMode(MOTOR_IN1, OUTPUT);
     pinMode(MOTOR_IN2, OUTPUT);
     pinMode(MOTOR_EN,  OUTPUT);
     motorStop();
+    faderADC.begin();
 
     // touchRead() no requiere init explícito en Arduino ESP32
 
@@ -247,4 +251,10 @@ void loop() {
     delay(2);
 
     updateAllNeopixels();
+
+    faderADC.update();
+    uint16_t pos = faderADC.getFaderPos(); // 0–8191
+    // Convertir a pitch bend Mackie (0–16383):
+    uint16_t pitchBend = (uint16_t)(pos * 16383.0f);
+
 }

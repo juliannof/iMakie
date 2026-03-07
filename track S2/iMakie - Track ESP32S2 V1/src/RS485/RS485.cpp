@@ -81,8 +81,8 @@ void RS485Slave::_processBuffer() {
                     uint8_t crc = rs485_crc8(_rxBuf, sizeof(MasterPacket) - 1);
                     if (crc != _rxBuf[sizeof(MasterPacket) - 1]) {
                         _crcErrors++;
-                        Serial.printf("[RS485] CRC error calc=0x%02X recv=0x%02X\n",
-                                         crc, _rxBuf[sizeof(MasterPacket) - 1]);
+                        //Serial.printf("[RS485] CRC error calc=0x%02X recv=0x%02X\n",
+                        //                 crc, _rxBuf[sizeof(MasterPacket) - 1]);
                     } else if (_rxBuf[1] != _myId) {
                         _wrongId++;
                     } else {

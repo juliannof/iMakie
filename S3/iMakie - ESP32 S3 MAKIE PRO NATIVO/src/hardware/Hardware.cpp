@@ -51,6 +51,8 @@ void initHardware() {
   }
   
   trellis.show();
+
+  digitalWrite(LED_BUILTIN, LOW);
   
   log_d("[SETUP] Módulo de Hardware iniciado y verificado.");
 }

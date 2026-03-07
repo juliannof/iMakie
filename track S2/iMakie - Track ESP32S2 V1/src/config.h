@@ -26,7 +26,6 @@ enum class ConnectionState {
 // ===================================
 // --- RS485 ---
 // ===================================
-#define MY_SLAVE_ID              1   // ← cambiar por cada unidad (1-17)
 
 #define RS485_RX_PIN             9
 #define RS485_TX_PIN             8
@@ -44,7 +43,6 @@ enum class ConnectionState {
 #define ENCODER_SW_PIN      11 // GPIO para el Switch (botón) del encoder
 #define ENCODER_DEBOUNCE_DELAY_MS 5
 
-#define FADER_POT    10   // ADC1_CH9
 #define MOTOR_IN1    18
 #define MOTOR_IN2    16
 #define MOTOR_EN     14
@@ -61,6 +59,9 @@ enum class ConnectionState {
 #define ENCODER_MAX_VALUE 127
 #define ENCODER_MIN_VALUE 0
 
+#define FADER_ADC_MIN   400    // valor ema en posición 0% física
+#define FADER_ADC_MAX   7800   // valor ema en posición 100% física
+
 
 // --- BOTONES FÍSICOS ---
 #define BUTTON_PIN_REC      37
@@ -72,6 +73,8 @@ enum class ConnectionState {
 
 // --- SENSOR TÁCTIL DEL FADER ---
 #define FADER_TOUCH_PIN     T1 // Pin táctil para el fader (GPIO1 en ESP32-S2)
+#define FADER_POT_PIN       10  // 
+
 // Porcentaje del valor base táctil para el umbral de detección (80% significa que detecta si el valor cae por debajo del 80% del valor base).
 #define FADER_TOUCH_THRESHOLD_PERCENTAGE 80
 

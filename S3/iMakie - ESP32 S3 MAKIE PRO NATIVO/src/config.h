@@ -137,6 +137,24 @@ public:
 #define DISPLAY_COPY_TIMEOUT         25  // ms
 
 
+
+// --- Pines ---
+#define RS485_TX_PIN          15
+#define RS485_RX_PIN          16
+#define RS485_ENABLE_PIN       1
+
+// --- Protocolo ---
+#define RS485_BAUD        500000
+#define NUM_SLAVES             1   // ← actualizar al añadir hardware
+
+// --- Timing (µs) ---
+#define RS485_TX_ENABLE_US     10
+#define RS485_TX_DONE_US       10
+#define RS485_RESP_TIMEOUT_US 5000
+#define RS485_GAP_US           300
+#define POLL_CYCLE_MS          20
+
+
 // ====================================================================
 // --- 2. ENUMERACIONES ---
 // ====================================================================

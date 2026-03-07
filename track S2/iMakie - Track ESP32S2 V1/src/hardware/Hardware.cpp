@@ -24,9 +24,9 @@ extern unsigned long vuPeakLastUpdateTime;
 Adafruit_NeoPixel neopixels(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 // ** Sensor Táctil del Fader Variables **
-volatile bool isFaderTouched = false;
-static uint16_t faderTouchThreshold = 0; // Se calculará en initHardware
-static uint16_t faderTouchBaseLine = 0;  // Valor de referencia sin tocar
+volatile bool     isFaderTouched           = false;
+static uint32_t   faderTouchThreshold      = 0;
+static uint32_t   faderTouchBaseLine       = 0;
 static unsigned long faderTouchLastReadTime = 0;
 static const unsigned long FADER_TOUCH_READ_INTERVAL_MS = 20;
 
@@ -147,6 +147,15 @@ void initHardware() {
     // --- Inicialización del LED Integrado ---
     pinMode(LED_BUILTIN_PIN, OUTPUT);
     digitalWrite(LED_BUILTIN_PIN, LOW); // Asegurarse de que esté apagado al inicio (LOW = apagado para la mayoría de los LEDs incorporados)
+    // --- Calibración del Sensor Táctil del Fader ---
+    uint32_t sum = 0;
+    for (int i = 0; i < 20; i++) {
+        sum += touchRead(FADER_TOUCH_PIN);
+        delay(10);
+    }
+    faderTouchBaseLine  = sum / 20;
+    faderTouchThreshold = faderTouchBaseLine * FADER_TOUCH_THRESHOLD_PERCENTAGE / 100;
+    Serial.printf("Touch calibrado → base: %u, threshold: %u\n", faderTouchBaseLine, faderTouchThreshold);
    
 }
 
@@ -161,8 +170,8 @@ void updateButtons() {
     // Lectura y gestión del sensor táctil del fader
     unsigned long currentTime = millis();
     if (currentTime - faderTouchLastReadTime >= FADER_TOUCH_READ_INTERVAL_MS) {
-        uint16_t touchValue = touchRead(FADER_TOUCH_PIN);
-        // Serial.printf("TouchRead: %u\n", touchValue); // Descomentar para depuración
+        uint32_t touchValue = touchRead(FADER_TOUCH_PIN);
+        //Serial.printf("TouchRead: %u\n", touchValue); // Descomentar para depuración
         
         bool currentlyTouched = (touchValue < faderTouchThreshold);
 
