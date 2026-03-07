@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <hardware/uart.h>
+#include <hardware/gpio.h>
 
 // ═══════════════════════════════════════════════════
 //  PINES
@@ -64,79 +65,16 @@ volatile int   motorTarget = 2048;
 volatile float emaValue    = 0;
 
 // ═══════════════════════════════════════════════════
-//  PARÁMETROS MOTOR
-// ═══════════════════════════════════════════════════
-const int   PWM_MIN    = 50;
-const int   PWM_MAX    = 220;
-const int   DEAD_ZONE  = 80;
-const int   MIN_ERROR  = 100;
-const int   BRAKE_DIST = 80;
-const int   SLEW_MAX   = 12;
-const float GAMMA      = 0.6f;
-
-int currentPWM = 0;
-
-// ═══════════════════════════════════════════════════
-//  MOTOR (Core 1)
-// ═══════════════════════════════════════════════════
-void motorForward(int pwm) {
-    digitalWrite(MOTOR_IN2, LOW);
-    analogWrite(MOTOR_IN1, pwm);
-}
-void motorReverse(int pwm) {
-    digitalWrite(MOTOR_IN1, LOW);
-    analogWrite(MOTOR_IN2, pwm);
-}
-void motorStop() {
-    digitalWrite(MOTOR_IN1, LOW);
-    digitalWrite(MOTOR_IN2, LOW);
-    currentPWM = 0;
-}
-
-int calcPWM(int error) {
-    float errNorm = constrain(abs(error) / 4096.0f, 0.0f, 1.0f);
-    float velFrac = pow(errNorm, GAMMA);
-    return (int)(PWM_MIN + velFrac * (PWM_MAX - PWM_MIN));
-}
-
-void updateMotor(int error) {
-    if (abs(error) <= DEAD_ZONE) { motorStop(); return; }
-    if (abs(error) <  MIN_ERROR) { motorStop(); return; }
-    int targetPWM = (abs(error) < BRAKE_DIST) ? PWM_MIN : calcPWM(error);
-    targetPWM = constrain(targetPWM, currentPWM - SLEW_MAX, currentPWM + SLEW_MAX);
-    currentPWM = targetPWM;
-    if (error > 0) motorForward(currentPWM);
-    else           motorReverse(currentPWM);
-}
-
-// ═══════════════════════════════════════════════════
-//  RS485 (Core 0)
+//  RS485
 // ═══════════════════════════════════════════════════
 enum class RxState : uint8_t { WAIT_HEADER, RECEIVE_PACKET };
-RxState  _rxState    = RxState::WAIT_HEADER;
-uint8_t  _rxBuf[sizeof(MasterPacket)];
-uint8_t  _rxBytesGot = 0;
+RxState      _rxState    = RxState::WAIT_HEADER;
+uint8_t      _rxBuf[sizeof(MasterPacket)];
+uint8_t      _rxBytesGot = 0;
 MasterPacket _rxPacket;
+bool         _newData    = false;
 
-void rs485SendResponse() {
-    SlavePacket pkt = {};
-    pkt.header   = RS485_RESP_BYTE;
-    pkt.id       = MY_SLAVE_ID;
-    pkt.faderPos = (uint16_t)emaValue;
-    pkt.crc      = rs485_crc8((const uint8_t*)&pkt, sizeof(SlavePacket) - 1);
-
-    digitalWrite(RS485_EN_PIN, HIGH);
-    delayMicroseconds(10);
-    // TX directo al hardware — garantiza transmisión completa antes de bajar EN
-    const uint8_t* buf = (const uint8_t*)&pkt;
-    for (size_t i = 0; i < sizeof(SlavePacket); i++)
-        uart_putc_raw(uart1, buf[i]);
-    uart_tx_wait_blocking(uart1);  // espera a que el UART termine físicamente
-    delayMicroseconds(10);
-    digitalWrite(RS485_EN_PIN, LOW);
-}
-
-void rs485ProcessBuffer() {
+void rs485Update() {
     while (Serial2.available()) {
         uint8_t byte = Serial2.read();
         switch (_rxState) {
@@ -154,8 +92,7 @@ void rs485ProcessBuffer() {
                     if (crc == _rxBuf[sizeof(MasterPacket) - 1] &&
                         _rxBuf[1] == MY_SLAVE_ID) {
                         memcpy(&_rxPacket, _rxBuf, sizeof(MasterPacket));
-                        rs485SendResponse();
-                        motorTarget = map(_rxPacket.faderTarget, 0, 16383, 0, 4095);
+                        _newData = true;
                     }
                     _rxState    = RxState::WAIT_HEADER;
                     _rxBytesGot = 0;
@@ -165,12 +102,69 @@ void rs485ProcessBuffer() {
     }
 }
 
+void rs485SendResponse() {
+    SlavePacket tx = {};
+    tx.header   = RS485_RESP_BYTE;
+    tx.id       = MY_SLAVE_ID;
+    tx.faderPos = (uint16_t)emaValue;
+    tx.crc      = rs485_crc8((const uint8_t*)&tx, sizeof(SlavePacket) - 1);
+
+    // Desconectar RX del UART durante TX — el echo no entra nunca
+    gpio_set_function(RS485_RX_PIN, GPIO_FUNC_SIO);
+    gpio_set_dir(RS485_RX_PIN, GPIO_IN);
+
+    digitalWrite(RS485_EN_PIN, HIGH);
+    delayMicroseconds(10);
+    Serial2.write((const uint8_t*)&tx, sizeof(SlavePacket));
+    delayMicroseconds((sizeof(SlavePacket) * 10 * 1000000UL) / RS485_BAUD + 50);
+    digitalWrite(RS485_EN_PIN, LOW);
+
+    // Reconectar RX al UART
+    gpio_set_function(RS485_RX_PIN, GPIO_FUNC_UART);
+}
+
+// ═══════════════════════════════════════════════════
+//  MOTOR
+// ═══════════════════════════════════════════════════
+const int   PWM_MIN    = 50;
+const int   PWM_MAX    = 220;
+const int   DEAD_ZONE  = 80;
+const int   MIN_ERROR  = 100;
+const int   BRAKE_DIST = 80;
+const int   SLEW_MAX   = 12;
+const float GAMMA      = 0.6f;
+int         currentPWM = 0;
+
+void motorForward(int pwm) { digitalWrite(MOTOR_IN2, LOW);  analogWrite(MOTOR_IN1, pwm); }
+void motorReverse(int pwm) { digitalWrite(MOTOR_IN1, LOW);  analogWrite(MOTOR_IN2, pwm); }
+void motorStop()           { digitalWrite(MOTOR_IN1, LOW);  digitalWrite(MOTOR_IN2, LOW); currentPWM = 0; }
+
+int calcPWM(int error) {
+    float errNorm = constrain(abs(error) / 4096.0f, 0.0f, 1.0f);
+    return (int)(PWM_MIN + pow(errNorm, GAMMA) * (PWM_MAX - PWM_MIN));
+}
+
+void updateMotor(int error) {
+    if (abs(error) <= DEAD_ZONE) { motorStop(); return; }
+    if (abs(error) <  MIN_ERROR) { motorStop(); return; }
+    int targetPWM = (abs(error) < BRAKE_DIST) ? PWM_MIN : calcPWM(error);
+    targetPWM  = constrain(targetPWM, currentPWM - SLEW_MAX, currentPWM + SLEW_MAX);
+    currentPWM = targetPWM;
+    if (error > 0) motorForward(currentPWM);
+    else           motorReverse(currentPWM);
+}
+
 // ═══════════════════════════════════════════════════
 //  CORE 0 — RS485
 // ═══════════════════════════════════════════════════
 void setup() {
     Serial.begin(115200);
     while (!Serial) delay(10);
+
+    // Anclar pines flotantes 0-8 para evitar ruido
+    for (int p = 0; p <= 8; p++) {
+        pinMode(p, INPUT_PULLDOWN);
+    }
 
     pinMode(RS485_EN_PIN, OUTPUT);
     digitalWrite(RS485_EN_PIN, LOW);
@@ -179,18 +173,29 @@ void setup() {
     Serial2.setTX(RS485_TX_PIN);
     Serial2.setRX(RS485_RX_PIN);
     Serial2.begin(RS485_BAUD, SERIAL_8N1);
+    gpio_set_function(RS485_TX_PIN, GPIO_FUNC_UART);
+    gpio_set_function(RS485_RX_PIN, GPIO_FUNC_UART);
+    uart_set_hw_flow(uart1, false, false);
+    uart_set_format(uart1, 8, 1, UART_PARITY_NONE);
+    gpio_disable_pulls(RS485_TX_PIN);
+    gpio_disable_pulls(RS485_RX_PIN);
 
     Serial.println("=== RP2040 Core0: RS485 ===");
 }
 
 void loop() {
     static uint32_t lastPrint = 0;
-    uint32_t now = millis();
 
-    rs485ProcessBuffer();
+    rs485Update();
 
-    if (now - lastPrint >= 200) {
-        lastPrint = now;
+    if (_newData) {
+        _newData = false;
+        rs485SendResponse();
+        motorTarget = map(_rxPacket.faderTarget, 0, 16383, 0, 4095);
+    }
+
+    if (millis() - lastPrint >= 200) {
+        lastPrint = millis();
         Serial.print("POS: ");   Serial.print((int)emaValue);
         Serial.print("  TGT: "); Serial.print((int)motorTarget);
         Serial.print("  ERR: "); Serial.print((int)motorTarget - (int)emaValue);
@@ -203,13 +208,11 @@ void loop() {
 // ═══════════════════════════════════════════════════
 void setup1() {
     analogReadResolution(12);
-
     pinMode(MOTOR_IN1, OUTPUT);
     pinMode(MOTOR_IN2, OUTPUT);
     pinMode(MOTOR_EN,  OUTPUT);
     digitalWrite(MOTOR_EN, HIGH);
     motorStop();
-
     emaValue = analogRead(FADER_PIN);
     Serial.println("=== RP2040 Core1: Motor + ADC ===");
 }
@@ -217,7 +220,6 @@ void setup1() {
 void loop1() {
     static uint32_t lastControl = 0;
     uint32_t now = millis();
-
     if (now - lastControl >= 5) {
         lastControl = now;
         int raw  = analogRead(FADER_PIN);
