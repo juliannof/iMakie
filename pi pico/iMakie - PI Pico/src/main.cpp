@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <hardware/uart.h>
-#include <hardware/irq.h>
 
 // ═══════════════════════════════════════════════════
 //  PINES
@@ -78,7 +77,7 @@ const float GAMMA      = 0.6f;
 int currentPWM = 0;
 
 // ═══════════════════════════════════════════════════
-//  CORE 0 — MOTOR + ADC
+//  MOTOR (Core 1)
 // ═══════════════════════════════════════════════════
 void motorForward(int pwm) {
     digitalWrite(MOTOR_IN2, LOW);
@@ -110,72 +109,14 @@ void updateMotor(int error) {
     else           motorReverse(currentPWM);
 }
 
-void setup() {
-    Serial.begin(115200);
-    while (!Serial) delay(10);
-
-    analogReadResolution(12);
-
-    pinMode(MOTOR_IN1, OUTPUT);
-    pinMode(MOTOR_IN2, OUTPUT);
-    pinMode(MOTOR_EN,  OUTPUT);
-    digitalWrite(MOTOR_EN, HIGH);
-    motorStop();
-
-    emaValue = analogRead(FADER_PIN);
-    Serial.println("=== RP2040 Core0: Motor + ADC ===");
-}
-
-void loop() {
-    static uint32_t lastControl = 0;
-    static uint32_t lastPrint   = 0;
-    uint32_t now = millis();
-
-    if (now - lastControl >= 5) {
-        lastControl = now;
-        int raw  = analogRead(FADER_PIN);
-        emaValue = 0.1f * raw + 0.9f * emaValue;
-        updateMotor((int)motorTarget - (int)emaValue);
-    }
-
-    if (now - lastPrint >= 200) {
-        lastPrint = now;
-        Serial.print("POS: ");   Serial.print((int)emaValue);
-        Serial.print("  TGT: "); Serial.print((int)motorTarget);
-        Serial.print("  ERR: "); Serial.print((int)motorTarget - (int)emaValue);
-        Serial.print("  PWM: "); Serial.println(currentPWM);
-    }
-}
-
 // ═══════════════════════════════════════════════════
-//  CORE 1 — RS485
+//  RS485 (Core 0)
 // ═══════════════════════════════════════════════════
-
-// Buffer circular ISR
-static constexpr uint16_t CB_SIZE = 256;
-volatile uint8_t  _cb[CB_SIZE];
-volatile uint16_t _cbHead = 0;
-volatile uint16_t _cbTail = 0;
-
-// Parser
 enum class RxState : uint8_t { WAIT_HEADER, RECEIVE_PACKET };
 RxState  _rxState    = RxState::WAIT_HEADER;
 uint8_t  _rxBuf[sizeof(MasterPacket)];
 uint8_t  _rxBytesGot = 0;
 MasterPacket _rxPacket;
-
-// ISR — interrupción nativa UART1 del RP2040
-void __isr rs485ISR() {
-    while (uart_is_readable(uart0)) {
-        uint16_t next = (_cbHead + 1) % CB_SIZE;
-        if (next != _cbTail) {
-            _cb[_cbHead] = uart_getc(uart0);
-            _cbHead = next;
-        } else {
-            uart_getc(uart0);  // overflow, descartar
-        }
-    }
-}
 
 void rs485SendResponse() {
     SlavePacket pkt = {};
@@ -185,16 +126,19 @@ void rs485SendResponse() {
     pkt.crc      = rs485_crc8((const uint8_t*)&pkt, sizeof(SlavePacket) - 1);
 
     digitalWrite(RS485_EN_PIN, HIGH);
-    Serial2.write((const uint8_t*)&pkt, sizeof(SlavePacket));
-    Serial2.flush();
+    delayMicroseconds(10);
+    // TX directo al hardware — garantiza transmisión completa antes de bajar EN
+    const uint8_t* buf = (const uint8_t*)&pkt;
+    for (size_t i = 0; i < sizeof(SlavePacket); i++)
+        uart_putc_raw(uart1, buf[i]);
+    uart_tx_wait_blocking(uart1);  // espera a que el UART termine físicamente
+    delayMicroseconds(10);
     digitalWrite(RS485_EN_PIN, LOW);
 }
 
 void rs485ProcessBuffer() {
-    while (_cbTail != _cbHead) {
-        uint8_t byte = _cb[_cbTail];
-        _cbTail = (_cbTail + 1) % CB_SIZE;
-
+    while (Serial2.available()) {
+        uint8_t byte = Serial2.read();
         switch (_rxState) {
             case RxState::WAIT_HEADER:
                 if (byte == RS485_START_BYTE) {
@@ -221,7 +165,13 @@ void rs485ProcessBuffer() {
     }
 }
 
-void setup1() {
+// ═══════════════════════════════════════════════════
+//  CORE 0 — RS485
+// ═══════════════════════════════════════════════════
+void setup() {
+    Serial.begin(115200);
+    while (!Serial) delay(10);
+
     pinMode(RS485_EN_PIN, OUTPUT);
     digitalWrite(RS485_EN_PIN, LOW);
     pinMode(RS485_RX_PIN, INPUT);
@@ -230,12 +180,48 @@ void setup1() {
     Serial2.setRX(RS485_RX_PIN);
     Serial2.begin(RS485_BAUD, SERIAL_8N1);
 
-    // Interrupción nativa UART1 del RP2040 SDK
-    irq_set_exclusive_handler(UART0_IRQ, rs485ISR);
-    irq_set_enabled(UART0_IRQ, true);
-    uart_set_irq_enables(uart0, true, false);  // RX irq habilitado, TX no
+    Serial.println("=== RP2040 Core0: RS485 ===");
+}
+
+void loop() {
+    static uint32_t lastPrint = 0;
+    uint32_t now = millis();
+
+    rs485ProcessBuffer();
+
+    if (now - lastPrint >= 200) {
+        lastPrint = now;
+        Serial.print("POS: ");   Serial.print((int)emaValue);
+        Serial.print("  TGT: "); Serial.print((int)motorTarget);
+        Serial.print("  ERR: "); Serial.print((int)motorTarget - (int)emaValue);
+        Serial.print("  PWM: "); Serial.println(currentPWM);
+    }
+}
+
+// ═══════════════════════════════════════════════════
+//  CORE 1 — MOTOR + ADC
+// ═══════════════════════════════════════════════════
+void setup1() {
+    analogReadResolution(12);
+
+    pinMode(MOTOR_IN1, OUTPUT);
+    pinMode(MOTOR_IN2, OUTPUT);
+    pinMode(MOTOR_EN,  OUTPUT);
+    digitalWrite(MOTOR_EN, HIGH);
+    motorStop();
+
+    emaValue = analogRead(FADER_PIN);
+    Serial.println("=== RP2040 Core1: Motor + ADC ===");
 }
 
 void loop1() {
-    rs485ProcessBuffer();
+    static uint32_t lastControl = 0;
+    uint32_t now = millis();
+
+    if (now - lastControl >= 5) {
+        lastControl = now;
+        int raw  = analogRead(FADER_PIN);
+        emaValue = 0.1f * raw + 0.9f * emaValue;
+        updateMotor((int)motorTarget - (int)emaValue);
+    }
 }
