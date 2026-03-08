@@ -1,26 +1,16 @@
 #include <Arduino.h>
 #include <hardware/uart.h>
-#include <hardware/gpio.h>
 
-// ═══════════════════════════════════════════════════
-//  PINES
-// ═══════════════════════════════════════════════════
 #define MY_SLAVE_ID     1
-
 #define FADER_PIN       26
-
 #define MOTOR_IN1       14
 #define MOTOR_IN2       15
 #define MOTOR_EN        27
-
 #define RS485_TX_PIN    4
 #define RS485_RX_PIN    5
 #define RS485_EN_PIN    28
 #define RS485_BAUD      500000
 
-// ═══════════════════════════════════════════════════
-//  PROTOCOLO
-// ═══════════════════════════════════════════════════
 #define RS485_START_BYTE  0xAA
 #define RS485_RESP_BYTE   0xBB
 
@@ -58,15 +48,9 @@ inline uint8_t rs485_crc8(const uint8_t* data, size_t len) {
     return crc;
 }
 
-// ═══════════════════════════════════════════════════
-//  VARIABLES COMPARTIDAS (volatile)
-// ═══════════════════════════════════════════════════
 volatile int   motorTarget = 2048;
 volatile float emaValue    = 0;
 
-// ═══════════════════════════════════════════════════
-//  RS485
-// ═══════════════════════════════════════════════════
 enum class RxState : uint8_t { WAIT_HEADER, RECEIVE_PACKET };
 RxState      _rxState    = RxState::WAIT_HEADER;
 uint8_t      _rxBuf[sizeof(MasterPacket)];
@@ -109,23 +93,21 @@ void rs485SendResponse() {
     tx.faderPos = (uint16_t)emaValue;
     tx.crc      = rs485_crc8((const uint8_t*)&tx, sizeof(SlavePacket) - 1);
 
-    // Desconectar RX del UART durante TX — el echo no entra nunca
-    gpio_set_function(RS485_RX_PIN, GPIO_FUNC_SIO);
-    gpio_set_dir(RS485_RX_PIN, GPIO_IN);
-
     digitalWrite(RS485_EN_PIN, HIGH);
     delayMicroseconds(10);
     Serial2.write((const uint8_t*)&tx, sizeof(SlavePacket));
-    delayMicroseconds((sizeof(SlavePacket) * 10 * 1000000UL) / RS485_BAUD + 50);
+    Serial2.flush();
+    delayMicroseconds(10);
     digitalWrite(RS485_EN_PIN, LOW);
 
-    // Reconectar RX al UART
-    gpio_set_function(RS485_RX_PIN, GPIO_FUNC_UART);
+    // Limpia eco del FIFO
+    delayMicroseconds(200);
+    while (Serial2.available()) Serial2.read();
+
+    // Limpia framing errors del PL011
+    hw_clear_bits(&uart_get_hw(uart1)->rsr, UART_UARTRSR_BITS);
 }
 
-// ═══════════════════════════════════════════════════
-//  MOTOR
-// ═══════════════════════════════════════════════════
 const int   PWM_MIN    = 50;
 const int   PWM_MAX    = 220;
 const int   DEAD_ZONE  = 80;
@@ -154,16 +136,12 @@ void updateMotor(int error) {
     else           motorReverse(currentPWM);
 }
 
-// ═══════════════════════════════════════════════════
-//  CORE 0 — RS485
-// ═══════════════════════════════════════════════════
 void setup() {
     Serial.begin(115200);
-    while (!Serial) delay(10);
 
-    // Anclar pines flotantes 0-8 para evitar ruido
     for (int p = 0; p <= 8; p++) {
-        pinMode(p, INPUT_PULLDOWN);
+        if (p != RS485_TX_PIN && p != RS485_RX_PIN)
+            pinMode(p, INPUT_PULLDOWN);
     }
 
     pinMode(RS485_EN_PIN, OUTPUT);
@@ -173,39 +151,33 @@ void setup() {
     Serial2.setTX(RS485_TX_PIN);
     Serial2.setRX(RS485_RX_PIN);
     Serial2.begin(RS485_BAUD, SERIAL_8N1);
-    gpio_set_function(RS485_TX_PIN, GPIO_FUNC_UART);
-    gpio_set_function(RS485_RX_PIN, GPIO_FUNC_UART);
-    uart_set_hw_flow(uart1, false, false);
-    uart_set_format(uart1, 8, 1, UART_PARITY_NONE);
-    gpio_disable_pulls(RS485_TX_PIN);
-    gpio_disable_pulls(RS485_RX_PIN);
 
     Serial.println("=== RP2040 Core0: RS485 ===");
 }
 
 void loop() {
     static uint32_t lastPrint = 0;
+    static uint32_t pktCount  = 0;
 
     rs485Update();
 
     if (_newData) {
         _newData = false;
+        pktCount++;
         rs485SendResponse();
         motorTarget = map(_rxPacket.faderTarget, 0, 16383, 0, 4095);
     }
 
     if (millis() - lastPrint >= 200) {
         lastPrint = millis();
-        Serial.print("POS: ");   Serial.print((int)emaValue);
-        Serial.print("  TGT: "); Serial.print((int)motorTarget);
-        Serial.print("  ERR: "); Serial.print((int)motorTarget - (int)emaValue);
-        Serial.print("  PWM: "); Serial.println(currentPWM);
+        Serial.print("PKT:"); Serial.print(pktCount);
+        Serial.print(" POS:"); Serial.print((int)emaValue);
+        Serial.print(" TGT:"); Serial.print((int)motorTarget);
+        Serial.print(" ERR:"); Serial.print((int)motorTarget - (int)emaValue);
+        Serial.print(" PWM:"); Serial.println(currentPWM);
     }
 }
 
-// ═══════════════════════════════════════════════════
-//  CORE 1 — MOTOR + ADC
-// ═══════════════════════════════════════════════════
 void setup1() {
     analogReadResolution(12);
     pinMode(MOTOR_IN1, OUTPUT);
@@ -214,7 +186,6 @@ void setup1() {
     digitalWrite(MOTOR_EN, HIGH);
     motorStop();
     emaValue = analogRead(FADER_PIN);
-    Serial.println("=== RP2040 Core1: Motor + ADC ===");
 }
 
 void loop1() {
