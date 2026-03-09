@@ -29,11 +29,19 @@ enum class ConnectionState {
 
 #define RS485_RX_PIN             9
 #define RS485_TX_PIN             8
-#define RS485_ENABLE_PIN        17
+#define RS485_ENABLE_PIN        35
 #define RS485_BAUD          500000
 
 #define RS485_START_BYTE      0xAA
 #define RS485_RESP_BYTE       0xBB
+
+// Fader
+#define FADER_POT_PIN           10   // ADC1_CH9 — sin cambio
+#define FADER_VCC_PIN           17   // DAC_1: salida ~1.1V al VCC del pot
+
+// Calibración (valores aproximados — ajustar con autocalibración)
+#define FADER_ADC_MIN      1600  // leer real en 0%
+#define FADER_ADC_MAX      8191   // leer real en 100%
 // --- LED INTEGRADO ---
 #define LED_BUILTIN_PIN 15 // Pin del LED integrado en la Lolin D1 ESP32 S2 (GPIO15)
                           // Verifica el diagrama de pines de tu placa si tienes dudas.
@@ -59,9 +67,6 @@ enum class ConnectionState {
 #define ENCODER_MAX_VALUE 127
 #define ENCODER_MIN_VALUE 0
 
-#define FADER_ADC_MIN   400    // valor ema en posición 0% física
-#define FADER_ADC_MAX   7800   // valor ema en posición 100% física
-
 
 // --- BOTONES FÍSICOS ---
 #define BUTTON_PIN_REC      37
@@ -73,7 +78,6 @@ enum class ConnectionState {
 
 // --- SENSOR TÁCTIL DEL FADER ---
 #define FADER_TOUCH_PIN     T1 // Pin táctil para el fader (GPIO1 en ESP32-S2)
-#define FADER_POT_PIN       10  // 
 
 // Porcentaje del valor base táctil para el umbral de detección (80% significa que detecta si el valor cae por debajo del 80% del valor base).
 #define FADER_TOUCH_THRESHOLD_PERCENTAGE 80

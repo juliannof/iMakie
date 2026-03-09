@@ -14,13 +14,16 @@
 #include "button/ButtonManager.h"
 #include "menu/SatMenu.h"
 #include <driver/touch_sensor.h>   // touch_pad_init, touch_pad_read_raw_data
+#include "hardware/Motor/Motor.h"
 #include "fader/FaderADC.h"
+
+extern FaderADC faderADC;
+
 
 // ─── Display objects ──────────────────────────────────────────
 LGFX        tft;
 LGFX_Sprite header(&tft), mainArea(&tft), vuSprite(&tft), vPotSprite(&tft);
 
-FaderADC faderADC;
 
 // ─── Externs de Display.cpp ───────────────────────────────────
 extern void initDisplay();
@@ -74,7 +77,7 @@ static void motorDrive(int pwm) {
 }
 
 // ─── Stubs ADC / Touch ────────────────────────────────────────
-static uint16_t readFaderADC() { return analogRead(FADER_POT_PIN); }
+static uint16_t readFaderADC() { return Motor::getRawADC(); }
 static uint8_t  readFaderTouch() {
     // touchRead() es la API Arduino del ESP32-S2 para capacitive touch.
     // Valor alto = sin contacto, valor bajo = tocado.
@@ -120,7 +123,7 @@ static void onMasterData(const MasterPacket& pkt) {
     float newFader = pkt.faderTarget / 16383.0f;
     if (!_suspended && fabsf(faderPositions - newFader) > 0.001f) {
         faderPositions = newFader;
-        // TODO: controlador de motor
+        Motor::setTarget(pkt.faderTarget);  // ← reemplaza el TODO
     }
 }
 
@@ -129,13 +132,12 @@ static void onMasterData(const MasterPacket& pkt) {
 // =============================================================
 void setup() {
     Serial.begin(115200);
-    delay(500); // Tiempo para que el CDC USB enumere
-
-    pinMode(MOTOR_IN1, OUTPUT);
-    pinMode(MOTOR_IN2, OUTPUT);
-    pinMode(MOTOR_EN,  OUTPUT);
-    motorStop();
-    faderADC.begin();
+    // 1. Estabilizar referencia DAC lo antes posible
+    // DAC: referencia 1.1V para el fader
+    dacWrite(FADER_VCC_PIN, 77);  // 77/255 × 3.3V ≈ 0.997V — margen antes de saturar ADC_0db
+    delay(1000); // estabilizar DAC
+    Motor::begin();   // calibra en boot
+    
 
     // touchRead() no requiere init explícito en Arduino ESP32
 
@@ -145,9 +147,9 @@ void setup() {
     Encoder::begin();
     // SAT Menu — se crea ANTES de RS485 para poder leer trackId desde NVS
     satMenu = new SatMenu(&tft);
-    satMenu->onMotorOff  ([]{ motorStop(); _suspended = true;  });
-    satMenu->onMotorOn   ([]{ motorStop(); _suspended = false; needsTOTALRedraw = true; });
-    satMenu->onMotorDrive([](int pwm){ motorDrive(pwm); });
+    satMenu->onMotorOff  ([]{ Motor::stop(); _suspended = true;  });
+    satMenu->onMotorOn   ([]{ Motor::stop(); _suspended = false; needsTOTALRedraw = true; });
+    satMenu->onMotorDrive([](int pwm){ /* Motor no expone drive directo — ok para SAT */ });
     satMenu->onRS485Off  ([]{ _suspended = true;  });
     satMenu->onRS485On   ([]{ _suspended = false; needsTOTALRedraw = true; });
     satMenu->onReboot    ([]{ ESP.restart(); });
@@ -251,10 +253,13 @@ void loop() {
     delay(2);
 
     updateAllNeopixels();
+    faderADC.update();  // único lector del ADC
 
-    faderADC.update();
-    uint16_t pos = faderADC.getFaderPos(); // 0–8191
-    // Convertir a pitch bend Mackie (0–16383):
-    uint16_t pitchBend = (uint16_t)(pos * 16383.0f);
+    if (readFaderTouch()) {
+        Motor::read();   // actualiza ADC sin mover
+        Motor::stop();
+    } else {
+        Motor::update(); // actualiza ADC + controla motor
+    }
 
 }

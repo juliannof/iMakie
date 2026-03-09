@@ -3,7 +3,7 @@
 
 
 void FaderADC::begin() {
-    analogSetPinAttenuation(FADER_POT_PIN, ADC_11db);  // ← vuelve a 11db
+    analogSetPinAttenuation(FADER_POT_PIN, ADC_0db);  // ← vuelve a 11db
     analogReadResolution(13);
     _emaValue = (float)analogRead(FADER_POT_PIN);
 }

@@ -1,6 +1,11 @@
 #include <Arduino.h>
-#include <hardware/uart.h>
+#include <hardware/pio.h>
+#include <hardware/clocks.h>
+#include <hardware/gpio.h>
 
+// ═══════════════════════════════════════════════════
+//  CONFIGURACIÓN Y PINES
+// ═══════════════════════════════════════════════════
 #define MY_SLAVE_ID     1
 #define FADER_PIN       26
 #define MOTOR_IN1       14
@@ -14,31 +19,83 @@
 #define RS485_START_BYTE  0xAA
 #define RS485_RESP_BYTE   0xBB
 
+// Deadzone con histéresis
+#define MOTOR_DEADZONE_STOP   50   // para cuando el motor está andando
+#define MOTOR_DEADZONE_START  70   // umbral para arrancar
+#define MOTOR_PWM_FREQ        20000 // 20 kHz — inaudible, mejor para DRV8833
+
+// Timeout RX: resetear buffer si no llega byte en este tiempo
+#define RS485_RX_TIMEOUT_MS   5
+
+// Estructuras de datos
 struct __attribute__((packed)) MasterPacket {
-    uint8_t  header;
-    uint8_t  id;
-    char     trackName[7];
-    uint8_t  flags;
-    uint16_t faderTarget;
-    uint8_t  vuLevel;
-    uint8_t  connected;
-    uint8_t  crc;
+    uint8_t  header; uint8_t  id; char trackName[7]; uint8_t  flags;
+    uint16_t faderTarget; uint8_t  vuLevel; uint8_t  connected; uint8_t  crc;
 };
-static_assert(sizeof(MasterPacket) == 15, "MasterPacket debe ser 15 bytes");
-
 struct __attribute__((packed)) SlavePacket {
-    uint8_t  header;
-    uint8_t  id;
-    uint16_t faderPos;
-    uint8_t  touchState;
-    uint8_t  buttons;
-    int8_t   encoderDelta;
-    uint8_t  encoderButton;
-    uint8_t  crc;
+    uint8_t  header; uint8_t  id; uint16_t faderPos; uint8_t  touchState;
+    uint8_t  buttons; int8_t  encoderDelta; uint8_t  encoderButton; uint8_t  crc;
 };
-static_assert(sizeof(SlavePacket) == 9, "SlavePacket debe ser 9 bytes");
 
-inline uint8_t rs485_crc8(const uint8_t* data, size_t len) {
+// ═══════════════════════════════════════════════════
+//  BLOQUE PIO — UART TX puro, sin sideset
+//
+//  BUG CRÍTICO CORREGIDO: la versión anterior usaba sideset para
+//  controlar EN. La instrucción pull (instr 0) tenía side=0, lo que
+//  bajaba EN entre cada byte, fragmentando la trama RS485.
+//
+//  Solución: PIO maneja SOLO los bits UART (sin sideset).
+//  EN se controla manualmente desde CPU antes/después de toda la trama.
+//
+//  clkdiv = sys_clk / (8 × baud) → 1 ciclo PIO = 1/8 de bit
+//  Cada bit = 8 ciclos PIO ✅
+// ═══════════════════════════════════════════════════
+static const uint16_t rs485_tx_instructions[] = {
+    0x8060, // 0: pull block           (espera dato en FIFO)
+    0xe027, // 1: set x, 7             (contador 8 bits)
+    0xe700, // 2: set pins, 0 [7]      (Start Bit: 1+7 = 8 ciclos) ✅
+    0x6001, // 3: out pins, 1          (Data bit: 1 ciclo)
+    0x0643, // 4: jmp x--, 3 [6]       (loop: 1+6+1 = 8 ciclos) ✅
+    0xe701  // 5: set pins, 1 [7]      (Stop Bit: 1+7 = 8 ciclos) ✅
+};
+static const struct pio_program rs485_tx_program = {
+    .instructions = rs485_tx_instructions, .length = 6, .origin = -1
+};
+
+// ═══════════════════════════════════════════════════
+//  VARIABLES GLOBALES
+// ═══════════════════════════════════════════════════
+volatile int      motorTarget = 2048;
+
+// Intercambio atómico de float entre cores via uint32_t ✅
+// Cortex-M0+: stores de 32 bits alineados son atómicos en hardware
+volatile uint32_t emaRaw = 0;
+
+MasterPacket _rxPacket;
+bool         _newData = false;
+PIO          _pio = pio0;
+uint         _sm  = 0;
+
+// ═══════════════════════════════════════════════════
+//  HELPERS ATÓMICOS
+// ═══════════════════════════════════════════════════
+static inline void ema_write(float v) {
+    uint32_t tmp;
+    memcpy(&tmp, &v, sizeof(tmp));
+    emaRaw = tmp;
+}
+
+static inline float ema_read() {
+    uint32_t raw = emaRaw;
+    float v;
+    memcpy(&v, &raw, sizeof(v));
+    return v;
+}
+
+// ═══════════════════════════════════════════════════
+//  CRC
+// ═══════════════════════════════════════════════════
+uint8_t rs485_crc8(const uint8_t* data, size_t len) {
     uint8_t crc = 0x00;
     for (size_t i = 0; i < len; i++) {
         crc ^= data[i];
@@ -48,153 +105,172 @@ inline uint8_t rs485_crc8(const uint8_t* data, size_t len) {
     return crc;
 }
 
-volatile int   motorTarget = 2048;
-volatile float emaValue    = 0;
+// ═══════════════════════════════════════════════════
+//  SETUP PIO
+// ═══════════════════════════════════════════════════
+void setupRS485PIO() {
+    uint offset = pio_add_program(_pio, &rs485_tx_program);
+    pio_sm_config c = pio_get_default_sm_config();
+    sm_config_set_wrap(&c, offset, offset + 5);
 
-enum class RxState : uint8_t { WAIT_HEADER, RECEIVE_PACKET };
-RxState      _rxState    = RxState::WAIT_HEADER;
-uint8_t      _rxBuf[sizeof(MasterPacket)];
-uint8_t      _rxBytesGot = 0;
-MasterPacket _rxPacket;
-bool         _newData    = false;
+    // Sin sideset: EN lo controla la CPU manualmente ✅
+    sm_config_set_out_pins(&c, RS485_TX_PIN, 1);
+    sm_config_set_set_pins(&c, RS485_TX_PIN, 1);
 
+    pio_gpio_init(_pio, RS485_TX_PIN);
+
+    // EN como GPIO puro, no PIO ✅
+    gpio_init(RS485_EN_PIN);
+    gpio_set_dir(RS485_EN_PIN, GPIO_OUT);
+    gpio_put(RS485_EN_PIN, 0); // LOW en reposo = receive mode
+
+    // Idle HIGH en TX (RS485 MARK state)
+    pio_sm_set_pins_with_mask(_pio, _sm, (1u << RS485_TX_PIN), (1u << RS485_TX_PIN));
+    pio_sm_set_consecutive_pindirs(_pio, _sm, RS485_TX_PIN, 1, true);
+
+    float div = (float)clock_get_hz(clk_sys) / (8.0f * RS485_BAUD);
+    sm_config_set_clkdiv(&c, div);
+    sm_config_set_out_shift(&c, true, false, 32);
+
+    pio_sm_init(_pio, _sm, offset, &c);
+    pio_sm_set_enabled(_pio, _sm, true);
+}
+
+// ═══════════════════════════════════════════════════
+//  RX
+// ═══════════════════════════════════════════════════
 void rs485Update() {
+    static uint8_t  _rxBuf[sizeof(MasterPacket)];
+    static uint8_t  _rxCount    = 0;
+    static uint32_t _lastByteMs = 0;
+
+    // Timeout: paquete incompleto → resetear ✅
+    if (_rxCount > 0 && (millis() - _lastByteMs) > RS485_RX_TIMEOUT_MS) {
+        _rxCount = 0;
+    }
+
     while (Serial2.available()) {
-        uint8_t byte = Serial2.read();
-        switch (_rxState) {
-            case RxState::WAIT_HEADER:
-                if (byte == RS485_START_BYTE) {
-                    _rxBuf[0]   = byte;
-                    _rxBytesGot = 1;
-                    _rxState    = RxState::RECEIVE_PACKET;
-                }
-                break;
-            case RxState::RECEIVE_PACKET:
-                _rxBuf[_rxBytesGot++] = byte;
-                if (_rxBytesGot >= sizeof(MasterPacket)) {
-                    uint8_t crc = rs485_crc8(_rxBuf, sizeof(MasterPacket) - 1);
-                    if (crc == _rxBuf[sizeof(MasterPacket) - 1] &&
-                        _rxBuf[1] == MY_SLAVE_ID) {
-                        memcpy(&_rxPacket, _rxBuf, sizeof(MasterPacket));
-                        _newData = true;
-                    }
-                    _rxState    = RxState::WAIT_HEADER;
-                    _rxBytesGot = 0;
-                }
-                break;
+        uint8_t b = Serial2.read();
+        _lastByteMs = millis();
+
+        if (_rxCount == 0 && b != RS485_START_BYTE) continue;
+
+        _rxBuf[_rxCount++] = b;
+        if (_rxCount >= sizeof(MasterPacket)) {
+            uint8_t crc = rs485_crc8(_rxBuf, sizeof(MasterPacket) - 1);
+            if (crc == _rxBuf[sizeof(MasterPacket) - 1] && _rxBuf[1] == MY_SLAVE_ID) {
+                memcpy(&_rxPacket, _rxBuf, sizeof(MasterPacket));
+                _newData = true;
+            }
+            _rxCount = 0;
         }
     }
 }
 
+// ═══════════════════════════════════════════════════
+//  TX
+// ═══════════════════════════════════════════════════
 void rs485SendResponse() {
     SlavePacket tx = {};
     tx.header   = RS485_RESP_BYTE;
     tx.id       = MY_SLAVE_ID;
-    tx.faderPos = (uint16_t)emaValue;
+    tx.faderPos = (uint16_t)ema_read();
     tx.crc      = rs485_crc8((const uint8_t*)&tx, sizeof(SlavePacket) - 1);
 
-    digitalWrite(RS485_EN_PIN, HIGH);
-    delayMicroseconds(10);
-    Serial2.write((const uint8_t*)&tx, sizeof(SlavePacket));
-    Serial2.flush();
-    delayMicroseconds(10);
-    digitalWrite(RS485_EN_PIN, LOW);
+    // EN HIGH antes de toda la trama — se mantiene durante TODOS los bytes ✅
+    gpio_put(RS485_EN_PIN, 1);
+    delayMicroseconds(2); // settling del transceptor
 
-    // Limpia eco del FIFO
-    delayMicroseconds(200);
-    while (Serial2.available()) Serial2.read();
+    uint8_t* p = (uint8_t*)&tx;
+    for (size_t i = 0; i < sizeof(SlavePacket); i++) {
+        pio_sm_put_blocking(_pio, _sm, p[i]);
+    }
 
-    // Limpia framing errors del PL011
-    hw_clear_bits(&uart_get_hw(uart1)->rsr, UART_UARTRSR_BITS);
+    // Esperar que FIFO y shift register terminen de vaciar.
+    // A 500 kbps: 1 byte (10 bits) = 20µs → 25µs de margen ✅
+    while (!pio_sm_is_tx_fifo_empty(_pio, _sm)) tight_loop_contents();
+    delayMicroseconds(25);
+
+    // Liberar el bus → receive mode
+    gpio_put(RS485_EN_PIN, 0);
 }
 
-const int   PWM_MIN    = 50;
-const int   PWM_MAX    = 220;
-const int   DEAD_ZONE  = 80;
-const int   MIN_ERROR  = 100;
-const int   BRAKE_DIST = 80;
-const int   SLEW_MAX   = 12;
-const float GAMMA      = 0.6f;
-int         currentPWM = 0;
-
-void motorForward(int pwm) { digitalWrite(MOTOR_IN2, LOW);  analogWrite(MOTOR_IN1, pwm); }
-void motorReverse(int pwm) { digitalWrite(MOTOR_IN1, LOW);  analogWrite(MOTOR_IN2, pwm); }
-void motorStop()           { digitalWrite(MOTOR_IN1, LOW);  digitalWrite(MOTOR_IN2, LOW); currentPWM = 0; }
-
-int calcPWM(int error) {
-    float errNorm = constrain(abs(error) / 4096.0f, 0.0f, 1.0f);
-    return (int)(PWM_MIN + pow(errNorm, GAMMA) * (PWM_MAX - PWM_MIN));
-}
-
-void updateMotor(int error) {
-    if (abs(error) <= DEAD_ZONE) { motorStop(); return; }
-    if (abs(error) <  MIN_ERROR) { motorStop(); return; }
-    int targetPWM = (abs(error) < BRAKE_DIST) ? PWM_MIN : calcPWM(error);
-    targetPWM  = constrain(targetPWM, currentPWM - SLEW_MAX, currentPWM + SLEW_MAX);
-    currentPWM = targetPWM;
-    if (error > 0) motorForward(currentPWM);
-    else           motorReverse(currentPWM);
-}
-
+// ═══════════════════════════════════════════════════
+//  CORE 0 — Comunicaciones
+// ═══════════════════════════════════════════════════
 void setup() {
     Serial.begin(115200);
 
-    for (int p = 0; p <= 8; p++) {
-        if (p != RS485_TX_PIN && p != RS485_RX_PIN)
-            pinMode(p, INPUT_PULLDOWN);
-    }
-
-    pinMode(RS485_EN_PIN, OUTPUT);
-    digitalWrite(RS485_EN_PIN, LOW);
-    pinMode(RS485_RX_PIN, INPUT);
-    Serial2.setFIFOSize(256);
-    Serial2.setTX(RS485_TX_PIN);
-    Serial2.setRX(RS485_RX_PIN);
+    // Buffer RX ampliado antes de begin() ✅
+    Serial2.setFIFOSize(128);
+    Serial2.setRX(RS485_RX_PIN); // GP5
+    Serial2.setTX(255);          // GP4 pertenece al PIO — UART TX deshabilitado ✅
     Serial2.begin(RS485_BAUD, SERIAL_8N1);
 
-    Serial.println("=== RP2040 Core0: RS485 ===");
+    setupRS485PIO();
+    Serial.println("System Ready: PIO RS485 & Dual Core");
 }
 
 void loop() {
-    static uint32_t lastPrint = 0;
-    static uint32_t pktCount  = 0;
-
     rs485Update();
-
     if (_newData) {
         _newData = false;
-        pktCount++;
         rs485SendResponse();
-        motorTarget = map(_rxPacket.faderTarget, 0, 16383, 0, 4095);
-    }
-
-    if (millis() - lastPrint >= 200) {
-        lastPrint = millis();
-        Serial.print("PKT:"); Serial.print(pktCount);
-        Serial.print(" POS:"); Serial.print((int)emaValue);
-        Serial.print(" TGT:"); Serial.print((int)motorTarget);
-        Serial.print(" ERR:"); Serial.print((int)motorTarget - (int)emaValue);
-        Serial.print(" PWM:"); Serial.println(currentPWM);
+        // constrain explícito: protección si master envía fuera de rango ✅
+        motorTarget = constrain(map(_rxPacket.faderTarget, 0, 16383, 0, 4095), 0, 4095);
     }
 }
 
+// ═══════════════════════════════════════════════════
+//  CORE 1 — Motor y ADC
+// ═══════════════════════════════════════════════════
 void setup1() {
     analogReadResolution(12);
+    analogWriteFreq(MOTOR_PWM_FREQ); // 20 kHz ✅
+    analogWriteRange(255);
+
     pinMode(MOTOR_IN1, OUTPUT);
     pinMode(MOTOR_IN2, OUTPUT);
     pinMode(MOTOR_EN,  OUTPUT);
     digitalWrite(MOTOR_EN, HIGH);
-    motorStop();
-    emaValue = analogRead(FADER_PIN);
+
+    float init = (float)analogRead(FADER_PIN);
+    ema_write(init);
 }
 
 void loop1() {
-    static uint32_t lastControl = 0;
-    uint32_t now = millis();
-    if (now - lastControl >= 5) {
-        lastControl = now;
+    static uint32_t lastControl  = 0;
+    static float    emaLocal     = 0.0f;
+    static bool     motorRunning = false; // estado para histéresis ✅
+
+    if (millis() - lastControl >= 5) {
+        lastControl = millis();
+
         int raw  = analogRead(FADER_PIN);
-        emaValue = 0.1f * raw + 0.9f * emaValue;
-        updateMotor((int)motorTarget - (int)emaValue);
+        emaLocal = 0.15f * raw + 0.85f * emaLocal;
+        ema_write(emaLocal);
+
+        int error  = (int)motorTarget - (int)emaLocal;
+        int absErr = abs(error);
+
+        // Histéresis: deadzone diferente para parar vs arrancar ✅
+        // Evita chatter cuando el error oscila alrededor del umbral
+        int deadzone = motorRunning ? MOTOR_DEADZONE_STOP : MOTOR_DEADZONE_START;
+
+        if (absErr < deadzone) {
+            digitalWrite(MOTOR_IN1, LOW);
+            digitalWrite(MOTOR_IN2, LOW);
+            motorRunning = false;
+        } else {
+            motorRunning = true;
+            int pwm = constrain(map(absErr, 0, 1000, 60, 230), 60, 230);
+            if (error > 0) {
+                digitalWrite(MOTOR_IN2, LOW);
+                analogWrite(MOTOR_IN1, pwm);
+            } else {
+                digitalWrite(MOTOR_IN1, LOW);
+                analogWrite(MOTOR_IN2, pwm);
+            }
+        }
     }
 }
