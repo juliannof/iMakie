@@ -264,7 +264,6 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
             updateLeds();
         }
     }
-    
 
     // ── Botón SMPTE/BEATS (key 15) ───────────────────────────────
     if (key == 15 && isPress) {
@@ -273,17 +272,26 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
         // SIN tocar currentTimecodeMode aquí — Logic confirma con nota 113/114
         return 0;
     }
-    // ── SHIFT + ZOOM (key 16) → calibrar fader de pista activa ──
+
+    // ── CALIB (key 16) → calibrar fader de pista activa ─────────
     if (key == 16 && isPress) {
-    // Buscar qué pista tiene SELECT activo
-        for (int i = 0; i < 8; i++) {
-            if (selectStates[i]) {
-                _onCalibrateRequest(i + 1);
-                log_i("[CAL] Calibracion enviada a slave %d", i + 1);
-                break;
+        log_i("[CAL] key 16 presionado");
+        if (_onCalibrateRequest) {
+            _onCalibrateRequest(1);  // hardcode canal 1 para test
+            log_i("[CAL] callback registrado");
+            for (int i = 0; i < 8; i++) {
+                if (selectStates[i]) {
+                    log_i("[CAL] SELECT activo en track %d", i + 1);
+                    //_onCalibrateRequest(i + 1);
+                    _onCalibrateRequest(1);  // hardcode canal 1 para test
+                    break;
+                }
             }
+            log_i("[CAL] ningún SELECT activo");
+        } else {
+            log_w("[CAL] _onCalibrateRequest no registrado");
         }
-        return 0;  // no enviar MIDI ZOOM a Logic
+        return 0;
     }
 
     // ── Enviar MIDI — Logic confirma el estado de vuelta ─────────
@@ -302,5 +310,4 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
 
     return 0;
 }
-
 // Fin del codigo

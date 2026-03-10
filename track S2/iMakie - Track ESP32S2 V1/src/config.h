@@ -39,6 +39,22 @@ enum class ConnectionState {
 #define FADER_POT_PIN           10   // ADC1_CH9 — sin cambio
 #define FADER_VCC_PIN           17   // DAC_1: salida ~1.1V al VCC del pot
 
+// ─── Parámetros de control ────────────────────────────────────
+static constexpr uint8_t  PWM_MIN     = 120;
+static constexpr uint8_t  PWM_MAX     = 255;
+static constexpr uint8_t  PWM_SLEW    = 4;
+static constexpr int      DEAD_ZONE   = 80;
+static constexpr int      BRAKE_DIST  = 150;
+static constexpr float    CURVE_GAMMA = 0.6f;
+
+// ─── Parámetros de calibración ───────────────────────────────
+static constexpr uint8_t  CALIB_PWM               = 200;
+static constexpr uint32_t CALIB_TIMEOUT            = 8000; // ms por fase
+static constexpr int      ADC_STABILITY_THRESHOLD  = 20;   // counts — "quieto"
+static constexpr uint32_t ADC_STABLE_TIME          = 400;  // ms quieto → tope
+
+
+
 // Calibración (valores aproximados — ajustar con autocalibración)
 #define FADER_ADC_MIN       768  // leer real en 0%
 #define FADER_ADC_MAX      4090   // leer real en 100%

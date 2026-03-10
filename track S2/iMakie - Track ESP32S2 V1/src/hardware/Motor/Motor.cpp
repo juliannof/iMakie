@@ -25,19 +25,7 @@
 
 extern FaderADC faderADC;
 
-// ─── Parámetros de control ────────────────────────────────────
-static constexpr uint8_t  PWM_MIN     = 120;
-static constexpr uint8_t  PWM_MAX     = 255;
-static constexpr uint8_t  PWM_SLEW    = 4;
-static constexpr int      DEAD_ZONE   = 80;
-static constexpr int      BRAKE_DIST  = 150;
-static constexpr float    CURVE_GAMMA = 0.6f;
 
-// ─── Parámetros de calibración ───────────────────────────────
-static constexpr uint8_t  CALIB_PWM               = 200;
-static constexpr uint32_t CALIB_TIMEOUT            = 8000; // ms por fase
-static constexpr int      ADC_STABILITY_THRESHOLD  = 20;   // counts — "quieto"
-static constexpr uint32_t ADC_STABLE_TIME          = 400;  // ms quieto → tope
 
 // ─── Estado interno ───────────────────────────────────────────
 static Motor::CalibState _calibState   = Motor::CalibState::IDLE;
@@ -75,9 +63,10 @@ static void _hwDrive(int pwm) {
 }
 
 // ─── Tick de calibración ─────────────────────────────────────
-// Lógica de estabilidad (igual que CalibrationManager):
-//   valor quieto → acumula tiempo → tope detectado
-//   valor cambiando → resetea timer
+// Detección de tope: estabilidad O posición límite
+//   valor quieto ADC_STABLE_TIME → tope
+//   pos <= 150 → tope inferior inmediato
+//   pos >= 8000 → tope superior inmediato
 static void _calibTick() {
     faderADC.update();
     _adcFiltered = (float)faderADC.getFaderPos();
@@ -92,6 +81,9 @@ static void _calibTick() {
         return;
     }
 
+    bool atBottom = (pos <= 150);
+    bool atTop    = (pos >= 8000);
+
     if (abs(pos - _calibStableVal) <= ADC_STABILITY_THRESHOLD) {
         // Quieto — acumular tiempo estable
         uint32_t tiempoEstable = now - _calibStableT;
@@ -100,8 +92,11 @@ static void _calibTick() {
             (_calibState == Motor::CalibState::CALIB_DOWN) ? "DOWN" : "UP  ",
             pos, tiempoEstable);
 
-        if (tiempoEstable >= ADC_STABLE_TIME) {
-            // Tope detectado
+        bool topeDetectado = (tiempoEstable >= ADC_STABLE_TIME) ||
+                             (_calibState == Motor::CalibState::CALIB_DOWN && atBottom) ||
+                             (_calibState == Motor::CalibState::CALIB_UP   && atTop);
+
+        if (topeDetectado) {
             _hwStop();
             delay(100);
             faderADC.update();
@@ -117,7 +112,7 @@ static void _calibTick() {
                 _calibStableVal = pos;
                 _calibStableT   = millis();
                 _calibStartT    = millis();
-                _hwDrive(-CALIB_PWM); // dirección opuesta a startCalib()
+                _hwDrive(-CALIB_PWM); // sube
 
             } else {
                 uint16_t topeUp = (uint16_t)pos;

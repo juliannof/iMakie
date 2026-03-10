@@ -125,6 +125,14 @@ static void onMasterData(const MasterPacket& pkt) {
         faderPositions = newFader;
         Motor::setTarget(pkt.faderTarget);  // ← reemplaza el TODO
     }
+    if (pkt.flags & FLAG_CALIB) {
+    Serial.println("[S2] FLAG_CALIB recibido");
+    Motor::startCalib();
+    }
+    AutoMode am = getAutoMode(pkt.flags);
+    if (am != AUTO_OFF) {
+        Serial.printf("[S2] AutoMode=%d\n", (int)am);
+    }
 }
 
 void setup() {
