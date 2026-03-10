@@ -17,7 +17,7 @@
 #include "hardware/Motor/Motor.h"
 #include "fader/FaderADC.h"
 
-extern FaderADC faderADC;
+FaderADC faderADC;
 
 
 // ─── Display objects ──────────────────────────────────────────
@@ -127,60 +127,36 @@ static void onMasterData(const MasterPacket& pkt) {
     }
 }
 
-// =============================================================
-//  SETUP
-// =============================================================
 void setup() {
     Serial.begin(115200);
-    // 1. Estabilizar referencia DAC lo antes posible
-    // DAC: referencia 1.1V para el fader
-    dacWrite(FADER_VCC_PIN, 77);  // 77/255 × 3.3V ≈ 0.997V — margen antes de saturar ADC_0db
-    delay(1000); // estabilizar DAC
-    Motor::begin();   // calibra en boot
     
+    // Motor pins off — PRIMERO
+    pinMode(MOTOR_IN1, OUTPUT);
+    pinMode(MOTOR_IN2, OUTPUT);
+    pinMode(MOTOR_EN,  OUTPUT);
+    digitalWrite(MOTOR_IN1, LOW);
+    digitalWrite(MOTOR_IN2, LOW);
+    digitalWrite(MOTOR_EN,  LOW);
 
-    // touchRead() no requiere init explícito en Arduino ESP32
+    dacWrite(FADER_VCC_PIN, 77);
+    delay(30);
+    faderADC.begin();
 
-    initDisplay();
-    initHardware();           // Crea instancias Button2, incluyendo buttonRec
+    initDisplay();        // LovyanGFX primero
+    initHardware();
     setVPotLevel(VPOT_DEFAULT_LEVEL);
     Encoder::begin();
-    // SAT Menu — se crea ANTES de RS485 para poder leer trackId desde NVS
+    
     satMenu = new SatMenu(&tft);
-    satMenu->onMotorOff  ([]{ Motor::stop(); _suspended = true;  });
-    satMenu->onMotorOn   ([]{ Motor::stop(); _suspended = false; needsTOTALRedraw = true; });
-    satMenu->onMotorDrive([](int pwm){ /* Motor no expone drive directo — ok para SAT */ });
-    satMenu->onRS485Off  ([]{ _suspended = true;  });
-    satMenu->onRS485On   ([]{ _suspended = false; needsTOTALRedraw = true; });
-    satMenu->onReboot    ([]{ ESP.restart(); });
-    satMenu->onWiFiLaunch([]{ /* WiFiManager.startConfigPortal() */ });
-    satMenu->onConfigSaved([](const SatConfig& cfg){
-        rs485.begin(cfg.trackId);
-    });
-    // Brillo máximo al entrar en SAT, restaura a 200 al salir
-    satMenu->onBrightness([](uint8_t v){ setScreenBrightness(v); }, 200);
-
-    // RS485: usar trackId guardado en NVS (leído por SatMenu en su constructor)
+    // ... callbacks ...
+    
     uint8_t slaveId = satMenu->getConfig().trackId;
     rs485.begin(slaveId);
-
-    // Si trackId no está configurado (valor 0 = nunca guardado),
-    // entrar en SAT directamente para forzar la identificación del módulo.
-    if (slaveId == 0) {
-        satMenu->open();
-    }
-
-    // ButtonManager: gestiona todos los botones + long-press REC → SAT
-    // Debe llamarse DESPUÉS de initHardware() (necesita buttonRec ya creado)
+    if (slaveId == 0) satMenu->open();
+    
     ButtonManager::begin(&tft, satMenu);
 
-    if (psramFound()) {
-        Serial.printf("PSRAM: %u KB total, %u KB libre\n",
-        ESP.getPsramSize() / 1024,
-        ESP.getFreePsram() / 1024);
-    } else {
-        Serial.println("ERROR: PSRAM no detectada");
-    }
+    Motor::begin();   // ← ÚLTIMO, todo ya inicializado
 }
 
 // =============================================================
@@ -192,7 +168,6 @@ void loop() {
         satMenu->update();
         return;
     }
-
 
     // Actualizar barra de progreso del long-press REC
     ButtonManager::update();
@@ -233,6 +208,16 @@ void loop() {
             }
         }
     }
+    // ── Fader + Motor — orden crítico ──
+    faderADC.update();
+    Motor::setADC(faderADC.getFaderPos());  // ← debe ir ANTES de update()
+
+    if (readFaderTouch()) {
+        Motor::stop();
+    } else {
+        Motor::update();
+    }
+
 
     // Encoder
     Encoder::update();
@@ -250,16 +235,8 @@ void loop() {
     // Display
     updateDisplay();
 
-    delay(2);
 
     updateAllNeopixels();
-    faderADC.update();  // único lector del ADC
-
-    if (readFaderTouch()) {
-        Motor::read();   // actualiza ADC sin mover
-        Motor::stop();
-    } else {
-        Motor::update(); // actualiza ADC + controla motor
-    }
+    
 
 }

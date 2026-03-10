@@ -40,8 +40,8 @@ enum class ConnectionState {
 #define FADER_VCC_PIN           17   // DAC_1: salida ~1.1V al VCC del pot
 
 // Calibración (valores aproximados — ajustar con autocalibración)
-#define FADER_ADC_MIN      1600  // leer real en 0%
-#define FADER_ADC_MAX      8191   // leer real en 100%
+#define FADER_ADC_MIN       768  // leer real en 0%
+#define FADER_ADC_MAX      4090   // leer real en 100%
 // --- LED INTEGRADO ---
 #define LED_BUILTIN_PIN 15 // Pin del LED integrado en la Lolin D1 ESP32 S2 (GPIO15)
                           // Verifica el diagrama de pines de tu placa si tienes dudas.

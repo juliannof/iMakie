@@ -44,7 +44,7 @@ void initHardware() {
   // Manual way (R, G, B)
   //uint32_t colorAzulClaro = (50 << 16) | (180 << 8) | 255;
   
-  uint32_t colorAzulClaro = seesaw_NeoPixel::Color(0, 0, 1);
+  uint32_t colorAzulClaro = seesaw_NeoPixel::Color(0, 0, 200);
   
   for (int i = 0; i < X_DIM * Y_DIM; i++) {
     trellis.setPixelColor(i, colorAzulClaro);

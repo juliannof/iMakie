@@ -3,9 +3,10 @@
 
 
 void FaderADC::begin() {
-    analogSetPinAttenuation(FADER_POT_PIN, ADC_0db);  // ← vuelve a 11db
-    analogReadResolution(13);
-    _emaValue = (float)analogRead(FADER_POT_PIN);
+    analogReadResolution(12);
+    analogSetPinAttenuation(FADER_POT_PIN, ADC_0db);
+    delay(30);                 // estabilizar antes del seed
+    _emaValue = (float)analogRead(FADER_POT_PIN);  // seed correcto
 }
 
 void FaderADC::update() {
@@ -20,6 +21,6 @@ void FaderADC::update() {
     static uint32_t _lastPrint = 0;
     if (millis() - _lastPrint >= 100) {
         _lastPrint = millis();
-        Serial.printf("[FADER] raw=%5d  ema=%5d  pos=%5d\n", raw, filtered, _faderPos);
+        //Serial.printf("[FADER] raw=%5d  ema=%5d  pos=%5d\n", raw, filtered, _faderPos);
     }
 }
