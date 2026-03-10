@@ -39,19 +39,34 @@ enum class ConnectionState {
 #define FADER_POT_PIN           10   // ADC1_CH9 — sin cambio
 #define FADER_VCC_PIN           17   // DAC_1: salida ~1.1V al VCC del pot
 
-// ─── Parámetros de control ────────────────────────────────────
-static constexpr uint8_t  PWM_MIN     = 120;
-static constexpr uint8_t  PWM_MAX     = 255;
-static constexpr uint8_t  PWM_SLEW    = 4;
-static constexpr int      DEAD_ZONE   = 80;
-static constexpr int      BRAKE_DIST  = 150;
-static constexpr float    CURVE_GAMMA = 0.6f;
-
 // ─── Parámetros de calibración ───────────────────────────────
-static constexpr uint8_t  CALIB_PWM               = 200;
-static constexpr uint32_t CALIB_TIMEOUT            = 8000; // ms por fase
-static constexpr int      ADC_STABILITY_THRESHOLD  = 20;   // counts — "quieto"
-static constexpr uint32_t ADC_STABLE_TIME          = 400;  // ms quieto → tope
+static constexpr uint8_t  CALIB_PWM               = 220;
+static constexpr uint32_t CALIB_TIMEOUT           = 1500;  // ms — timeout global
+static constexpr int      ADC_STABILITY_THRESHOLD = 200;    // counts
+static constexpr uint32_t CALIB_STABLE_TIME       = 500;   // ms
+
+// ─── Parámetros de control de posición ───────────────────────
+static constexpr uint8_t PWM_MIN     = 120;
+static constexpr uint8_t PWM_MAX     = 255;
+static constexpr uint8_t PWM_SLEW    = 4;
+static constexpr int     DEAD_ZONE   = 80;
+static constexpr int     BRAKE_DIST  = 150;
+static constexpr float   CURVE_GAMMA = 0.6f;
+
+// ─── Estado interno ───────────────────────────────────────────
+static uint16_t _adcMin      = 0;
+static uint16_t _adcMax      = 8191;
+static uint16_t _adcSpan     = 8191;
+static float    _adcFiltered = 0.0f;
+static uint16_t _targetADC   = 0;
+static int      _currentPWM  = 0;
+
+// Calibración — estado interno (igual que CalibrationManager)
+static uint32_t _tiempoInicioCalibracion = 0;
+static uint32_t _ultimoTiempoEstable     = 0;
+static int      _ultimoValorEstable      = 0;
+static uint16_t _posicionMaximaADC       = 0;
+
 
 
 

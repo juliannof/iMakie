@@ -48,4 +48,4 @@ namespace Motor {
     uint16_t   getRawADC();    // último valor recibido por setADC()
     float      getPosition();  // 0.0–1.0 posición real
 
-} // namespace Motor
+} // namespace Motor                  
