@@ -33,6 +33,24 @@ void RS485Master::begin(uint8_t numSlaves) {
     log_i("[RS485] Master init | slaves:%u baud:%u", _numSlaves, RS485_BAUD);
 }
 
+void RS485Master::setCalibrate(uint8_t id) {
+    if (id < 1 || id > _numSlaves) return;
+    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+        _ch[id].calibrate = true;
+        _ch[id].dirty     = true;
+        xSemaphoreGive(_mutex);
+    }
+}
+
+void RS485Master::setAutoMode(uint8_t id, AutoMode mode) {
+    if (id < 1 || id > _numSlaves) return;
+    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+        _ch[id].autoMode = mode;
+        _ch[id].dirty    = true;
+        xSemaphoreGive(_mutex);
+    }
+}
+
 void RS485Master::taskEntry(void* param) {
     static_cast<RS485Master*>(param)->runTask();
 }
@@ -86,10 +104,17 @@ void RS485Master::_sendPacket(uint8_t id) {
         pkt.id          = id;
         memcpy(pkt.trackName, _ch[id].trackName, 7);
         pkt.flags       = _ch[id].flags;
+        // ── autoMode en bits 5-7 ──
+        pkt.flags = ::setAutoMode(pkt.flags, _ch[id].autoMode);
+        // ── FLAG_CALIB one-shot ──
+        if (_ch[id].calibrate) {
+            pkt.flags |= FLAG_CALIB;
+            _ch[id].calibrate = false;
+        }
         pkt.faderTarget = _ch[id].faderTarget;
         pkt.vuLevel     = _ch[id].vuLevel;
-        extern uint8_t g_logicConnected;  // 0=desconectado, 1=conectado
-        pkt.connected = g_logicConnected;
+        extern uint8_t g_logicConnected;
+        pkt.connected   = g_logicConnected;
         _ch[id].dirty   = false;
         xSemaphoreGive(_mutex);
     } else {
@@ -115,7 +140,7 @@ void RS485Master::_sendPacket(uint8_t id) {
 bool RS485Master::_readResponse() {
     while (Serial1.available()) {
         uint8_t b = (uint8_t)Serial1.read();
-        log_e("RX byte: 0x%02X", b);  // ← solo esta línea
+        log_v("RX byte: 0x%02X", b);  // ← solo esta línea
 
         if (!_rxHeader) {
             if (b == RS485_RESP_BYTE) {

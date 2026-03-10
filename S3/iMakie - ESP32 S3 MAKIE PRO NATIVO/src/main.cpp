@@ -200,6 +200,8 @@ void setup() {
     memset(beatsChars_clean,   ' ', 12); beatsChars_clean[12]   = '\0';
 
     snprintf(tempoString, sizeof(tempoString), "%.2f BPM", projectTempo);
+    registerCalibrateRequestCallback([](uint8_t id) {
+    rs485.setCalibrate(id);});
 
     log_e("Inicializando USB stack...");
     USB.begin();

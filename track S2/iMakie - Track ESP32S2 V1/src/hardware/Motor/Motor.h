@@ -20,9 +20,11 @@ namespace Motor {
     // Llamar lo primero en setup() — silencia el motor antes de todo
     void init();
 
-    // Arranca la calibración no bloqueante
-    // Llamar después de faderADC.begin()
+    // Inicializar — no arranca calibración
     void begin();
+
+    // Disparar calibración — llamar cuando S3 lo ordene por RS485
+    void startCalib();
 
     // Avanza la máquina de calibración + control de posición
     // Llamar en cada loop()

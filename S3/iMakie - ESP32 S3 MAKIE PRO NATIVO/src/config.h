@@ -145,7 +145,7 @@ public:
 
 // --- Protocolo ---
 #define RS485_BAUD        500000
-#define NUM_SLAVES             1   // ← actualizar al añadir hardware
+#define NUM_SLAVES             2   // ← actualizar al añadir hardware
 
 // --- Timing (µs) ---
 #define RS485_TX_ENABLE_US     10
@@ -153,6 +153,8 @@ public:
 #define RS485_RESP_TIMEOUT_US 5000
 #define RS485_GAP_US           300
 #define POLL_CYCLE_MS          20
+
+
 
 
 // ====================================================================
@@ -297,14 +299,14 @@ static const byte LED_COLORS_PG3[32] = {
 static const char* labels_PG1[32] = {
     "TRACK", "PAN",   "EQ",    "SEND",  "PLUG",  "INST",  "FLIP",  "GLOB",
     "READ",  "WRIT",  "TCH",   "LTCH",  "TRIM",  "OFF",   "SOLO0", "SMPT",
-    "ZOOM",  "SCRUB", "NUDGE", "MARK", "CHAN<", "CHAN>", "BANK<", "BANK>",
+    "CALIB",  "SCRUB", "NUDGE", "MARK", "CHAN<", "CHAN>", "BANK<", "BANK>",
     "UNDO",  "SAVE",  "SHIFT", "CTRL",  "OPT",   "CMD",   "ENTER", ">>PG2"
 };
 
 static const byte MIDI_NOTES_PG1[32] = {
     0x28, 0x2A, 0x2C, 0x29, 0x2B, 0x2D, 0x32, 0x33,
     0x4A, 0x4B, 0x4D, 0x4E, 0x4C, 0x4F, 0x57, 0x35,
-    0x64, 0x65, 0x66, 0x54, 0x30, 0x31, 0x2E, 0x2F, 
+    0x00, 0x65, 0x66, 0x54, 0x30, 0x31, 0x2E, 0x2F, 
     0x51, 0x50, 0x46, 0x47, 0x48, 0x49, 0x53, 0x00
 };
 

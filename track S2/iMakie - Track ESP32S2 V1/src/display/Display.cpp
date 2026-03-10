@@ -238,47 +238,60 @@ void drawMainArea() {
 }
 
 // ════════════════════════════════════════════════════════════
-//  drawMeter
+//  drawMeter  — visual S2 (rounded) + cálculo robusto de S3
 // ════════════════════════════════════════════════════════════
 void drawMeter(LGFX_Sprite &sprite, uint16_t x, uint16_t y,
                uint16_t w, uint16_t h,
                float level, float peakLevel, bool isClipping) {
-    const int numSegments    = 12;
-    const int padding        = 2;
-    const int peakBorderWidth = 2;
+
+    const int numSegments     = 12;
+    const int padding         = 2;
+    const int cornerRadius    = 2;
 
     if (numSegments <= 1 || h <= (uint16_t)(padding * (numSegments - 1))) return;
 
-    int segmentHeight = (h - padding * (numSegments - 1)) / numSegments;
-    int cornerRadius  = 2;
-    size_t activeSegments = (size_t)(level * numSegments);
-    size_t peakSegment    = (size_t)(peakLevel * numSegments);
-    if (peakSegment >= (size_t)numSegments) peakSegment = numSegments - 1;
+    const int segmentHeight = (h - padding * (numSegments - 1)) / numSegments;
 
+    // ── Cálculo de segmentos activos y peak (lógica S3) ──────────────────────
+    size_t activeSegments  = (size_t)round(level     * numSegments);
+    size_t peakSegment_idx = (size_t)round(peakLevel * numSegments);
+
+    if (peakSegment_idx > 0) peakSegment_idx--;
+
+    if (activeSegments > 0 && peakSegment_idx < activeSegments - 1) {
+        peakSegment_idx = activeSegments - 1;
+    } else if (activeSegments == 0 && peakSegment_idx != (size_t)-1) {
+        peakSegment_idx = (size_t)-1;
+    }
+
+    // ── Dibujo con estilo S2 (rounded + doble borde peak) ────────────────────
     for (int i = 0; i < numSegments; i++) {
         int segY = y + h - (i + 1) * segmentHeight - i * padding;
-        bool hasPeakBorder = (i == (int)peakSegment && peakLevel > 0.0f);
+
+        bool hasPeakBorder = (static_cast<size_t>(i) == peakSegment_idx
+                              && peakLevel > level + 0.001f);   // ← condición S3
 
         uint16_t fillColor;
         if (hasPeakBorder) {
             fillColor = (i < 8) ? VU_GREEN_OFF : (i < 10) ? VU_YELLOW_OFF : VU_RED_OFF;
-        } else if ((size_t)i < activeSegments) {
-            fillColor = (i < 8) ? TFT_GREEN : (i < 10) ? TFT_YELLOW : TFT_RED;
+        } else if (static_cast<size_t>(i) < activeSegments) {
+            fillColor = (i < 8) ? VU_GREEN_ON : (i < 10) ? VU_YELLOW_ON : VU_RED_ON;
         } else {
             fillColor = (i < 8) ? VU_GREEN_OFF : (i < 10) ? VU_YELLOW_OFF : VU_RED_OFF;
         }
-        if ((size_t)i == (size_t)(numSegments - 1) && isClipping) fillColor = TFT_RED;
+
+        if (static_cast<size_t>(i) == (size_t)(numSegments - 1) && isClipping) {
+            fillColor = VU_RED_ON;
+        }
+
+        sprite.fillRoundRect(x, segY, w, segmentHeight, cornerRadius, fillColor);
 
         if (hasPeakBorder) {
-            sprite.fillRoundRect(x, segY, w, segmentHeight, cornerRadius, fillColor);
             sprite.drawRoundRect(x,   segY,   w,   segmentHeight,   cornerRadius,   VU_PEAK_COLOR);
             sprite.drawRoundRect(x+1, segY+1, w-2, segmentHeight-2, cornerRadius-1, VU_PEAK_COLOR);
-        } else {
-            sprite.fillRoundRect(x, segY, w, segmentHeight, cornerRadius, fillColor);
         }
     }
 }
-
 // ════════════════════════════════════════════════════════════
 //  drawVUMeters
 // ════════════════════════════════════════════════════════════
@@ -290,33 +303,45 @@ void drawVUMeters() {
 }
 
 // ════════════════════════════════════════════════════════════
-//  handleVUMeterDecay
+//  handleVUMeterDecay — lógica S3 + bug fix timer peak
 // ════════════════════════════════════════════════════════════
 void handleVUMeterDecay() {
-    const unsigned long DECAY_INTERVAL_MS = 150;
-    const unsigned long PEAK_HOLD_TIME_MS = 1500;
+    const unsigned long DECAY_INTERVAL_MS = 100;
+    const unsigned long PEAK_HOLD_TIME_MS = 2000;
     const float DECAY_AMOUNT = 1.0f / 12.0f;
 
     unsigned long now = millis();
     bool changed = false;
 
+    // 1. Decaimiento del nivel normal
     if (vuLevels > 0 && now - vuLastUpdateTime > DECAY_INTERVAL_MS) {
+        float old = vuLevels;
         vuLevels -= DECAY_AMOUNT;
-        if (vuLevels < 0.0f) vuLevels = 0.0f;
+        if (vuLevels < 0.01f) vuLevels = 0.0f;
         vuLastUpdateTime = now;
         changed = true;
+        log_v("VU Level decayed %.3f → %.3f", old, vuLevels);
     }
+
+    // 2. Decaimiento del peak tras hold time
     if (vuPeakLevels > 0 && now - vuPeakLastUpdateTime > PEAK_HOLD_TIME_MS) {
         if (vuPeakLevels > vuLevels) {
+            float old = vuPeakLevels;
             vuPeakLevels = vuLevels;
+            vuPeakLastUpdateTime = now;     // ← BUG FIX: sin esto se dispara cada ciclo
             changed = true;
+            log_v("VU Peak decayed %.3f → %.3f (jump to current level)", old, vuPeakLevels);
         }
     }
+
+    // 3. Seguridad: peak nunca puede ser menor que el nivel actual
     if (vuPeakLevels < vuLevels) {
+        log_w("VU Peak (%.3f) < VU Level (%.3f). Corrigiendo.", vuPeakLevels, vuLevels);
         vuPeakLevels = vuLevels;
         vuPeakLastUpdateTime = now;
         changed = true;
     }
+
     if (changed) needsVUMetersRedraw = true;
 }
 

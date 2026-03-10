@@ -4,8 +4,12 @@
 //
 //  CALIBRACIÓN NO BLOQUEANTE (máquina de estados):
 //    IDLE → CALIB_DOWN → CALIB_UP → DONE
-//    Avanza en update() — no bloquea el loop
-//    Watchdog nunca muere
+//    Disparada por S3 vía RS485 → Motor::startCalib()
+//    Avanza en update() — no bloquea el loop nunca
+//
+//  DETECCIÓN DE TOPE:
+//    Lógica de estabilidad: si el ADC no cambia más de
+//    ADC_STABILITY_THRESHOLD durante ADC_STABLE_TIME → tope
 //
 //  ARQUITECTURA ADC:
 //    FaderADC es el único dueño del ADC — siempre.
@@ -22,18 +26,18 @@
 extern FaderADC faderADC;
 
 // ─── Parámetros de control ────────────────────────────────────
-static constexpr uint8_t  PWM_MIN      = 80;    // mínimo PWM que mueve el motor
-static constexpr uint8_t  PWM_MAX      = 255;   // máximo
-static constexpr uint8_t  PWM_SLEW     = 12;    // máx cambio de PWM por ciclo
-static constexpr int      DEAD_ZONE    = 15;    // FaderADC counts — no mover
-static constexpr int      BRAKE_DIST   = 20;    // FaderADC counts — frenar
-static constexpr float    CURVE_GAMMA  = 0.6f;  // curva no lineal
+static constexpr uint8_t  PWM_MIN     = 120;
+static constexpr uint8_t  PWM_MAX     = 255;
+static constexpr uint8_t  PWM_SLEW    = 4;
+static constexpr int      DEAD_ZONE   = 80;
+static constexpr int      BRAKE_DIST  = 150;
+static constexpr float    CURVE_GAMMA = 0.6f;
 
 // ─── Parámetros de calibración ───────────────────────────────
-static constexpr uint8_t  CALIB_PWM        = 200;   // velocidad calibración
-static constexpr uint16_t STALL_THRESHOLD  = 30;    // FaderADC counts mínimo de movimiento
-static constexpr uint32_t STALL_TIME       = 400;   // ms sin movimiento → tope detectado
-static constexpr uint32_t CALIB_TIMEOUT    = 5000;  // ms máximo por fase
+static constexpr uint8_t  CALIB_PWM               = 200;
+static constexpr uint32_t CALIB_TIMEOUT            = 8000; // ms por fase
+static constexpr int      ADC_STABILITY_THRESHOLD  = 20;   // counts — "quieto"
+static constexpr uint32_t ADC_STABLE_TIME          = 400;  // ms quieto → tope
 
 // ─── Estado interno ───────────────────────────────────────────
 static Motor::CalibState _calibState   = Motor::CalibState::IDLE;
@@ -44,11 +48,11 @@ static float    _adcFiltered = 0.0f;
 static uint16_t _targetADC   = 0;
 static int      _currentPWM  = 0;
 
-// Calibración — estado interno de la máquina
-static uint16_t _calibLastPos  = 0;
-static uint32_t _calibStallT   = 0;
-static uint32_t _calibStartT   = 0;
-static uint16_t _calibTopeDown = 0;
+// Calibración — estado interno
+static uint16_t _calibTopeDown  = 0;
+static uint32_t _calibStartT    = 0;
+static int      _calibStableVal = 0;
+static uint32_t _calibStableT   = 0;
 
 // ─── Helpers de hardware ─────────────────────────────────────
 static void _hwStop() {
@@ -62,7 +66,7 @@ static void _hwDrive(int pwm) {
     if (pwm == 0) { _hwStop(); return; }
     digitalWrite(MOTOR_EN, HIGH);
     if (pwm > 0) {
-        analogWrite(MOTOR_IN1, constrain( pwm, 0, 255));
+        analogWrite(MOTOR_IN1, constrain(pwm, 0, 255));
         digitalWrite(MOTOR_IN2, LOW);
     } else {
         digitalWrite(MOTOR_IN1, LOW);
@@ -70,85 +74,95 @@ static void _hwDrive(int pwm) {
     }
 }
 
-// ─── Tick de calibración (llamado desde update()) ────────────
+// ─── Tick de calibración ─────────────────────────────────────
+// Lógica de estabilidad (igual que CalibrationManager):
+//   valor quieto → acumula tiempo → tope detectado
+//   valor cambiando → resetea timer
 static void _calibTick() {
     faderADC.update();
     _adcFiltered = (float)faderADC.getFaderPos();
-    uint16_t pos = (uint16_t)_adcFiltered;
+    int pos = (int)_adcFiltered;
     uint32_t now = millis();
 
     // Timeout por fase
     if (now - _calibStartT > CALIB_TIMEOUT) {
         _hwStop();
         _calibState = Motor::CalibState::ERROR;
-        Serial.printf("[MOTOR] Calibracion TIMEOUT en fase %d\n",
-                      (int)_calibState);
+        Serial.println("[MOTOR] Calibracion TIMEOUT");
         return;
     }
 
-    // Detectar movimiento
-    uint16_t delta = (pos > _calibLastPos) ? (pos - _calibLastPos)
-                                           : (_calibLastPos - pos);
-    if (delta >= STALL_THRESHOLD) {
-        _calibLastPos = pos;
-        _calibStallT  = now;
-    }
+    if (abs(pos - _calibStableVal) <= ADC_STABILITY_THRESHOLD) {
+        // Quieto — acumular tiempo estable
+        uint32_t tiempoEstable = now - _calibStableT;
 
-    bool stalled = (now - _calibStallT) >= STALL_TIME;
+        Serial.printf("[MOTOR] %s pos=%d estable=%lums\n",
+            (_calibState == Motor::CalibState::CALIB_DOWN) ? "DOWN" : "UP  ",
+            pos, tiempoEstable);
 
-    if (_calibState == Motor::CalibState::CALIB_DOWN) {
-        Serial.printf("[MOTOR] DOWN pos=%d delta=%d stall=%lums\n",
-                      pos, delta, now - _calibStallT);
-        if (stalled) {
+        if (tiempoEstable >= ADC_STABLE_TIME) {
+            // Tope detectado
             _hwStop();
-            delay(80);
-            _calibTopeDown = (uint16_t)_adcFiltered;
-            Serial.printf("[MOTOR] Tope BAJO detectado pos=%d\n", _calibTopeDown);
+            delay(100);
+            faderADC.update();
+            _adcFiltered = (float)faderADC.getFaderPos();
+            pos = (int)_adcFiltered;
 
-            // Arrancar fase UP
-            _calibState   = Motor::CalibState::CALIB_UP;
-            _calibLastPos = _calibTopeDown;
-            _calibStallT  = millis();
-            _calibStartT  = millis();
-            _hwDrive(-CALIB_PWM); // -pwm = sube en este hardware
-        }
+            if (_calibState == Motor::CalibState::CALIB_DOWN) {
+                _calibTopeDown = (uint16_t)pos;
+                Serial.printf("[MOTOR] Tope BAJO detectado pos=%d\n", _calibTopeDown);
 
-    } else if (_calibState == Motor::CalibState::CALIB_UP) {
-        Serial.printf("[MOTOR] UP pos=%d delta=%d stall=%lums\n",
-                      pos, delta, now - _calibStallT);
-        if (stalled) {
-            _hwStop();
-            delay(80);
-            uint16_t topeUp = (uint16_t)_adcFiltered;
-            Serial.printf("[MOTOR] Tope ALTO detectado pos=%d\n", topeUp);
+                delay(300); // pausa antes de invertir
+                _calibState     = Motor::CalibState::CALIB_UP;
+                _calibStableVal = pos;
+                _calibStableT   = millis();
+                _calibStartT    = millis();
+                _hwDrive(-CALIB_PWM); // dirección opuesta a startCalib()
 
-            if (topeUp > _calibTopeDown && (topeUp - _calibTopeDown) > 500) {
-                _adcMin   = _calibTopeDown + 20;
-                _adcMax   = topeUp         - 20;
-                _adcSpan  = _adcMax - _adcMin;
-                _targetADC = (uint16_t)_adcFiltered; // no mover al terminar
-                _calibState = Motor::CalibState::DONE;
-                Serial.printf("[MOTOR] Calibrado OK  MIN=%d MAX=%d span=%d\n",
-                              _adcMin, _adcMax, _adcSpan);
             } else {
-                _calibState = Motor::CalibState::ERROR;
-                Serial.printf("[MOTOR] Calibracion fallida bajo=%d alto=%d\n",
-                              _calibTopeDown, topeUp);
+                uint16_t topeUp = (uint16_t)pos;
+                Serial.printf("[MOTOR] Tope ALTO detectado pos=%d\n", topeUp);
+
+                if (topeUp > _calibTopeDown && (topeUp - _calibTopeDown) > 500) {
+                    _adcMin     = _calibTopeDown + 20;
+                    _adcMax     = topeUp         - 20;
+                    _adcSpan    = _adcMax - _adcMin;
+                    _targetADC  = (uint16_t)_adcFiltered;
+                    _calibState = Motor::CalibState::DONE;
+                    Serial.printf("[MOTOR] Calibrado OK  MIN=%d MAX=%d span=%d\n",
+                                  _adcMin, _adcMax, _adcSpan);
+                } else {
+                    _calibState = Motor::CalibState::ERROR;
+                    Serial.printf("[MOTOR] Calibracion fallida bajo=%d alto=%d\n",
+                                  _calibTopeDown, topeUp);
+                }
             }
         }
+    } else {
+        // Valor cambiando — resetear timer de estabilidad
+        _calibStableVal = pos;
+        _calibStableT   = now;
     }
 }
 
-// ─── Control de posición (llamado desde update() si DONE) ────
+// ─── Control de posición ─────────────────────────────────────
+static bool _motorActive = false;
+
 static void _controlTick() {
     int pos    = (int)_adcFiltered;
     int err    = (int)_targetADC - pos;
     int absErr = abs(err);
 
-    if (absErr <= DEAD_ZONE) {
+    // Hysteresis: arranca si supera DEAD_ZONE, para si baja de DEAD_ZONE/2
+    if (!_motorActive && absErr > DEAD_ZONE) {
+        _motorActive = true;
+    } else if (_motorActive && absErr < DEAD_ZONE / 2) {
+        _motorActive = false;
         _hwStop();
         return;
     }
+
+    if (!_motorActive) { _hwStop(); return; }
 
     int targetPWM;
     if (absErr <= BRAKE_DIST) {
@@ -163,9 +177,9 @@ static void _controlTick() {
 
     if (err < 0) targetPWM = -targetPWM;
 
-    int delta   = targetPWM - _currentPWM;
-    delta       = constrain(delta, -PWM_SLEW, PWM_SLEW);
-    _currentPWM += delta;
+    int slewed  = targetPWM - _currentPWM;
+    slewed      = constrain(slewed, -PWM_SLEW, PWM_SLEW);
+    _currentPWM += slewed;
 
     _hwDrive(_currentPWM);
 }
@@ -181,19 +195,33 @@ void init() {
     digitalWrite(MOTOR_IN1, LOW);
     digitalWrite(MOTOR_IN2, LOW);
     digitalWrite(MOTOR_EN,  LOW);
+    // PWM 20kHz — por encima del umbral auditivo
+    analogWriteFrequency(MOTOR_IN1, 20000);
+    analogWriteFrequency(MOTOR_IN2, 20000);
 }
 
-// Arranca la calibración no bloqueante
-// Requiere faderADC.begin() llamado antes
+// Inicializar sin arrancar calibración
+// La calibración la dispara el S3 vía RS485 → startCalib()
 void begin() {
     faderADC.update();
-    _adcFiltered  = (float)faderADC.getFaderPos();
-    _calibLastPos = (uint16_t)_adcFiltered;
-    _calibStallT  = millis();
-    _calibStartT  = millis();
-    _calibState   = CalibState::CALIB_DOWN;
-    _hwDrive(-CALIB_PWM); // -pwm = baja
-    Serial.println("[MOTOR] Calibracion iniciada...");
+    _adcFiltered = (float)faderADC.getFaderPos();
+    _calibState  = CalibState::IDLE;
+    Serial.println("[MOTOR] Listo. Esperando orden de calibracion del S3.");
+}
+
+// Llamar cuando el S3 ordena calibrar por RS485
+void startCalib() {
+    if (_calibState == CalibState::CALIB_DOWN ||
+        _calibState == CalibState::CALIB_UP) return; // ya calibrando
+
+    faderADC.update();
+    _adcFiltered    = (float)faderADC.getFaderPos();
+    _calibStableVal = (int)_adcFiltered;
+    _calibStableT   = millis();
+    _calibStartT    = millis();
+    _calibState     = CalibState::CALIB_DOWN;
+    _hwDrive(+CALIB_PWM); // +pwm = baja
+    Serial.println("[MOTOR] Calibracion iniciada por S3.");
 }
 
 void setADC(uint16_t value) {

@@ -7,7 +7,10 @@
 
 void initHardware();
 void handleHardwareInputs();
-void handleVUMeterDecay();
+
 void updateLeds();
 void setTrellisBrightness(uint8_t newBrightness);
 void resetToStandbyState(); 
+
+typedef void (*CalibrateRequestCallback)(uint8_t slaveId);
+void registerCalibrateRequestCallback(CalibrateRequestCallback cb);

@@ -217,6 +217,67 @@ void drawVUMeters() {
     }
 }
 
+// ****************************************************************************
+// Lógica de decaimiento de los vúmetros y retención de picos
+// ****************************************************************************
+void handleVUMeterDecay() {
+    log_v("handleVUMeterDecay() llamado.");
+
+    const unsigned long DECAY_INTERVAL_MS = 100;    // Frecuencia de decaimiento del nivel normal
+    const unsigned long PEAK_HOLD_TIME_MS = 2000;   // Tiempo que el pico se mantiene visible
+    const float DECAY_AMOUNT = 1.0f / 12.0f;        // Cantidad de decaimiento (aproximadamente 1 segmento)
+    
+    unsigned long currentTime = millis(); // Obtener el tiempo actual una sola vez
+    bool anyVUMeterChanged = false; // Flag para saber si algún VU cambió por decaimiento
+
+    for (int i = 0; i < 8; i++) {
+        // --- 1. Decaimiento del Nivel Normal (RMS/Instantáneo) ---
+        if (vuLevels[i] > 0) {
+            // Si el tiempo desde la última actualización excede el intervalo de decaimiento
+            if (currentTime - vuLastUpdateTime[i] > DECAY_INTERVAL_MS) {
+                float oldLevel = vuLevels[i];
+                vuLevels[i] -= DECAY_AMOUNT; // Reducir el nivel
+                if (vuLevels[i] < 0.01f) { // Evitar números negativos y asegurar que llega a cero
+                    vuLevels[i] = 0.0f;
+                }
+                vuLastUpdateTime[i] = currentTime; // Actualizar el tiempo de la última caída
+                anyVUMeterChanged = true; // Indicar que hubo un cambio
+                log_v("  Track %d: VU Level decayed from %.3f to %.3f.", i, oldLevel, vuLevels[i]);
+            }
+        }
+        
+        // --- 2. Decaimiento/Reinicia de Nivel de Pico (Peak Hold) ---
+        if (vuPeakLevels[i] > 0) {
+            // Si ha pasado el tiempo de retención del pico
+            if (currentTime - vuPeakLastUpdateTime[i] > PEAK_HOLD_TIME_MS) {
+                // El pico "salta" hacia abajo hasta el nivel normal actual.
+                if (vuPeakLevels[i] > vuLevels[i]) { // Solo si el pico aún está por encima del nivel actual
+                    float oldPeakLevel = vuPeakLevels[i];
+                    vuPeakLevels[i] = vuLevels[i]; // Igualar el pico al nivel actual
+                    anyVUMeterChanged = true; // Indicar que hubo un cambio
+                    log_v("  Track %d: VU Peak decayed from %.3f to %.3f (jump to current level).", i, oldPeakLevel, vuPeakLevels[i]);
+                }
+            }
+        }
+
+        // --- 3. Lógica de Seguridad para el Pico ---
+        // Asegurarse de que el pico nunca esté por debajo del nivel actual.
+        // Si el nivel instantáneo sube por encima del pico, el pico debe igualarlo.
+        if (vuPeakLevels[i] < vuLevels[i]) {
+            log_w("  Track %d: VU Peak (%.3f) era menor que VU Level (%.3f). Corrigiendo.", i, vuPeakLevels[i], vuLevels[i]);
+            vuPeakLevels[i] = vuLevels[i];
+            vuPeakLastUpdateTime[i] = currentTime; // Reiniciar el temporizador de retención del pico
+            anyVUMeterChanged = true; // Indicar que hubo un cambio
+        }
+    }
+
+    // Si cualquier vúmetro cambió, activar el flag de redibujo específico para vúmetros
+    if (anyVUMeterChanged) {
+        needsVUMetersRedraw = true; // <--- Usamos el nuevo flag específico para VUMeters
+        log_v("handleVUMeterDecay(): anyVUMeterChanged es TRUE. needsVUMetersRedraw = true.");
+    }
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS DE COLOR

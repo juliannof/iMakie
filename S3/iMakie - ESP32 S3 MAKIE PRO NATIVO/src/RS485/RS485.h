@@ -2,8 +2,9 @@
 #include <Arduino.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
-#include "../config.h"
 #include "protocol.h"
+#include "../config.h"
+
 
 // ============================================================
 //  RS485.h  –  Master ESP32-S3  (integrado en iMakie)
@@ -12,15 +13,16 @@
 // ============================================================
 
 
-
 // Base de datos por canal (acceso thread-safe desde Core 0)
 struct ChannelData {
     // Master → Slave (escrito desde Core 0 via MIDI)
-    char     trackName[8] = {};
-    uint8_t  flags        = 0;
-    uint16_t faderTarget  = 8192;
-    uint8_t  vuLevel      = 0;
-    bool     dirty        = true;
+    char      trackName[8]  = {};
+    uint8_t   flags         = 0;
+    uint16_t  faderTarget   = 8192;
+    uint8_t   vuLevel       = 0;
+    bool      dirty         = true;
+    bool      calibrate     = false;   // one-shot: FLAG_CALIB → se limpia tras enviar
+    AutoMode  autoMode      = AUTO_OFF; // bits 5-7 de flags
 
     // Slave → Master (leído desde Core 0 para enviar a Logic)
     uint16_t faderPos      = 0;
@@ -45,6 +47,8 @@ public:
     void setFlags      (uint8_t id, uint8_t flags);
     void setFaderTarget(uint8_t id, uint16_t value14bit);
     void setVuLevel    (uint8_t id, uint8_t value);
+    void setCalibrate  (uint8_t id);               // one-shot calibración
+    void setAutoMode   (uint8_t id, AutoMode mode); // modo de automatización
 
     // API RS485 → Core 0 (slaves → MIDI)
     bool               hasNewSlaveData(uint8_t id);

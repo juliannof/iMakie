@@ -81,3 +81,4 @@ void drawMeter(LGFX_Sprite &sprite,         // ← TFT_eSprite → LGFX_Sprite
  * @brief Gestiona la lógica de sincronización del display de tiempo.
  */
 //void handleDisplaySynchronization();
+void handleVUMeterDecay();
