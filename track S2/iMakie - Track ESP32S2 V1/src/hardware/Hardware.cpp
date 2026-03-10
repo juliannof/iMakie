@@ -159,6 +159,10 @@ void initHardware() {
    
 }
 
+bool readFaderTouch() {
+    return false;  // AT42QT1011 eliminado en rev2
+}
+
 
 // === updateButtons: Actualiza el estado de todos los botones y el sensor táctil ===
 void updateButtons() {

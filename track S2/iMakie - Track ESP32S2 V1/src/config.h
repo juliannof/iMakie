@@ -38,6 +38,12 @@ enum class ConnectionState {
 // Fader
 #define FADER_POT_PIN           10   // ADC1_CH9 — sin cambio
 #define FADER_VCC_PIN           17   // DAC_1: salida ~1.1V al VCC del pot
+// --- SENSOR TÁCTIL DEL FADER ---
+#define FADER_TOUCH_PIN     T1 // Pin táctil para el fader (GPIO1 en ESP32-S2)
+
+#define MOTOR_IN1    18
+#define MOTOR_IN2    16
+#define MOTOR_EN     14
 
 // ─── Parámetros de calibración ───────────────────────────────
 static constexpr uint8_t  CALIB_PWM               = 220;
@@ -82,9 +88,7 @@ static uint16_t _posicionMaximaADC       = 0;
 #define ENCODER_SW_PIN      11 // GPIO para el Switch (botón) del encoder
 #define ENCODER_DEBOUNCE_DELAY_MS 5
 
-#define MOTOR_IN1    18
-#define MOTOR_IN2    16
-#define MOTOR_EN     14
+
 
 
 // <<<<<<<<<<<<<<<<<<<<<<<< DEFINICIONES DEL ENCODER ROTATIVO >>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -107,8 +111,7 @@ static uint16_t _posicionMaximaADC       = 0;
 #define BUTTON_USE_INTERNAL_PULLUP true // Usar pull-up internos para los botones
 
 
-// --- SENSOR TÁCTIL DEL FADER ---
-#define FADER_TOUCH_PIN     T1 // Pin táctil para el fader (GPIO1 en ESP32-S2)
+
 
 // Porcentaje del valor base táctil para el umbral de detección (80% significa que detecta si el valor cae por debajo del 80% del valor base).
 #define FADER_TOUCH_THRESHOLD_PERCENTAGE 80
