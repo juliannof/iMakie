@@ -6,6 +6,11 @@ extern FaderADC faderADC;
 
 // ─── Hardware ────────────────────────────────────────────────
 static void _hwStop() {
+    digitalWrite(MOTOR_EN, HIGH);
+    analogWrite (MOTOR_IN1, 255);
+    analogWrite (MOTOR_IN2, 255);
+}
+static void _hwOff() {
     digitalWrite(MOTOR_EN, LOW);
     analogWrite (MOTOR_IN1, 0);
     analogWrite (MOTOR_IN2, 0);
@@ -124,45 +129,102 @@ void startCalib() {
     Serial.println("[CALIB] Iniciada");
 }
 
+
+//***************************************
+// POSITION TICK
+// **************************************
+
+
+
 static void _positionTick() {
     int pos    = (int)_adcFiltered;
     int err    = (int)_targetADC - pos;
     int absErr = abs(err);
-
+    
+    static int lastErr = 0;
+    static int stableCount = 0;
+    
     Serial.printf("[POS] pos=%d target=%d err=%d pwm=%d active=%d\n",
         pos, _targetADC, err, _currentPWM, _motorActive);
 
+    // ─── HOLDING TORQUE CONTINUO ───────────────────────────
+    if (absErr < HOLD_ZONE) {
+        // Siempre aplicar holding torque cuando estamos cerca
+        int holdPWM;
+        
+        if (absErr < DEAD_ZONE) {
+            // Dentro de zona muerta: holding mínimo
+            holdPWM = HOLD_MIN;
+            stableCount++;
+            
+            // Desactivar solo después de mucho tiempo estable
+            if (stableCount > 50) {  // 50 ciclos estable
+                _motorActive = false;
+                _hwOff();
+                _currentPWM = 0;
+                return;
+            }
+        } else {
+            // En zona de aproximación: holding proporcional
+            holdPWM = HOLD_MIN + (absErr * HOLD_GAIN);
+            holdPWM = constrain(holdPWM, HOLD_MIN, HOLD_MAX);
+            stableCount = 0;
+        }
+        
+        // Aplicar holding torque en dirección correcta
+        if (err > 0) {
+            _hwUp((uint8_t)holdPWM);
+        } else {
+            _hwDown((uint8_t)holdPWM);
+        }
+        _currentPWM = holdPWM;
+        _motorActive = true;
+        return;
+    }
+    
+    // ─── CONTROL NORMAL ────────────────────────────────────
+    stableCount = 0;
+    
     if (!_motorActive && absErr > DEAD_ZONE) {
         _motorActive = true;
-    } else if (_motorActive && absErr < DEAD_ZONE / 2) {
-        _motorActive = false;
-        _currentPWM  = 0;  // ← añadir esta línea
-        _hwStop();
-    return;
-}
-
-    if (!_motorActive) { _hwStop(); return; }
-
-    int targetPWM;
-    if (absErr <= BRAKE_DIST) {
-        float frac = (float)absErr / BRAKE_DIST;
-        targetPWM  = PWM_MIN + (int)(frac * (PWM_MIN * 0.6f));
-    } else {
-        float norm = (float)absErr / (float)_adcSpan;
-        float vel  = powf(norm, CURVE_GAMMA);
-        targetPWM  = PWM_MIN + (int)(vel * (PWM_MAX - PWM_MIN));
-        targetPWM  = constrain(targetPWM, PWM_MIN, PWM_MAX);
+    }
+    
+    if (!_motorActive) {
+        _hwOff();
+        return;
     }
 
-    int delta   = constrain(targetPWM - _currentPWM, -PWM_SLEW, PWM_SLEW);
-    _currentPWM = constrain(_currentPWM + delta, PWM_MIN, PWM_MAX);
+    // Calcular PWM (con ganancia proporcional)
+    int targetPWM;
+    int maxError = 1000;  // Error para PWM máximo
+    
+    if (absErr >= maxError) {
+        targetPWM = PWM_MAX;
+    } else {
+        // Fórmula lineal simple
+        targetPWM = PWM_MIN + (absErr * (PWM_MAX - PWM_MIN)) / maxError;
+    }
+    
+    targetPWM = constrain(targetPWM, PWM_MIN, PWM_MAX);
 
+    // Slew rate
+    int delta = targetPWM - _currentPWM;
+    if (delta > PWM_SLEW) delta = PWM_SLEW;
+    if (delta < -PWM_SLEW) delta = -PWM_SLEW;
+    _currentPWM += delta;
+    _currentPWM = constrain(_currentPWM, 0, PWM_MAX);
+
+    // Aplicar dirección
     if (err > 0) {
         _hwUp((uint8_t)_currentPWM);
     } else {
         _hwDown((uint8_t)_currentPWM);
     }
 }
+
+// **********************************
+// UPDATE PRINCIPAL (LLAMAR EN LOOP)
+// **********************************
 
 void update() {
     if (_phase == CalibPhase::GOING_UP ||
