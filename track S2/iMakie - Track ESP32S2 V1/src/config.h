@@ -57,7 +57,7 @@ static constexpr uint32_t CALIB_STABLE_TIME       = 500;   // ms
 static constexpr uint8_t PWM_MIN     = 170;
 static constexpr uint8_t PWM_MAX     = 255;
 static constexpr uint8_t PWM_SLEW    = 4;
-static constexpr int     DEAD_ZONE   = 80;
+static constexpr int     DEAD_ZONE   = 150;
 static constexpr int     BRAKE_DIST  = 150;
 static constexpr float   CURVE_GAMMA = 0.6f;
 

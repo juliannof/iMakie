@@ -129,13 +129,17 @@ static void _positionTick() {
     int err    = (int)_targetADC - pos;
     int absErr = abs(err);
 
+    Serial.printf("[POS] pos=%d target=%d err=%d pwm=%d active=%d\n",
+        pos, _targetADC, err, _currentPWM, _motorActive);
+
     if (!_motorActive && absErr > DEAD_ZONE) {
         _motorActive = true;
     } else if (_motorActive && absErr < DEAD_ZONE / 2) {
         _motorActive = false;
+        _currentPWM  = 0;  // ← añadir esta línea
         _hwStop();
-        return;
-    }
+    return;
+}
 
     if (!_motorActive) { _hwStop(); return; }
 
