@@ -30,6 +30,8 @@ static int      _stableRef   = 0;
 static uint16_t _adcTop      = 0;
 static bool _hasMoved = false;
 
+static bool _motorActive = false;  // ← aquí
+
 
 // ─── Calibración ─────────────────────────────────────────────
 static void _calibTick() {
@@ -122,10 +124,48 @@ void startCalib() {
     Serial.println("[CALIB] Iniciada");
 }
 
+static void _positionTick() {
+    int pos    = (int)_adcFiltered;
+    int err    = (int)_targetADC - pos;
+    int absErr = abs(err);
+
+    if (!_motorActive && absErr > DEAD_ZONE) {
+        _motorActive = true;
+    } else if (_motorActive && absErr < DEAD_ZONE / 2) {
+        _motorActive = false;
+        _hwStop();
+        return;
+    }
+
+    if (!_motorActive) { _hwStop(); return; }
+
+    int targetPWM;
+    if (absErr <= BRAKE_DIST) {
+        float frac = (float)absErr / BRAKE_DIST;
+        targetPWM  = PWM_MIN + (int)(frac * (PWM_MIN * 0.6f));
+    } else {
+        float norm = (float)absErr / (float)_adcSpan;
+        float vel  = powf(norm, CURVE_GAMMA);
+        targetPWM  = PWM_MIN + (int)(vel * (PWM_MAX - PWM_MIN));
+        targetPWM  = constrain(targetPWM, PWM_MIN, PWM_MAX);
+    }
+
+    int delta   = constrain(targetPWM - _currentPWM, -PWM_SLEW, PWM_SLEW);
+    _currentPWM = constrain(_currentPWM + delta, PWM_MIN, PWM_MAX);
+
+    if (err > 0) {
+        _hwUp((uint8_t)_currentPWM);
+    } else {
+        _hwDown((uint8_t)_currentPWM);
+    }
+}
+
 void update() {
     if (_phase == CalibPhase::GOING_UP ||
         _phase == CalibPhase::GOING_DOWN) {
         _calibTick();
+    } else if (_phase == CalibPhase::DONE) {
+        _positionTick();
     } else {
         _hwStop();
     }
