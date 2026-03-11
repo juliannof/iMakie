@@ -46,13 +46,15 @@ enum class ConnectionState {
 #define MOTOR_EN     14
 
 // ─── Parámetros de calibración ───────────────────────────────
-static constexpr uint8_t  CALIB_PWM               = 220;
-static constexpr uint32_t CALIB_TIMEOUT           = 1500;  // ms — timeout global
-static constexpr int      ADC_STABILITY_THRESHOLD = 200;    // counts
+static constexpr uint8_t  CALIB_PWM      = 125;  // PWM de crucero durante calibración
+static constexpr uint8_t  CALIB_KICK_PWM  = 155;
+static constexpr uint32_t CALIB_KICK_MS   = 120;
+static constexpr uint32_t CALIB_TIMEOUT           = 5000;  // ms — timeout global
+static constexpr int      ADC_STABILITY_THRESHOLD = 700;    // counts
 static constexpr uint32_t CALIB_STABLE_TIME       = 500;   // ms
 
 // ─── Parámetros de control de posición ───────────────────────
-static constexpr uint8_t PWM_MIN     = 120;
+static constexpr uint8_t PWM_MIN     = 170;
 static constexpr uint8_t PWM_MAX     = 255;
 static constexpr uint8_t PWM_SLEW    = 4;
 static constexpr int     DEAD_ZONE   = 80;
