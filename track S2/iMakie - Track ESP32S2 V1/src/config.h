@@ -2,6 +2,8 @@
 #pragma once
 #include <Arduino.h>
 #include "display/LovyanGFX_config.h"
+#include "protocol.h"
+
 extern LGFX tft;
 extern LGFX_Sprite header, mainArea, vuSprite, vPotSprite;
 
@@ -247,7 +249,11 @@ static uint16_t _posicionMaximaADC       = 0;
 #define TFT_MCU_RED      0xF800     // Rojo MCU
 #define TFT_MCU_GRAY     0x3186 // Gris azulado estándar TFT
 #define TFT_MCU_DARKGRAY 0x0842 // Gris oscuro MCU
-
+#define TFT_AUTO_OFF    0x0842   // gris oscuro (= TFT_MCU_DARKGRAY)
+#define TFT_AUTO_READ   0x3F20   // verde (= TFT_MCU_GREEN)
+#define TFT_AUTO_WRITE  TFT_MAGENTA   // lila
+#define TFT_AUTO_TOUCH  0xFD20   // naranja vivo
+#define TFT_AUTO_LATCH  0xA900   // naranja oscuro
 
 // --- CONSTANTES PARA EL DISPLAY DE TIEMPO ---
 #define FONT_CHAR_WIDTH_MONO 12     // Ancho estimado de un carácter en FreeMonoBold12pt7b (ajustar si es necesario)
@@ -275,6 +281,7 @@ static uint16_t _posicionMaximaADC       = 0;
 // --- VARIABLES DE ESTADO DE CANAL (Declaradas en Display.cpp, usadas en main.cpp) ---
 extern String trackName; // Corregido a singular
 extern bool recStates, soloStates, muteStates, selectStates;
+extern AutoMode currentAutoMode;
 extern bool vuClipState; 
 extern float vuLevels;
 extern unsigned long vuLastUpdateTime;

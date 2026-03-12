@@ -207,7 +207,7 @@ void RS485Master::setTrackName(uint8_t id, const char* name) {
 void RS485Master::setFlags(uint8_t id, uint8_t flags) {
     if (id < 1 || id > _numSlaves) return;
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        _ch[id].flags = flags;
+        _ch[id].flags = flags & ~AUTOMODE_MASK;  // preservar autoMode separado
         _ch[id].dirty = true;
         xSemaphoreGive(_mutex);
     }

@@ -40,6 +40,9 @@ namespace {
 
     unsigned long lastVersionReplyTime = 0;
     const unsigned long VERSION_REPLY_COOLDOWN_MS = 200;
+    // Añadir junto a las otras variables estáticas del namespace
+    static int8_t  g_selectedChannel    = -1;      // canal activo (0-7)
+    static uint8_t g_channelAutoMode[8] = {};       // AutoMode por canal
 }
 
 // --- Prototipos privados ---
@@ -539,22 +542,44 @@ void processNote(byte status, byte note, byte velocity) {
             case 0: if (recStates[track_idx]    != is_on) { recStates[track_idx]    = is_on; stateChanged = true; } break;
             case 1: if (soloStates[track_idx]   != is_on) { soloStates[track_idx]   = is_on; stateChanged = true; } break;
             case 2: if (muteStates[track_idx]   != is_on) { muteStates[track_idx]   = is_on; stateChanged = true; } break;
-            case 3: if (selectStates[track_idx] != is_on) { selectStates[track_idx] = is_on; stateChanged = true; } break;
+            case 3:
+                if (selectStates[track_idx] != is_on) { selectStates[track_idx] = is_on; stateChanged = true; }
+                if (is_on) g_selectedChannel = track_idx;
+                else if (g_selectedChannel == track_idx) g_selectedChannel = -1;
+                break;
         }
 
         if (stateChanged) {
             needsMainAreaRedraw = true;
 
-            // ← RS485 NUEVO: reconstruir flags y enviar al slave
             uint8_t slaveId = track_idx + 1;
             uint8_t flags = 0;
             if (recStates[track_idx])    flags |= FLAG_REC;
             if (soloStates[track_idx])   flags |= FLAG_SOLO;
             if (muteStates[track_idx])   flags |= FLAG_MUTE;
             if (selectStates[track_idx]) flags |= FLAG_SELECT;
+            flags = setAutoMode(flags, (AutoMode)g_channelAutoMode[track_idx]);
             rs485.setFlags(slaveId, flags);
         }
         return;
+    }
+
+    if (note >= 74 && note <= 79 && is_on && g_selectedChannel >= 0) {
+        const AutoMode modeMap[] = {
+            AUTO_READ, AUTO_WRITE, AUTO_TRIM, AUTO_TOUCH, AUTO_LATCH, AUTO_OFF
+        };
+        AutoMode mode = modeMap[note - 74];
+        g_channelAutoMode[g_selectedChannel] = (uint8_t)mode;
+        rs485.setAutoMode(g_selectedChannel + 1, mode);
+
+        // ← Actualizar botones en display y trellis
+        for (int key = 0; key < 32; key++) {
+            if (MIDI_NOTES_PG1[key] != 0x00 && MIDI_NOTES_PG1[key] == note) {
+                btnStatePG1[key] = is_on;
+        }
+    }
+    needsMainAreaRedraw = true;
+    return;
     }
 
     bool stateChanged = false;

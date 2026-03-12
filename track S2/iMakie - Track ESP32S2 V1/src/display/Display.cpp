@@ -32,6 +32,7 @@ bool needsVPotRedraw     = false;
 volatile ConnectionState logicConnectionState = ConnectionState::DISCONNECTED;
 
 static int8_t currentVPotLevel = VPOT_DEFAULT_LEVEL;
+AutoMode currentAutoMode = AUTO_OFF;
 
 // ════════════════════════════════════════════════════════════
 //  initDisplay
@@ -86,14 +87,7 @@ void setScreenBrightness(uint8_t brightness) {
     tft.setBrightness(brightness);
 }
 
-void setVPotLevel(int8_t level) {
-    if (level < VPOT_MIN_LEVEL) level = VPOT_MIN_LEVEL;
-    if (level > VPOT_MAX_LEVEL) level = VPOT_MAX_LEVEL;
-    if (level != currentVPotLevel) {
-        currentVPotLevel = level;
-        needsVPotRedraw = true;
-    }
-}
+
 
 // ════════════════════════════════════════════════════════════
 //  updateDisplay  —  redraw total + redraws incrementales
@@ -165,18 +159,28 @@ void drawInitializingScreen() {
 //  drawHeaderSprite
 // ════════════════════════════════════════════════════════════
 void drawHeaderSprite() {
-    header.fillSprite(TFT_MCU_DARKGRAY);
-    int rectWidth  = TFT_WIDTH - 60;
-    int rectHeight = 10;
-    int rectX = (TFT_WIDTH    - rectWidth)  / 2;
-    int rectY = (HEADER_HEIGHT - rectHeight) / 2;
+    static const uint16_t AUTO_COLORS[] = {
+        TFT_AUTO_OFF,    // AUTO_OFF
+        TFT_AUTO_READ,   // AUTO_READ
+        TFT_AUTO_WRITE,  // AUTO_WRITE
+        TFT_AUTO_OFF,    // AUTO_TRIM — reservado
+        TFT_AUTO_TOUCH,  // AUTO_TOUCH
+        TFT_AUTO_LATCH,  // AUTO_LATCH
+    };
 
-    if (selectStates) {
-        screenBrightness = 255;
-    } else {
-        header.fillRoundRect(rectX, rectY, rectWidth, rectHeight, 3, TFT_MCU_GRAY);
-        screenBrightness = 70;
+    uint16_t headerColor = selectStates
+        ? AUTO_COLORS[currentAutoMode]
+        : TFT_MCU_DARKGRAY;
+
+    header.fillSprite(headerColor);
+
+    if (!selectStates) {
+        int rectX = (TFT_WIDTH - (TFT_WIDTH - 60)) / 2;
+        int rectY = (HEADER_HEIGHT - 10)            / 2;
+        header.fillRoundRect(rectX, rectY, TFT_WIDTH - 60, 10, 3, TFT_MCU_GRAY);
     }
+
+    screenBrightness = selectStates ? 255 : 70;
     setScreenBrightness(screenBrightness);
     header.pushSprite(0, 0);
 }
@@ -376,5 +380,16 @@ void drawVPotDisplay() {
         vPotSprite.fillRoundRect(x, seg_y, segW, seg_h, cornerRadius, act ? TFT_MCU_BLUE : TFT_MCU_GRAY);
     }
 
+    
+    
     vPotSprite.pushSprite(0, MAINAREA_HEIGHT + HEADER_HEIGHT);
+}
+
+void setVPotLevel(int8_t level) {
+    if (level < VPOT_MIN_LEVEL) level = VPOT_MIN_LEVEL;
+    if (level > VPOT_MAX_LEVEL) level = VPOT_MAX_LEVEL;
+    if (level != currentVPotLevel) {
+        currentVPotLevel = level;
+        needsVPotRedraw = true;
+    }
 }

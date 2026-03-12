@@ -129,10 +129,11 @@ static void onMasterData(const MasterPacket& pkt) {
     Serial.println("[S2] FLAG_CALIB recibido");
     Motor::startCalib();
     }
-    AutoMode am = getAutoMode(pkt.flags);
-    if (am != AUTO_OFF) {
-        Serial.printf("[S2] AutoMode=%d\n", (int)am);
-    }
+    AutoMode newAutoMode = getAutoMode(pkt.flags);
+if (newAutoMode != currentAutoMode) {
+    currentAutoMode  = newAutoMode;
+    needsHeaderRedraw = true;
+}
 }
 
 void setup() {

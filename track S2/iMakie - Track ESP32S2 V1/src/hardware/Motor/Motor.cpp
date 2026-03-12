@@ -142,8 +142,8 @@ static void _positionTick() {
     static int lastErr = 0;
     static int stableCount = 0;
     
-    Serial.printf("[POS] pos=%d target=%d err=%d pwm=%d active=%d\n",
-        pos, _targetADC, err, _currentPWM, _motorActive);
+    //Serial.printf("[POS] pos=%d target=%d err=%d pwm=%d active=%d\n",
+    //    pos, _targetADC, err, _currentPWM, _motorActive);
 
     // ─── HOLDING TORQUE CONTINUO ───────────────────────────
     if (absErr < HOLD_ZONE) {
