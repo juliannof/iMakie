@@ -54,13 +54,13 @@ static constexpr int      ADC_STABILITY_THRESHOLD = 700;    // counts
 static constexpr uint32_t CALIB_STABLE_TIME       = 500;   // ms
 
 // ─── Parámetros finales optimizados ────────────────────────
-static constexpr uint8_t PWM_MIN     = 42;      // Mínimo para mover (antes 40)
+static constexpr uint8_t PWM_MIN     = 40;      // Mínimo para mover (antes 40)
 static constexpr uint8_t PWM_MAX     = 160;     // Máximo para mover
 static constexpr uint8_t PWM_SLEW    = 4;       // Cambio máximo por ciclo
 
 static constexpr int DEAD_ZONE       = 30;      // Zona muerta
 static constexpr int HOLD_ZONE       = 80;      // Zona de holding torque
-static constexpr uint8_t HOLD_MIN    = 25;      // Holding mínimo
+static constexpr uint8_t HOLD_MIN    = 35;      // Holding mínimo
 static constexpr uint8_t HOLD_MAX    = 50;      // Holding máximo
 static constexpr float HOLD_GAIN     = 0.35;    // Ganancia para holding
 

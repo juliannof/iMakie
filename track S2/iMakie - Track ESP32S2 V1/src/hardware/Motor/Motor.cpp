@@ -134,8 +134,6 @@ void startCalib() {
 // POSITION TICK
 // **************************************
 
-
-
 static void _positionTick() {
     int pos    = (int)_adcFiltered;
     int err    = (int)_targetADC - pos;
@@ -149,38 +147,38 @@ static void _positionTick() {
 
     // ─── HOLDING TORQUE CONTINUO ───────────────────────────
     if (absErr < HOLD_ZONE) {
-        // Siempre aplicar holding torque cuando estamos cerca
-        int holdPWM;
+    // Siempre aplicar holding torque cuando estamos cerca
+    int holdPWM;
+    
+    if (absErr < DEAD_ZONE) {
+        // Dentro de zona muerta: holding mínimo pero suficiente
+        holdPWM = HOLD_MIN;  // Ahora 35, no 25
+        stableCount++;
         
-        if (absErr < DEAD_ZONE) {
-            // Dentro de zona muerta: holding mínimo
-            holdPWM = HOLD_MIN;
-            stableCount++;
-            
-            // Desactivar solo después de mucho tiempo estable
-            if (stableCount > 50) {  // 50 ciclos estable
-                _motorActive = false;
-                _hwOff();
-                _currentPWM = 0;
-                return;
-            }
-        } else {
-            // En zona de aproximación: holding proporcional
-            holdPWM = HOLD_MIN + (absErr * HOLD_GAIN);
-            holdPWM = constrain(holdPWM, HOLD_MIN, HOLD_MAX);
-            stableCount = 0;
+        // Solo desactivar después de MUCHO tiempo estable y error casi cero
+        if (stableCount > 200 && absErr < 5) {  // Más ciclos y error muy pequeño
+            _motorActive = false;
+            _hwOff();
+            _currentPWM = 0;
+            return;
         }
-        
-        // Aplicar holding torque en dirección correcta
-        if (err > 0) {
-            _hwUp((uint8_t)holdPWM);
-        } else {
-            _hwDown((uint8_t)holdPWM);
-        }
-        _currentPWM = holdPWM;
-        _motorActive = true;
-        return;
+    } else {
+        // En zona de aproximación: holding proporcional
+        holdPWM = HOLD_MIN + (absErr * HOLD_GAIN);
+        holdPWM = constrain(holdPWM, HOLD_MIN, HOLD_MAX);
+        stableCount = 0;
     }
+    
+    // Aplicar holding torque en dirección correcta
+    if (err > 0) {
+        _hwUp((uint8_t)holdPWM);
+    } else {
+        _hwDown((uint8_t)holdPWM);
+    }
+    _currentPWM = holdPWM;
+    _motorActive = true;
+    return;
+}
     
     // ─── CONTROL NORMAL ────────────────────────────────────
     stableCount = 0;
@@ -247,7 +245,9 @@ void stop() {
 
 void setTarget(uint16_t midiTarget) {
     if (_phase != CalibPhase::DONE) return;
-    _targetADC = (uint16_t)map((long)midiTarget, 0, 16383, _adcMin, _adcMax);
+    _targetADC = (uint16_t)map((long)midiTarget, 0, 14848, _adcMin, _adcMax);
+    Serial.printf("[TARGET] midi=%d → adc=%d (min=%d max=%d)\n", 
+                  midiTarget, _targetADC, _adcMin, _adcMax);
 }
 
 Motor::CalibState getCalibState() {

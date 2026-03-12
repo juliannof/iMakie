@@ -632,6 +632,10 @@ void processPitchBend(byte channel, int bendValue) {
     }
 }
 
+// ****************************************************************************
+// helper para detectar inactividad MIDI y desconexión lógica — sin cambios
+// ****************************************************************************
+
 void checkMidiTimeout() {
     if (logicConnectionState == ConnectionState::CONNECTED) {
         if (millis() - lastMidiActivityTime > MIDI_TIMEOUT_MS) {
@@ -641,6 +645,9 @@ void checkMidiTimeout() {
         }
     }
 }
+// ****************************************************************************
+// helper para verificar estado de conexión lógica — sin cambios
+// ****************************************************************************
 
 bool isLogicConnected() {
     return (logicConnectionState == ConnectionState::CONNECTED);
