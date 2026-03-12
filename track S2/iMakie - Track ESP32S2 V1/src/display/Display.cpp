@@ -158,6 +158,16 @@ void drawInitializingScreen() {
 // ════════════════════════════════════════════════════════════
 //  drawHeaderSprite
 // ════════════════════════════════════════════════════════════
+
+// Función helper — atenuar color RGB565 a ~25%
+static uint16_t dimColor565(uint16_t color) {
+    uint8_t r = (color >> 11) & 0x1F;
+    uint8_t g = (color >> 5)  & 0x3F;
+    uint8_t b =  color        & 0x1F;
+    return ((r / 4) << 11) | ((g / 4) << 5) | (b / 4);
+}
+
+
 void drawHeaderSprite() {
     static const uint16_t AUTO_COLORS[] = {
         TFT_AUTO_OFF,    // AUTO_OFF
@@ -168,17 +178,17 @@ void drawHeaderSprite() {
         TFT_AUTO_LATCH,  // AUTO_LATCH
     };
 
-    uint16_t headerColor = selectStates
-        ? AUTO_COLORS[currentAutoMode]
-        : TFT_MCU_DARKGRAY;
+    auto dimColor565 = [](uint16_t color) -> uint16_t {
+        uint8_t r = (color >> 11) & 0x1F;
+        uint8_t g = (color >> 5)  & 0x3F;
+        uint8_t b =  color        & 0x1F;
+        return ((r / 4) << 11) | ((g / 4) << 5) | (b / 4);
+    };
+
+    uint16_t baseColor   = AUTO_COLORS[currentAutoMode];
+    uint16_t headerColor = selectStates ? baseColor : dimColor565(baseColor);
 
     header.fillSprite(headerColor);
-
-    if (!selectStates) {
-        int rectX = (TFT_WIDTH - (TFT_WIDTH - 60)) / 2;
-        int rectY = (HEADER_HEIGHT - 10)            / 2;
-        header.fillRoundRect(rectX, rectY, TFT_WIDTH - 60, 10, 3, TFT_MCU_GRAY);
-    }
 
     screenBrightness = selectStates ? 255 : 70;
     setScreenBrightness(screenBrightness);
