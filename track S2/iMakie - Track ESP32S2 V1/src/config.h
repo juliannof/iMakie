@@ -264,7 +264,6 @@ static uint16_t _posicionMaximaADC       = 0;
 #define DOT_RADIUS     2 // Radio del círculo del punto.
 #define DISPLAY_COPY_TIMEOUT 25 // 25ms para sincronización de display
 
-
 // --- PROTOCOLO UART (Si lo usas) ---
 #define USB_TO_UART_START 0xAA
 #define USB_TO_UART_END   0xBB
