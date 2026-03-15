@@ -132,7 +132,8 @@ static uint16_t _posicionMaximaADC       = 0;
 // --- NEOPixel ---
 #define NEOPIXEL_PIN        36  // Pin GPIO donde están conectados los Neopixels
 #define NEOPIXEL_COUNT      4   // Número total de Neopixels
-#define NEOPIXEL_DEFAULT_BRIGHTNESS 15 // Brillo inicial por defecto (0-255)
+#define NEOPIXEL_DEFAULT_BRIGHTNESS 10 // Brillo inicial por defecto (0-255)
+#define NEOPIXEL_DIM_BRIGHTNESS 1   // brillo atenuado cuando estado = OFF (0-255)
 
 
 // --- COLORES PREDETERMINADOS DE LOS BOTONES (PARA CADA NEOPixel) ---

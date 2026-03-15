@@ -6,7 +6,7 @@
 #include <Arduino.h>
 #include <LovyanGFX.hpp>
 #include <Preferences.h>
-#include <Adafruit_NeoPixel.h>
+#include "hardware/Neopixels/Neopixel.h"
 #include "../config.h"   // Única fuente de verdad para pines
 
 // ─── Colores RGB565 ───────────────────────────────────────────
@@ -59,7 +59,6 @@ public:
     void onReboot     (CbVoid   cb) { _cbReboot    = cb; }
     void onWiFiLaunch (CbVoid   cb) { _cbWiFi      = cb; }
     void onConfigSaved(CbConfig cb) { _cbSaved     = cb; }
-    // brightness: recibe valor 0-255, se llama al abrir (255) y al cerrar (valor previo)
     void onBrightness (std::function<void(uint8_t)> cb, uint8_t currentBrightness = 255) {
         _cbBrightness    = cb;
         _savedBrightness = currentBrightness;
@@ -120,11 +119,11 @@ private:
     std::function<void(uint8_t)> _cbBrightness;
     uint8_t  _savedBrightness = 255;
 
-    // ── NeoPixel interno (para test) ──────────────────────────
-    Adafruit_NeoPixel _neo;
+    // ── NeoPixel (referencia al objeto global) ────────────────
+    NeoStrip* _neo = nullptr;
 
     // ── Test Display ──────────────────────────────────────────
-    int           _dPat   = 0;   // patrón actual 0-N
+    int           _dPat   = 0;
     bool          _dAuto  = false;
     unsigned long _dAutoT = 0;
 
@@ -135,29 +134,27 @@ private:
     bool          _encSW     = false;
     bool          _encSWlast = false;
     unsigned long _encDebT   = 0;
-    // barra de historial circular (últimas 20 posiciones)
     static const int ENC_HIST = 20;
     int8_t        _encHist[ENC_HIST] = {};
     int           _encHistIdx = 0;
 
     // ── Test NeoPixel ─────────────────────────────────────────
-    int           _neoSel    = 0;   // 0-3 pixel, 4=todos
+    int           _neoSel     = 0;
     int           _neoColorIdx = 0;
-    unsigned long _neoAnimT  = 0;
+    unsigned long _neoAnimT   = 0;
     int           _neoAnimStep = 0;
-    bool          _neoAnim   = false;
+    bool          _neoAnim    = false;
 
     // ── Test Fader ────────────────────────────────────────────
     int           _fadRaw    = 0;
     float         _fadPct    = 0.0f;
     int           _tchRaw    = 0;
     bool          _tchOn     = false;
-    int           _motPWM    = 0;   // -255..+255 control manual
+    int           _motPWM    = 0;
     int           _fadCalMin = 4095;
     int           _fadCalMax = 0;
     bool          _fadCaling = false;
     unsigned long _fadT      = 0;
-    // historial fader (últimas 80 muestras para gráfica)
     static const int FAD_HIST = 80;
     uint8_t       _fadHist[FAD_HIST] = {};
     int           _fadHistIdx = 0;
@@ -180,7 +177,6 @@ private:
     void _drawVU(int x, int y, int w, int h, float pct, bool clip);
     void _drawDivider(int y);
 
-    // Handlers menú
     void _hMain(Btn b);
     void _hIdent(Btn b);
     void _hMotor(Btn b);
@@ -191,17 +187,14 @@ private:
     void _hConfirm(Btn b);
     void _hToast(Btn b);
 
-    // Handlers tests (render + logic juntos)
     void _tickTestDisplay(Btn b);
     void _tickTestEncoder(Btn b);
     void _tickTestNeopixel(Btn b);
     void _tickTestFader(Btn b);
 
-    // Motor helpers
     void _motorStop();
     void _motorDrive(int pwm);
 
-    // NVS
     void _load();
     void _save();
 

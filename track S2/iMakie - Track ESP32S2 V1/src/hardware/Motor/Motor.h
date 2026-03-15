@@ -47,5 +47,6 @@ namespace Motor {
     uint16_t   getADCMax();
     uint16_t   getRawADC();    // último valor recibido por setADC()
     float      getPosition();  // 0.0–1.0 posición real
+    void driveRaw(int pwm);  // >0 arriba, <0 abajo, 0 stop
 
 } // namespace Motor                  

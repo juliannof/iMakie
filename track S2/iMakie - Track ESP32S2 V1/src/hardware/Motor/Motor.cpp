@@ -268,5 +268,10 @@ float    getPosition()  {
     if (_adcSpan == 0) return 0.0f;
     return constrain((_adcFiltered - _adcMin) / (float)_adcSpan, 0.0f, 1.0f);
 }
+void driveRaw(int pwm) {
+    if (pwm == 0) { _hwStop(); return; }
+    if (pwm > 0) _hwUp((uint8_t)constrain( pwm, 0, 255));
+    else         _hwDown((uint8_t)constrain(-pwm, 0, 255));
+}
 
 } // namespace Motor

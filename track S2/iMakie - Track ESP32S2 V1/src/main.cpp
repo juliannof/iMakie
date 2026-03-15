@@ -1,7 +1,6 @@
 // ============================================================
 //  main.cpp  —  iMakie PTxx Track S2
-//  REC long-press 1 s → SAT (gestionado en ButtonManager)
-//  Sin Serial. Todo el feedback en display.
+//  Solo orquesta. Cero lógica de negocio aquí.
 // ============================================================
 #include <Arduino.h>
 #include "config.h"
@@ -9,30 +8,21 @@
 #include "display/LovyanGFX_config.h"
 #include "hardware/encoder/Encoder.h"
 #include "hardware/Hardware.h"
+#include "hardware/Neopixels/Neopixel.h"
+#include "hardware/Motor/Motor.h"
 #include "RS485/RS485.h"
+#include "RS485/RS485Handler.h"       // ← onMasterData vive aquí
 #include "protocol.h"
 #include "button/ButtonManager.h"
 #include "menu/SatMenu.h"
-#include <driver/touch_sensor.h>   // touch_pad_init, touch_pad_read_raw_data
-#include "hardware/Motor/Motor.h"
 #include "fader/FaderADC.h"
 
-FaderADC faderADC;
-
-
-// ─── Display objects ──────────────────────────────────────────
+// ─── Objetos globales ──────────────────────────────────────────
 LGFX        tft;
 LGFX_Sprite header(&tft), mainArea(&tft), vuSprite(&tft), vPotSprite(&tft);
+FaderADC    faderADC;
 
-
-// ─── Externs de Display.cpp ───────────────────────────────────
-extern void initDisplay();
-extern void updateDisplay();
-extern void setVPotLevel(int8_t level);
-extern int  currentVPotLevel;
-extern bool needsVPotRedraw;
-
-// ─── Variables de estado de canal ─────────────────────────────
+// ─── Estado de canal (externs consumidos por Display / Hardware) ──
 String assignmentString = "CH-01 ";
 String trackName        = "Track  ";
 bool  recStates    = false;
@@ -46,120 +36,17 @@ float vuLevels        = 0.0f;
 unsigned long vuLastUpdateTime     = 0;
 unsigned long vuPeakLastUpdateTime = 0;
 
-
-
-
-// ─── RS485 response packet ────────────────────────────────────
-static SlavePacket _resp = {};
-
-// ─── Flag: suspendido por SAT ─────────────────────────────────
+// ─── Estado de conexión ───────────────────────────────────────
 static bool _suspended = false;
 
 // ─── SAT menu ─────────────────────────────────────────────────
 static SatMenu* satMenu = nullptr;
 
-// ─── Forward ──────────────────────────────────────────────────
-extern void handleButtonLedState(ButtonId id);
-
-// ─── Motor helpers ────────────────────────────────────────────
-static void motorStop() {
-    digitalWrite(MOTOR_EN,  LOW);
-    digitalWrite(MOTOR_IN1, LOW);
-    digitalWrite(MOTOR_IN2, LOW);
-}
-static void motorDrive(int pwm) {
-    if (pwm == 0) { motorStop(); return; }
-    digitalWrite(MOTOR_EN, HIGH);
-    if (pwm > 0) {
-        analogWrite(MOTOR_IN1, constrain( pwm, 0, 255));
-        digitalWrite(MOTOR_IN2, LOW);
-    } else {
-        digitalWrite(MOTOR_IN1, LOW);
-        analogWrite(MOTOR_IN2, constrain(-pwm, 0, 255));
-    }
-}
-
-// ─── Stubs ADC / Touch ────────────────────────────────────────
-static uint16_t readFaderADC() { return Motor::getRawADC(); }
-static uint8_t  readFaderTouch() {
-    // touchRead() es la API Arduino del ESP32-S2 para capacitive touch.
-    // Valor alto = sin contacto, valor bajo = tocado.
-    uint32_t v = touchRead(FADER_TOUCH_PIN);   // GPIO1 / Touch1
-    static uint32_t base = 0;
-    if (base == 0 && v > 100) base = v;
-    return (base > 0 && v < base * 0.80f) ? 1 : 0;
-}
-
-// Colores de modo de automatización — sincronizados con el header
-static uint16_t autoModeColor(uint8_t mode) {
-    switch (mode) {
-        case 1: return TFT_MCU_GREEN;              // READ  — verde
-        case 2: return 0x801F;                     // WRITE — púrpura
-        case 3: return TFT_ORANGE;                 // TOUCH — naranja
-        case 4: return COLOR_16_BITS(180, 80, 0);  // LATCH — naranja oscuro
-        default: return TFT_MCU_GRAY;              // OFF   — gris
-    }
-}
-
 // =============================================================
-//  onMasterData  —  RS485
+//  setup
 // =============================================================
-static void onMasterData(const MasterPacket& pkt) {
-    ConnectionState newState = pkt.connected ?
-        ConnectionState::CONNECTED : ConnectionState::DISCONNECTED;
-    if (newState != logicConnectionState) {
-        logicConnectionState = newState;
-        needsTOTALRedraw = true;
-    }
-    if (logicConnectionState != ConnectionState::CONNECTED) return;
-
-    char nameBuf[8] = {};
-    memcpy(nameBuf, pkt.trackName, 7); nameBuf[7] = '\0';
-    if (trackName != nameBuf) { trackName = String(nameBuf); needsHeaderRedraw = true; }
-
-    bool nr = (pkt.flags & FLAG_REC)    != 0;
-    bool ns = (pkt.flags & FLAG_SOLO)   != 0;
-    bool nm = (pkt.flags & FLAG_MUTE)   != 0;
-    bool nq = (pkt.flags & FLAG_SELECT) != 0;
-    if (recStates    != nr) { recStates    = nr; handleButtonLedState(ButtonId::REC);    needsMainAreaRedraw = true; }
-    if (soloStates   != ns) { soloStates   = ns; handleButtonLedState(ButtonId::SOLO);   needsMainAreaRedraw = true; }
-    if (muteStates   != nm) { muteStates   = nm; handleButtonLedState(ButtonId::MUTE);   needsMainAreaRedraw = true; }
-    if (selectStates != nq) { selectStates = nq; handleButtonLedState(ButtonId::SELECT); needsHeaderRedraw   = true; }
-
-    float newVu = pkt.vuLevel / 127.0f;
-    if (fabsf(vuLevels - newVu) > 0.01f) {
-        vuLevels = newVu;
-        if (vuLevels > vuPeakLevels) { vuPeakLevels = vuLevels; vuPeakLastUpdateTime = millis(); }
-        vuLastUpdateTime = millis();
-        needsVUMetersRedraw = true;
-    }
-
-    float newFader = pkt.faderTarget / 16383.0f;
-    if (!_suspended && fabsf(faderPositions - newFader) > 0.001f) {
-        faderPositions = newFader;
-        Motor::setTarget(pkt.faderTarget);  // ← reemplaza el TODO
-    }
-    if (pkt.flags & FLAG_CALIB) {
-    Serial.println("[S2] FLAG_CALIB recibido");
-    Motor::startCalib();
-    }
-   // Extraer autoMode de bits 5-7 y actualizar display
-uint8_t newAutoMode = (pkt.flags >> 5) & 0x07;
-if (newAutoMode != currentAutoMode) {
-    setAutoMode((pkt.flags >> 5) & 0x07);
-    needsVPotRedraw    = true;
-    needsHeaderRedraw  = true;   // header también cambia de color
-}
-// VPot display desde Logic
-    setVPotRaw(pkt.vpotValue);
-    setVPotRaw(pkt.vpotValue);
-    setAutoMode((pkt.flags >> 5) & 0x07);
-}
-
 void setup() {
-    Serial.begin(115200);
-    
-    // Motor pins off — PRIMERO
+    // Motor pins — PRIMERO, antes de cualquier init
     pinMode(MOTOR_IN1, OUTPUT);
     pinMode(MOTOR_IN2, OUTPUT);
     pinMode(MOTOR_EN,  OUTPUT);
@@ -171,25 +58,36 @@ void setup() {
     delay(30);
     faderADC.begin();
 
-    initDisplay();        // LovyanGFX primero
-    initHardware();
+    initDisplay();       // 1. LovyanGFX — reserva periféricos SPI/DMA
+    initNeopixels();     // 2. NeoPixelBus I2S — DESPUÉS del display
+    initHardware();      // 3. Botones, encoder, touch
     setVPotLevel(VPOT_DEFAULT_LEVEL);
     Encoder::begin();
-    
+
+    // SAT menu
     satMenu = new SatMenu(&tft);
-    // ... callbacks ...
-    
+    satMenu->onMotorOff  ([]() { Motor::stop();    _suspended = true;  });
+    satMenu->onMotorOn   ([]() { Motor::begin();   _suspended = false; });
+    satMenu->onMotorDrive([](int pwm) { Motor::driveRaw(pwm); });
+    satMenu->onRS485Off  ([]() { _suspended = true;  });
+    satMenu->onRS485On   ([]() { _suspended = false; });
+    satMenu->onReboot    ([]() { ESP.restart(); });
+    satMenu->onBrightness([](uint8_t b) { setScreenBrightness(b); }, 255);
+    satMenu->onConfigSaved([](const SatConfig& cfg) {
+        rs485.begin(cfg.trackId);
+    });
+
     uint8_t slaveId = satMenu->getConfig().trackId;
     rs485.begin(slaveId);
     if (slaveId == 0) satMenu->open();
-    
+
     ButtonManager::begin(&tft, satMenu);
 
-    Motor::begin();   // ← ÚLTIMO, todo ya inicializado
+    Motor::begin();      // ÚLTIMO — todo ya inicializado
 }
 
 // =============================================================
-//  LOOP
+//  loop
 // =============================================================
 void loop() {
     // SAT abierto: solo menú
@@ -198,58 +96,41 @@ void loop() {
         return;
     }
 
-    // Actualizar barra de progreso del long-press REC
+    // Long-press REC → barra de progreso
     ButtonManager::update();
     if (satMenu && satMenu->isOpen()) return;
 
-    // RS485
+    // ── RS485 ────────────────────────────────────────────────
     if (!_suspended) {
         rs485.update();
         static unsigned long lastRxTime = 0;
 
         if (rs485.hasNewData()) {
             lastRxTime = millis();
-            if (logicConnectionState != ConnectionState::CONNECTED) {
-                logicConnectionState = ConnectionState::CONNECTED;
-                needsTOTALRedraw = true;
-            }
-            onMasterData(rs485.getData());
+            RS485Handler::onMasterData(rs485.getData());   // ← lógica en su módulo
 
-            _resp.faderPos      = readFaderADC();
-            _resp.touchState    = readFaderTouch();
-            _resp.buttons       = ButtonManager::getButtonFlags();
-            _resp.encoderDelta  = (int8_t)constrain(Encoder::getCount(), -127, 127);
-            _resp.encoderButton = ButtonManager::getEncoderButton();
-            rs485.sendResponse(_resp);
+            SlavePacket resp = RS485Handler::buildResponse(faderADC, *satMenu);
+            rs485.sendResponse(resp);
 
             ButtonManager::clearButtonFlags();
             ButtonManager::clearEncoderButton();
             Encoder::reset();
         }
 
-        if (millis() - lastRxTime > 500) {
-            if (vuLevels > 0.0f) {
-                vuLevels = 0.0f; vuPeakLevels = 0.0f;
-                needsVUMetersRedraw = true;
-            }
-            if (logicConnectionState != ConnectionState::DISCONNECTED) {
-                logicConnectionState = ConnectionState::DISCONNECTED;
-                needsTOTALRedraw = true;
-            }
-        }
+        RS485Handler::checkTimeout(lastRxTime);            // desconexión por silencio
     }
-    // ── Fader + Motor — orden crítico ──
-    faderADC.update();
-    Motor::setADC(faderADC.getFaderPos());  // ← debe ir ANTES de update()
 
-    if (readFaderTouch()) {
+    // ── Fader + Motor ─────────────────────────────────────────
+    faderADC.update();
+    Motor::setADC(faderADC.getFaderPos());
+
+    if (isFaderTouched) {
         Motor::stop();
     } else {
         Motor::update();
     }
 
-
-    // Encoder
+    // ── Encoder ───────────────────────────────────────────────
     Encoder::update();
     if (Encoder::hasChanged()) {
         int newLevel = constrain((int)Encoder::getCount(), -7, 7);
@@ -259,14 +140,12 @@ void loop() {
         }
     }
 
-    // Botones (Button2 tick — necesario para que Button2 detecte eventos)
+    // ── Hardware (botones + touch) ────────────────────────────
     updateButtons();
 
-    // Display
+    // ── Display ───────────────────────────────────────────────
     updateDisplay();
 
-
+    // ── NeoPixels ─────────────────────────────────────────────
     updateAllNeopixels();
-    
-
 }

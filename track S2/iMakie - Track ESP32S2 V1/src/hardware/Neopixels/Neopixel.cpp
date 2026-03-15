@@ -54,14 +54,9 @@ uint8_t getNeopixelBrightness() {
 void setNeopixelState(int idx, uint8_t r, uint8_t g, uint8_t b) {
     if (idx < 0 || idx >= NEOPIXEL_COUNT) return;
 
-    uint8_t s = neoBrightness;
-    RgbColor color(
-        (uint8_t)((r * s) / 255),
-        (uint8_t)((g * s) / 255),
-        (uint8_t)((b * s) / 255)
-    );
+    // Sin escalar — el brillo se controla desde los valores que se pasan
+    RgbColor color(r, g, b);
 
-    // Solo marcar dirty si el color realmente cambió
     if (neopixels.GetPixelColor(idx) != color) {
         neopixels.SetPixelColor(idx, color);
         neoNeedsUpdate = true;

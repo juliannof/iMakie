@@ -3,6 +3,7 @@
 //  Todo el feedback en display. Sin Serial.
 // ============================================================
 #include "SatMenu.h"
+#include "hardware/Neopixels/Neopixel.h"
 
 // ─────────────────────────────────────────────────────────────
 //  Tablas de menú
@@ -43,8 +44,7 @@ const int SatMenu::_diagN  = 4;
 //  Constructor
 // ─────────────────────────────────────────────────────────────
 SatMenu::SatMenu(LovyanGFX* tft)
-    : _tft(tft),
-      _neo(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800)
+    : _tft(tft)
 {
     pinMode(BUTTON_PIN_REC,    INPUT_PULLUP);
     pinMode(BUTTON_PIN_SOLO,   INPUT_PULLUP);
@@ -57,9 +57,13 @@ SatMenu::SatMenu(LovyanGFX* tft)
     pinMode(MOTOR_IN2, OUTPUT);
     pinMode(MOTOR_EN,  OUTPUT);
     _motorStop();
-    _neo.begin();
-    _neo.setBrightness(50);
-    _neo.clear(); _neo.show();
+
+    _neo = &neopixels;          // apuntar al objeto global de Neopixel.cpp
+    // begin() ya fue llamado en initNeopixels() antes de construir SatMenu
+    setNeopixelGlobalBrightness(50);
+    clearAllNeopixels();
+    showNeopixels();
+
     _load();
     _tmp = _cfg;
 }
@@ -71,17 +75,18 @@ void SatMenu::open() {
     _cur = 0; _scrl = 0; _dirty = true; _tmp = _cfg;
     if (_cbMotorOff)   _cbMotorOff();
     if (_cbRS485Off)   _cbRS485Off();
-    if (_cbBrightness) _cbBrightness(255);   // Brillo máximo en modo SAT
+    if (_cbBrightness) _cbBrightness(255);
 }
 void SatMenu::close() {
     if (!_open) return;
     if (_cfg.trackId == 0) return;
     _open = false;
     _motorStop();
-    _neo.clear(); _neo.show();
+    clearAllNeopixels();
+    showNeopixels();
     if (_cbMotorOn)    _cbMotorOn();
     if (_cbRS485On)    _cbRS485On();
-    if (_cbBrightness) _cbBrightness(_savedBrightness);  // Restaurar brillo previo
+    if (_cbBrightness) _cbBrightness(_savedBrightness);
     _tft->fillScreen(C_BLACK);
 }
 
@@ -98,7 +103,6 @@ void SatMenu::update() {
 
     Btn b = _readBtn();
 
-    // Toast auto-dismiss
     if (_scr == Scr::TOAST) {
         if (millis() - _toastT > 1300 || b != Btn::NONE)
             _goto(_toastRet);
@@ -150,7 +154,7 @@ SatMenu::Btn SatMenu::_readBtn() {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  Render dispatcher (solo para pantallas estáticas)
+//  Render dispatcher
 // ─────────────────────────────────────────────────────────────
 void SatMenu::_render() {
     switch (_scr) {
@@ -168,7 +172,6 @@ void SatMenu::_render() {
             _drawHdr(_cfg.trackId == 0 ? "!SIN CONFIGURAR!" : "iMakie SAT");
             _drawList(_mainItems, _mainN);
             _drawHints("","","Salir","Entrar");
-            // Banner de aviso si no hay ID
             if (_cfg.trackId == 0) {
                 int W = _tft->width();
                 _tft->fillRect(0, SAT_HDR_H, W, 20, C_ACCENT);
@@ -239,19 +242,8 @@ void SatMenu::_render() {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  ██████████  TEST DISPLAY  ██████████
+//  TEST DISPLAY
 // ─────────────────────────────────────────────────────────────
-/*
-  Patrones (SELECT avanza, MUTE sale):
-  0 – Relleno colores puros (rojo/verde/azul/blanco/negro)
-  1 – Gradiente horizontal RGB565
-  2 – Cuadrícula de píxeles aleatorios (checker)
-  3 – Texto en todos los tamaños y posiciones
-  4 – Formas geométricas (rectángulos, círculos, triángulos)
-  5 – Barras verticales de escala de grises
-  6 – Animación de barrido de líneas (frame continuo)
-*/
-
 static const uint16_t DISP_SOLID_COLORS[] = {
     C_RED, C_GREEN, C_BLUE, C_WHITE, C_BLACK,
     C_YELLOW, C_CYAN, C_ORANGE, C_ACCENT
@@ -264,31 +256,28 @@ static const int DISP_SOLID_N = 9;
 void SatMenu::_tickTestDisplay(Btn b) {
     int W = _tft->width(), H = _tft->height();
 
-    if (b == Btn::BACK)  { _neo.clear(); _neo.show(); _goto(Scr::DIAG); return; }
+    if (b == Btn::BACK)  {
+        clearAllNeopixels(); showNeopixels();
+        _goto(Scr::DIAG); return;
+    }
     if (b == Btn::ENTER) { _dPat = (_dPat + 1) % 7; }
     if (b == Btn::UP)    { _dPat = (_dPat + 1) % 7; }
-    if (b == Btn::DOWN)  { _dPat = (_dPat + 6) % 7; }  // prev
+    if (b == Btn::DOWN)  { _dPat = (_dPat + 6) % 7; }
 
     switch (_dPat) {
-
-        // ── 0: Colores sólidos ─────────────────────────────
         case 0: {
             static int ci = 0;
             if (b == Btn::ENTER || b == Btn::UP)   ci = (ci+1) % DISP_SOLID_N;
             if (b == Btn::DOWN)                     ci = (ci+DISP_SOLID_N-1) % DISP_SOLID_N;
             _tft->fillScreen(DISP_SOLID_COLORS[ci]);
-            // Overlay con nombre del color
             uint16_t inv = ~DISP_SOLID_COLORS[ci];
             _tft->setTextColor(inv);
-            _tft->setTextSize(2);
-            _tft->setTextDatum(textdatum_t::middle_center);
+            _tft->setTextSize(2); _tft->setTextDatum(textdatum_t::middle_center);
             _tft->drawString(DISP_SOLID_NAMES[ci], W/2, H/2);
             _tft->setTextSize(1);
             _tft->drawString("SEL/SOL/REC=color  MUT=salir", W/2, H-14);
             break;
         }
-
-        // ── 1: Gradiente horizontal ────────────────────────
         case 1: {
             for (int x = 0; x < W; x++) {
                 uint8_t r = (x * 31) / W;
@@ -297,33 +286,26 @@ void SatMenu::_tickTestDisplay(Btn b) {
                 uint16_t col = (r << 11) | (g << 5) | b16;
                 _tft->drawFastVLine(x, 0, H, col);
             }
-            _tft->setTextColor(C_WHITE);
-            _tft->setTextSize(1);
+            _tft->setTextColor(C_WHITE); _tft->setTextSize(1);
             _tft->setTextDatum(textdatum_t::middle_center);
             _tft->drawString("Gradiente RGB — SEL=sig  MUT=salir", W/2, H/2);
             break;
         }
-
-        // ── 2: Checker pattern ────────────────────────────
         case 2: {
             _tft->fillScreen(C_BLACK);
             for (int y = 0; y < H; y += 8)
                 for (int x = 0; x < W; x += 8)
                     if (((x/8)+(y/8)) % 2 == 0)
                         _tft->fillRect(x, y, 8, 8, C_WHITE);
-            _tft->setTextColor(C_ACCENT);
-            _tft->setTextSize(1);
+            _tft->setTextColor(C_ACCENT); _tft->setTextSize(1);
             _tft->setTextDatum(textdatum_t::middle_center);
             _tft->drawString("Checker 8px — SEL=sig  MUT=salir", W/2, H/2);
             break;
         }
-
-        // ── 3: Texto multisize ─────────────────────────────
         case 3: {
             _tft->fillScreen(C_WHITE);
             int y = 4;
-            _tft->setTextColor(C_BLACK);
-            _tft->setTextDatum(textdatum_t::top_left);
+            _tft->setTextColor(C_BLACK); _tft->setTextDatum(textdatum_t::top_left);
             _tft->setTextSize(1); _tft->drawString("Texto tam 1 — ABCDEFGabcdefg0123", 2, y); y+=14;
             _tft->setTextSize(2); _tft->drawString("Tam 2 ABCabc123", 2, y); y+=22;
             _tft->setTextSize(3); _tft->drawString("Tam 3 ABC", 2, y); y+=30;
@@ -332,12 +314,9 @@ void SatMenu::_tickTestDisplay(Btn b) {
             _tft->setTextColor(C_BLUE);
             _tft->setTextSize(1); _tft->drawString("Track ID: 1  Label: CH-01  PWM: 40-220", 2, y); y+=16;
             _tft->setTextColor(C_DARK);
-            _tft->setTextSize(1);
             _tft->drawString("SEL=sig  MUT=salir", 2, H-14);
             break;
         }
-
-        // ── 4: Formas geométricas ─────────────────────────
         case 4: {
             _tft->fillScreen(C_BLACK);
             _tft->fillRect   (10, 40,  60, 40, C_RED);
@@ -351,15 +330,11 @@ void SatMenu::_tickTestDisplay(Btn b) {
             _tft->drawString("Geometria — SEL=sig  MUT=salir", W/2, H-2);
             break;
         }
-
-        // ── 5: Escala de grises ───────────────────────────
         case 5: {
-            int bars = 32;
-            int bw   = W / bars;
+            int bars = 32, bw = W / bars;
             for (int i = 0; i < bars; i++) {
                 uint8_t v = (i * 255) / (bars - 1);
-                uint8_t r5 = v >> 3, g6 = v >> 2, b5 = v >> 3;
-                uint16_t col = (r5 << 11) | (g6 << 5) | b5;
+                uint16_t col = ((v>>3)<<11) | ((v>>2)<<5) | (v>>3);
                 _tft->fillRect(i * bw, 0, bw, H - SAT_HINT_H, col);
             }
             _tft->fillRect(0, H-SAT_HINT_H, W, SAT_HINT_H, C_BLACK);
@@ -368,15 +343,11 @@ void SatMenu::_tickTestDisplay(Btn b) {
             _tft->drawString("Grises — SEL=sig  MUT=salir", W/2, H-SAT_HINT_H/2);
             break;
         }
-
-        // ── 6: Barrido de líneas animado ─────────────────
         case 6: {
             static int lx = 0;
             static uint16_t lcol = C_ACCENT;
-            // Borrar línea anterior (2px atrás)
             int prev = (lx + W - 4) % W;
             _tft->drawFastVLine(prev, 0, H - SAT_HINT_H, C_BLACK);
-            // Dibujar línea nueva
             _tft->drawFastVLine(lx, 0, H - SAT_HINT_H, lcol);
             lx = (lx + 1) % W;
             if (lx == 0) {
@@ -393,20 +364,8 @@ void SatMenu::_tickTestDisplay(Btn b) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  ██████████  TEST ENCODER  ██████████
+//  TEST ENCODER
 // ─────────────────────────────────────────────────────────────
-/*
-  Muestra en tiempo real:
-  - Valor del contador  (grande, centro)
-  - Dirección de la última rotación  (← →)
-  - Estado del SW (presionado / libre)
-  - Gráfica de barras del historial de posiciones
-  - Pines A y B en crudo (HIGH/LOW)
-
-  SOLO/REC = reset contador
-  SELECT   = resetear historial
-  MUTE     = salir
-*/
 void SatMenu::_tickTestEncoder(Btn b) {
     int W = _tft->width(), H = _tft->height();
 
@@ -414,7 +373,6 @@ void SatMenu::_tickTestEncoder(Btn b) {
     if (b == Btn::UP || b == Btn::DOWN) { _encCnt = 0; memset(_encHist,0,ENC_HIST); }
     if (b == Btn::ENTER) { _encCnt = 0; memset(_encHist,0,ENC_HIST); }
 
-    // ── Leer encoder (quadrature) ─────────────────────────
     int A = digitalRead(ENCODER_PIN_A);
     int B = digitalRead(ENCODER_PIN_B);
     unsigned long now = millis();
@@ -432,14 +390,10 @@ void SatMenu::_tickTestEncoder(Btn b) {
     }
     if (B != _encLastB) _encLastB = B;
 
-    // ── Leer SW encoder ───────────────────────────────────
     bool sw = (digitalRead(ENCODER_SW_PIN) == LOW);
     _encSW = sw;
 
-    // ── Dibujar pantalla ──────────────────────────────────
     _tft->fillScreen(C_BLACK);
-
-    // Header
     _tft->fillRect(0, 0, W, SAT_HDR_H, C_BLACK);
     _tft->drawFastHLine(0, SAT_HDR_H-2, W, C_ACCENT);
     _tft->setTextColor(C_WHITE); _tft->setTextSize(1);
@@ -447,30 +401,23 @@ void SatMenu::_tickTestEncoder(Btn b) {
     _tft->drawString("TEST ENCODER", W/2, SAT_HDR_H/2);
 
     int y = SAT_HDR_H + 6;
-
-    // Pines A/B raw
-    _tft->setTextDatum(textdatum_t::top_left);
-    _tft->setTextSize(1);
+    _tft->setTextDatum(textdatum_t::top_left); _tft->setTextSize(1);
     _tft->setTextColor(A==LOW ? C_GREEN : C_DARK, C_BLACK);
     _tft->drawString(A==LOW ? "A = LOW " : "A = HIGH", 6, y);
     _tft->setTextColor(B==LOW ? C_GREEN : C_DARK, C_BLACK);
     _tft->drawString(B==LOW ? "B = LOW " : "B = HIGH", W/2, y);
     y += 16;
 
-    // SW
     _tft->setTextColor(sw ? C_YELLOW : C_DARK, C_BLACK);
     _tft->drawString(sw ? "SW = PULSADO  " : "SW = libre    ", 6, y);
     y += 18;
 
-    // Contador (grande)
     char cbuf[8]; snprintf(cbuf, 8, "%+ld", _encCnt);
-    _tft->setTextSize(4);
-    _tft->setTextDatum(textdatum_t::middle_center);
+    _tft->setTextSize(4); _tft->setTextDatum(textdatum_t::middle_center);
     _tft->setTextColor(C_WHITE, C_BLACK);
     _tft->drawString(cbuf, W/2, y + 28);
     y += 64;
 
-    // Dirección (flecha)
     _tft->setTextSize(2);
     int prev2 = (_encHistIdx + ENC_HIST - 1) % ENC_HIST;
     int prev3 = (_encHistIdx + ENC_HIST - 2) % ENC_HIST;
@@ -481,32 +428,23 @@ void SatMenu::_tickTestEncoder(Btn b) {
     _tft->drawString(dir, W/2, y);
     y += 22;
 
-    // Gráfica historial (barras verticales)
-    int gW = W - 12;
-    int gH = 40;
-    int gX = 6;
-    int gY = y;
+    int gW = W - 12, gH = 40, gX = 6, gY = y;
     _tft->drawRect(gX-1, gY-1, gW+2, gH+2, C_DARK);
-
     int bw = gW / ENC_HIST;
     int cy = gY + gH/2;
-    // línea central
     _tft->drawFastHLine(gX, cy, gW, C_DARK);
-
     for (int i = 0; i < ENC_HIST; i++) {
         int idx = (_encHistIdx + i) % ENC_HIST;
         int v   = _encHist[idx];
-        int barH= abs(v) * (gH/2) / 63;
+        int barH = abs(v) * (gH/2) / 63;
         uint16_t col = v >= 0 ? C_CYAN : C_ACCENT;
-        int bx  = gX + i * bw;
+        int bx = gX + i * bw;
         if (v >= 0)
             _tft->fillRect(bx, cy - barH, bw>1?bw-1:1, barH, col);
         else
             _tft->fillRect(bx, cy,        bw>1?bw-1:1, barH, col);
     }
-    y += gH + 10;
 
-    // Hints
     _tft->fillRect(0, H-SAT_HINT_H, W, SAT_HINT_H, C_BLACK);
     _tft->drawFastHLine(0, H-SAT_HINT_H, W, C_DARK);
     _tft->setTextSize(1); _tft->setTextColor(C_GRAY, C_BLACK);
@@ -515,23 +453,12 @@ void SatMenu::_tickTestEncoder(Btn b) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  ██████████  TEST NEOPIXEL  ██████████
+//  TEST NEOPIXEL
 // ─────────────────────────────────────────────────────────────
-/*
-  Selector de pixel (0-3, 4=todos) + selector de color.
-  Previsualización en pantalla con cuadros del color real.
-  Animación rainbow con SELECT largo (toggle).
-
-  SOLO  = siguiente pixel
-  REC   = anterior pixel
-  SELECT = siguiente color / activar
-  MUTE  = salir
-*/
-
 static const uint32_t NEO_COLORS_RGB[] = {
     0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00,
     0xFF00FF, 0x00FFFF, 0xFFFFFF, 0xFF4500,
-    0xE94560, 0x000000   // último = apagar
+    0xE94560, 0x000000
 };
 static const char* NEO_COLOR_NAMES[] = {
     "Rojo","Verde","Azul","Amarillo",
@@ -544,38 +471,32 @@ void SatMenu::_tickTestNeopixel(Btn b) {
     int W = _tft->width(), H = _tft->height();
 
     if (b == Btn::BACK) {
-        _neo.clear(); _neo.show();
+        _neo->ClearTo(RgbColor(0)); _neo->Show();
         _goto(Scr::DIAG); return;
     }
-    if (b == Btn::UP)   _neoSel = (_neoSel + 1) % 5;        // 0-3 + "todos"
-    if (b == Btn::DOWN) _neoSel = (_neoSel + 4) % 5;
-    if (b == Btn::ENTER){
-        _neoColorIdx = (_neoColorIdx + 1) % NEO_COLOR_N;
-        _neoAnim = false;
-    }
+    if (b == Btn::UP)    _neoSel = (_neoSel + 1) % 5;
+    if (b == Btn::DOWN)  _neoSel = (_neoSel + 4) % 5;
+    if (b == Btn::ENTER) { _neoColorIdx = (_neoColorIdx + 1) % NEO_COLOR_N; _neoAnim = false; }
 
-    // Aplicar color
     if (!_neoAnim) {
-        uint32_t c = NEO_COLORS_RGB[_neoColorIdx];
-        uint8_t r = (c >> 16) & 0xFF;
-        uint8_t g = (c >>  8) & 0xFF;
-        uint8_t bv= (c      ) & 0xFF;
+        uint32_t c  = NEO_COLORS_RGB[_neoColorIdx];
+        uint8_t  r  = (c >> 16) & 0xFF;
+        uint8_t  g  = (c >>  8) & 0xFF;
+        uint8_t  bv = (c      ) & 0xFF;
         if (_neoSel == 4) {
             for (int i = 0; i < NEOPIXEL_COUNT; i++)
-                _neo.setPixelColor(i, _neo.Color(r, g, bv));
+                _neo->SetPixelColor(i, RgbColor(r, g, bv));
         } else {
-            _neo.clear();
-            _neo.setPixelColor(_neoSel, _neo.Color(r, g, bv));
+            _neo->ClearTo(RgbColor(0));
+            _neo->SetPixelColor(_neoSel, RgbColor(r, g, bv));
         }
-        _neo.show();
+        _neo->Show();
     } else {
-        // Animación rainbow
         unsigned long now = millis();
         if (now - _neoAnimT > 30) {
             _neoAnimT = now;
             for (int i = 0; i < NEOPIXEL_COUNT; i++) {
                 uint8_t hue = (_neoAnimStep + i * 64) & 0xFF;
-                // simple HSV→RGB
                 uint8_t r2,g2,b2;
                 uint8_t h6 = hue / 43;
                 uint8_t f  = (hue - h6 * 43) * 6;
@@ -588,30 +509,25 @@ void SatMenu::_tickTestNeopixel(Btn b) {
                     case 4: r2=f  ;g2=0  ;b2=255; break;
                     default:r2=255;g2=0  ;b2=q  ; break;
                 }
-                _neo.setPixelColor(i, _neo.Color(r2, g2, b2));
+                _neo->SetPixelColor(i, RgbColor(r2, g2, b2));
             }
-            _neo.show();
+            _neo->Show();
             _neoAnimStep = (_neoAnimStep + 2) & 0xFF;
         }
     }
 
-    // ── Dibujar pantalla ──────────────────────────────────
     _tft->fillScreen(C_BLACK);
     _drawHdr("TEST NEOPIXEL");
 
     int y = SAT_HDR_H + 10;
-
-    // Selector de pixel
-    _tft->setTextColor(C_WHITE, C_BLACK);
-    _tft->setTextSize(1);
+    _tft->setTextColor(C_WHITE, C_BLACK); _tft->setTextSize(1);
     _tft->setTextDatum(textdatum_t::middle_left);
     _tft->drawString("Pixel:", 6, y + 10);
 
     for (int i = 0; i < 5; i++) {
         int bx = 55 + i * 36;
         bool sel = (i == _neoSel);
-        _tft->fillRoundRect(bx, y, 30, 20, 4,
-            sel ? C_ACCENT : C_DARK);
+        _tft->fillRoundRect(bx, y, 30, 20, 4, sel ? C_ACCENT : C_DARK);
         _tft->setTextColor(C_WHITE, sel ? C_ACCENT : C_DARK);
         _tft->setTextDatum(textdatum_t::middle_center);
         char lb[4]; snprintf(lb, 4, i<4 ? "%d" : "ALL", i);
@@ -619,50 +535,40 @@ void SatMenu::_tickTestNeopixel(Btn b) {
     }
     y += 30;
 
-    // Selector de color
     _tft->setTextColor(C_WHITE, C_BLACK);
     _tft->setTextDatum(textdatum_t::middle_left);
     _tft->drawString("Color:", 6, y + 10);
 
-    // 10 cuadros de color
     int cx0 = 55;
     for (int i = 0; i < NEO_COLOR_N; i++) {
         int bx = cx0 + (i % 5) * 34;
         int by = y   + (i / 5) * 26;
         uint32_t c = NEO_COLORS_RGB[i];
-        // convertir RGB888 → RGB565
         uint16_t col565 = ((c>>8)&0xF800) | ((c>>5)&0x07E0) | ((c>>3)&0x001F);
         bool sel = (i == _neoColorIdx);
-        _tft->fillRect(bx, by, 30, 22,
-            i == 9 ? C_DARK : col565);  // apagar = gris
-        if (sel)
-            _tft->drawRect(bx-1, by-1, 32, 24, C_WHITE);
+        _tft->fillRect(bx, by, 30, 22, i == 9 ? C_DARK : col565);
+        if (sel) _tft->drawRect(bx-1, by-1, 32, 24, C_WHITE);
     }
     y += 60;
 
-    // Nombre color seleccionado
     _tft->setTextSize(1); _tft->setTextColor(C_ACCENT, C_BLACK);
     _tft->setTextDatum(textdatum_t::middle_center);
     _tft->drawString(NEO_COLOR_NAMES[_neoColorIdx], W/2, y);
     y += 18;
 
-    // Preview grande del color seleccionado
     if (_neoSel < 4) {
         uint32_t c = NEO_COLORS_RGB[_neoColorIdx];
         uint16_t col565 = ((c>>8)&0xF800)|((c>>5)&0x07E0)|((c>>3)&0x001F);
         _tft->fillRoundRect(W/2-40, y, 80, 30, 6, col565);
         _tft->drawRoundRect(W/2-40, y, 80, 30, 6, C_WHITE);
     } else {
-        // Mostrar los 4 colores activos
         for (int i = 0; i < 4; i++) {
             uint32_t c = NEO_COLORS_RGB[_neoColorIdx];
             uint16_t col565 = ((c>>8)&0xF800)|((c>>5)&0x07E0)|((c>>3)&0x001F);
             _tft->fillRoundRect(W/2 - 68 + i*36, y, 30, 30, 4, col565);
         }
     }
-    y += 40;
 
-    // Hints
     _tft->fillRect(0, H-SAT_HINT_H, W, SAT_HINT_H, C_BLACK);
     _tft->drawFastHLine(0, H-SAT_HINT_H, W, C_DARK);
     _tft->setTextSize(1); _tft->setTextColor(C_GRAY, C_BLACK);
@@ -671,66 +577,31 @@ void SatMenu::_tickTestNeopixel(Btn b) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  ██████████  TEST FADER  ██████████
+//  TEST FADER
 // ─────────────────────────────────────────────────────────────
-/*
-  Pantalla dividida en 3 zonas:
-
-  ┌─────────────────────────────┐
-  │  FADER    ADC raw / %        │  zona 1: barra posición fader
-  │  ████████████░░░░  72.3%     │
-  │  [min 0   max 4095]          │
-  ├─────────────────────────────┤
-  │  TOUCH    raw / estado       │  zona 2: touch
-  │  ●  TOCADO   raw=2400        │
-  ├─────────────────────────────┤
-  │  MOTOR   PWM: +150  [▲▲▲]   │  zona 3: motor manual
-  │  IN1=PWM  IN2=0              │
-  ├─────────────────────────────┤
-  │  Gráfica historial fader     │  zona 4: miniplot 80 muestras
-  └─────────────────────────────┘
-
-  SOLO  = motor +pwm (subir)
-  REC   = motor -pwm (bajar)
-  SELECT = motor stop / calibrar (long press)
-  MUTE  = salir
-*/
-
 static int _touchRead() {
-    return (int)touchRead(FADER_TOUCH_PIN);   // Arduino API, no init necesario
+    return (int)touchRead(FADER_TOUCH_PIN);
 }
 
 void SatMenu::_tickTestFader(Btn b) {
     int W = _tft->width(), H = _tft->height();
 
-    if (b == Btn::BACK)  {
-        _motorStop();
-        _goto(Scr::DIAG); return;
-    }
-
-    // Motor manual
+    if (b == Btn::BACK)  { _motorStop(); _goto(Scr::DIAG); return; }
     if (b == Btn::UP)    { _motPWM = constrain(_motPWM + 20, -255, 255); _motorDrive(_motPWM); }
     if (b == Btn::DOWN)  { _motPWM = constrain(_motPWM - 20, -255, 255); _motorDrive(_motPWM); }
-    if (b == Btn::ENTER) { _motPWM = 0; _motorStop();
-                           _fadCalMin = 4095; _fadCalMax = 0; }  // reset calibración
+    if (b == Btn::ENTER) { _motPWM = 0; _motorStop(); _fadCalMin = 4095; _fadCalMax = 0; }
 
-    // ── Leer ADC fader ───────────────────────────────────
     unsigned long now = millis();
     if (now - _fadT > 25) {
         _fadT = now;
-        // Múltiples lecturas y promedio
         int sum = 0;
         for (int i = 0; i < 8; i++) sum += analogRead(FADER_POT_PIN);
         _fadRaw = sum / 8;
         if (_fadRaw < _fadCalMin) _fadCalMin = _fadRaw;
         if (_fadRaw > _fadCalMax) _fadCalMax = _fadRaw;
         int range = _fadCalMax - _fadCalMin;
-        _fadPct = range > 50
-            ? (float)(_fadRaw - _fadCalMin) / range
-            : (float)_fadRaw / 4095.0f;
+        _fadPct = range > 50 ? (float)(_fadRaw - _fadCalMin) / range : (float)_fadRaw / 4095.0f;
         _fadPct = constrain(_fadPct, 0.0f, 1.0f);
-
-        // Actualizar historial
         if (now - _fadHistT > 50) {
             _fadHistT = now;
             _fadHist[_fadHistIdx] = (uint8_t)(_fadPct * 255);
@@ -738,108 +609,73 @@ void SatMenu::_tickTestFader(Btn b) {
         }
     }
 
-    // ── Leer touch ───────────────────────────────────────
     _tchRaw = _touchRead();
-    // El ESP32-S2 touch: valor alto = sin contacto, bajo = tocado
     static int tchBase = 0;
     if (tchBase == 0 && _tchRaw > 100) tchBase = _tchRaw;
     _tchOn = (tchBase > 0) && (_tchRaw < (int)(tchBase * 0.80f));
 
-    // ── Dibujar ──────────────────────────────────────────
     _tft->fillScreen(C_BLACK);
     _drawHdr("TEST FADER");
 
-    int y  = SAT_HDR_H + 6;
-    int mx = W - 8;
+    int y = SAT_HDR_H + 6;
 
-    // ── Zona 1: ADC / Posición ────────────────────────────
-    _tft->setTextColor(C_CYAN, C_BLACK);
-    _tft->setTextSize(1); _tft->setTextDatum(textdatum_t::top_left);
+    _tft->setTextColor(C_CYAN, C_BLACK); _tft->setTextSize(1);
+    _tft->setTextDatum(textdatum_t::top_left);
     _tft->drawString("FADER", 4, y);
-
     char buf[32];
-    snprintf(buf, 32, "raw=%4d  %.1f%%  [%d-%d]",
-             _fadRaw, _fadPct*100.f, _fadCalMin, _fadCalMax);
-    _tft->setTextColor(C_WHITE, C_BLACK);
-    _tft->drawString(buf, 44, y);
+    snprintf(buf, 32, "raw=%4d  %.1f%%  [%d-%d]", _fadRaw, _fadPct*100.f, _fadCalMin, _fadCalMax);
+    _tft->setTextColor(C_WHITE, C_BLACK); _tft->drawString(buf, 44, y);
     y += 14;
-
     _drawHBar(4, y, W-8, 14, _fadPct, C_CYAN);
     y += 20;
-
-    // Indicador de unidad gain (75%)
     int ugX = 4 + (int)((W-8) * 0.75f);
     _tft->drawFastVLine(ugX, y-20, 20, C_YELLOW);
-    _tft->setTextColor(C_YELLOW, C_BLACK);
-    _tft->setTextDatum(textdatum_t::top_center);
+    _tft->setTextColor(C_YELLOW, C_BLACK); _tft->setTextDatum(textdatum_t::top_center);
     _tft->drawString("0dB", ugX, y-8);
 
-    // ── Zona 2: Touch ─────────────────────────────────────
     _drawDivider(y+4); y += 10;
-
-    _tft->setTextColor(C_YELLOW, C_BLACK);
-    _tft->setTextDatum(textdatum_t::top_left);
+    _tft->setTextColor(C_YELLOW, C_BLACK); _tft->setTextDatum(textdatum_t::top_left);
     _tft->drawString("TOUCH", 4, y);
-
     uint16_t tCol = _tchOn ? C_GREEN : C_DARK;
     _tft->fillCircle(55, y+5, 6, tCol);
-    snprintf(buf, 32, " %s  raw=%5d  base=%5d",
-             _tchOn ? "TOCADO  " : "libre   ", _tchRaw, tchBase);
+    snprintf(buf, 32, " %s  raw=%5d  base=%5d", _tchOn ? "TOCADO  " : "libre   ", _tchRaw, tchBase);
     _tft->setTextColor(_tchOn ? C_GREEN : C_GRAY, C_BLACK);
     _tft->drawString(buf, 62, y);
     y += 20;
-
-    // Barra touch ratio
     if (tchBase > 0) {
         float ratio = constrain(1.0f - (float)_tchRaw / tchBase, 0.0f, 1.0f);
         _drawHBar(4, y, W-8, 10, ratio, _tchOn ? C_GREEN : C_DARK);
     }
     y += 16;
 
-    // ── Zona 3: Motor ─────────────────────────────────────
     _drawDivider(y+2); y += 8;
-
-    _tft->setTextColor(C_ORANGE, C_BLACK);
-    _tft->setTextDatum(textdatum_t::top_left);
+    _tft->setTextColor(C_ORANGE, C_BLACK); _tft->setTextDatum(textdatum_t::top_left);
     _tft->drawString("MOTOR", 4, y);
-
-    // Barra PWM -255..+255 centrada
     float mPct = ((float)_motPWM + 255.f) / 510.f;
-    int bx = 44, bw = W - 48;
-    _tft->fillRect(bx, y, bw, 14, C_DARK);
-    int center = bx + bw/2;
-    int barEnd = bx + (int)(mPct * bw);
+    int bx = 44, bwm = W - 48;
+    _tft->fillRect(bx, y, bwm, 14, C_DARK);
+    int center = bx + bwm/2;
+    int barEnd = bx + (int)(mPct * bwm);
     if (barEnd >= center)
         _tft->fillRect(center, y, barEnd-center, 14, _motPWM > 0 ? C_GREEN : C_DARK);
     else
         _tft->fillRect(barEnd, y, center-barEnd, 14, C_ACCENT);
-    // Línea central
     _tft->drawFastVLine(center, y, 14, C_WHITE);
-
     snprintf(buf, 32, " PWM %+d", _motPWM);
-    _tft->setTextColor(C_WHITE, C_BLACK);
-    _tft->drawString(buf, bx + bw + 2, y);
+    _tft->setTextColor(C_WHITE, C_BLACK); _tft->drawString(buf, bx + bwm + 2, y);
     y += 18;
-
     bool in1H = (_motPWM > 0), in2H = (_motPWM < 0);
-    snprintf(buf, 32, "IN1=%s  IN2=%s  EN=%s",
-             in1H?"PWM":"0", in2H?"PWM":"0",
-             (abs(_motPWM) > 0)?"HIGH":"LOW");
+    snprintf(buf, 32, "IN1=%s  IN2=%s  EN=%s", in1H?"PWM":"0", in2H?"PWM":"0", (abs(_motPWM)>0)?"HIGH":"LOW");
     _tft->setTextColor(C_GRAY, C_BLACK); _tft->drawString(buf, 44, y);
     y += 16;
 
-    // ── Zona 4: Gráfica historial ─────────────────────────
     _drawDivider(y); y += 4;
-
     int gH = H - SAT_HINT_H - y - 4;
     if (gH < 20) gH = 20;
     int gW = W - 8;
     _tft->drawRect(3, y, gW+2, gH+2, C_DARK);
-
-    // Baseline 0dB (75%)
     int ugY = y + gH - (int)(0.75f * gH);
     _tft->drawFastHLine(4, ugY, gW, C_YELLOW);
-
     int pxW = gW / FAD_HIST;
     if (pxW < 1) pxW = 1;
     for (int i = 0; i < FAD_HIST; i++) {
@@ -847,9 +683,7 @@ void SatMenu::_tickTestFader(Btn b) {
         int fh  = (_fadHist[idx] * gH) / 255;
         _tft->fillRect(4 + i * (gW / FAD_HIST), y + gH - fh, pxW, fh+1, C_CYAN);
     }
-    y += gH + 4;
 
-    // Hints
     _tft->fillRect(0, H-SAT_HINT_H, W, SAT_HINT_H, C_BLACK);
     _tft->drawFastHLine(0, H-SAT_HINT_H, W, C_DARK);
     _tft->setTextSize(1); _tft->setTextColor(C_GRAY, C_BLACK);
@@ -858,7 +692,7 @@ void SatMenu::_tickTestFader(Btn b) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  Handlers menú (sin cambios respecto v1, compactos)
+//  Handlers menú
 // ─────────────────────────────────────────────────────────────
 void SatMenu::_hMain(Btn b) {
     if (b == Btn::UP)    { if (_cur > 0) { _cur--; _dirty=true; } }
@@ -936,10 +770,10 @@ void SatMenu::_hEditVal(Btn b) {
     if (b == Btn::BACK)  _back();
     if (b == Btn::ENTER) {
         switch (_scr) {
-            case Scr::EDIT_TRACKID: _cfg.trackId=_tmp.trackId=(uint8_t)_eVal; break;
-            case Scr::EDIT_PWMMIN:  _cfg.pwmMin =_tmp.pwmMin =(uint8_t)_eVal; break;
-            case Scr::EDIT_PWMMAX:  _cfg.pwmMax =_tmp.pwmMax =(uint8_t)_eVal; break;
-            case Scr::EDIT_TOUCHTHR:_cfg.touchThreshold=_tmp.touchThreshold=(uint8_t)_eVal; break;
+            case Scr::EDIT_TRACKID:  _cfg.trackId=_tmp.trackId=(uint8_t)_eVal; break;
+            case Scr::EDIT_PWMMIN:   _cfg.pwmMin =_tmp.pwmMin =(uint8_t)_eVal; break;
+            case Scr::EDIT_PWMMAX:   _cfg.pwmMax =_tmp.pwmMax =(uint8_t)_eVal; break;
+            case Scr::EDIT_TOUCHTHR: _cfg.touchThreshold=_tmp.touchThreshold=(uint8_t)_eVal; break;
             default: break;
         }
         _save(); if (_cbSaved) _cbSaved(_cfg);
@@ -990,8 +824,7 @@ void SatMenu::_hToast(Btn b) {
 void SatMenu::_drawHdr(const char* t) {
     int W = _tft->width();
     _tft->fillRect(0, 0, W, SAT_HDR_H, C_BLACK);
-    _tft->setTextColor(C_WHITE, C_BLACK);
-    _tft->setTextSize(1);
+    _tft->setTextColor(C_WHITE, C_BLACK); _tft->setTextSize(1);
     _tft->setTextDatum(textdatum_t::middle_center);
     _tft->drawString(t, W/2, SAT_HDR_H/2);
     _tft->fillRect(0, SAT_HDR_H-2, W, 2, C_ACCENT);
@@ -1143,7 +976,7 @@ void SatMenu::_motorDrive(int pwm) {
 // ─────────────────────────────────────────────────────────────
 void SatMenu::_load() {
     _prefs.begin("ptxx", true);
-    _cfg.trackId        = _prefs.getUChar("trackId", 0);  // 0 = no configurado → SAT al arrancar
+    _cfg.trackId        = _prefs.getUChar("trackId", 0);
     _cfg.pwmMin         = _prefs.getUChar("pwmMin",  40);
     _cfg.pwmMax         = _prefs.getUChar("pwmMax",  220);
     _cfg.touchEnabled   = _prefs.getBool ("touchEn", true);
