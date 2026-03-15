@@ -13,7 +13,7 @@
 #include <Arduino.h>
 #include <LovyanGFX.hpp>
 #include "hardware/Hardware.h"
-#include "hardware/encoder/Encoder.h"
+#include "hardware/encoder/Encoder.h" 
 
 class SatMenu;
 

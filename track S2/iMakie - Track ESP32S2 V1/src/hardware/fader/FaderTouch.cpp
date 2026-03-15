@@ -55,6 +55,7 @@ bool update() {
     }
 
     _raw = _sample();
+    Serial.printf("T raw=%lu  base=%lu\n", _raw, _base);  // ← debug
 
     bool prev = _touched;
     if (!_touched && _raw < _base * THR_TOUCH)   _touched = true;

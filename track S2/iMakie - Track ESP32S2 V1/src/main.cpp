@@ -46,6 +46,8 @@ static SatMenu* satMenu = nullptr;
 //  setup
 // =============================================================
 void setup() {
+    Serial.begin(115200);
+    delay(500);
     // Motor pins — PRIMERO, antes de cualquier init
     pinMode(MOTOR_IN1, OUTPUT);
     pinMode(MOTOR_IN2, OUTPUT);
