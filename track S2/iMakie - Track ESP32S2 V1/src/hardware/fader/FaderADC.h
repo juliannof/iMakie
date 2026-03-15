@@ -1,6 +1,6 @@
 #pragma once
 #include <Arduino.h>
-#include "../config.h"
+#include "../../config.h"
 
 static constexpr float FADER_EMA_ALPHA = 0.10f;
 

@@ -118,14 +118,17 @@ static void processSlaveResponse(uint8_t slaveId) {
 
     // --- Encoder → CC (modo relativo Mackie) ---
     if (ch.encoderDelta != 0) {
-        uint8_t cc   = 16 + midiCh;
-        uint8_t val  = (ch.encoderDelta > 0) ? 63 : 65;  // ← invertido
-        int8_t ticks = abs(ch.encoderDelta);
-        byte msg[3]  = { (byte)(0xB0 | midiCh), cc, val };
-        extern void sendMIDIBytes(const byte* data, size_t len);
-        for (int8_t t = 0; t < ticks; t++) sendMIDIBytes(msg, 3);
-        log_v("[RS485→MIDI] Encoder ch%u delta=%d ticks=%d val=%u",
-              slaveId, ch.encoderDelta, ticks, val);
+        uint8_t cc      = 16 + midiCh;
+        int8_t  delta   = ch.encoderDelta;
+        int     total   = abs(delta) * 6;
+        uint8_t dir_bit = (delta > 0) ? 0x40 : 0x00;
+
+    while (total > 0) {
+        uint8_t chunk = (uint8_t)min(total, 4);
+        byte msg[3] = { (byte)(0xB0 | midiCh), cc, (uint8_t)(dir_bit | chunk) };
+        sendMIDIBytes(msg, 3);
+        total -= chunk;
+    }
     }
 
     // --- Encoder button → V-Select (nota 32+ch), una por pulsación ---

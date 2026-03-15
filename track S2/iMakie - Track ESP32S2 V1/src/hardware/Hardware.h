@@ -31,8 +31,7 @@ extern Button2 buttonMute;
 extern Button2 buttonSelect;
 extern Button2 buttonEncoderSelect;
 
-// ** Sensor Táctil **
-extern volatile bool isFaderTouched;
+
 
 
 // ===================================

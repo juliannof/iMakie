@@ -5,7 +5,8 @@
 #include "../hardware/Hardware.h"
 #include "../hardware/Motor/Motor.h"
 #include "../hardware/encoder/Encoder.h"
-#include "../button/ButtonManager.h"
+#include "../hardware/fader/FaderTouch.h"
+#include "../hardware/button/ButtonManager.h"
 #include "../config.h"
 
 // ─── Externs de estado global (definidos en main.cpp) ────────
@@ -100,7 +101,7 @@ void onMasterData(const MasterPacket& pkt) {
 SlavePacket buildResponse(FaderADC& faderADC, SatMenu& satMenu) {
     SlavePacket resp = {};
     resp.faderPos      = Motor::getRawADC();
-    resp.touchState    = isFaderTouched ? 1 : 0;
+    resp.touchState = FaderTouch::isTouched() ? 1 : 0;
     resp.buttons       = ButtonManager::getButtonFlags();
     resp.encoderDelta  = (int8_t)constrain(Encoder::getCount(), -127, 127);
     resp.encoderButton = ButtonManager::getEncoderButton();

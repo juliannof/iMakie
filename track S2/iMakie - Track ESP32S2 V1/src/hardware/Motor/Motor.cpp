@@ -1,5 +1,5 @@
 #include "Motor.h"
-#include "../../fader/FaderADC.h"
+#include "hardware/fader/FaderADC.h" 
 #include "../../config.h"
 
 extern FaderADC faderADC;

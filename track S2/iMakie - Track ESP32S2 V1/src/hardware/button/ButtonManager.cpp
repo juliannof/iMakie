@@ -2,9 +2,9 @@
 //  ButtonManager.cpp  —  iMakie PTxx Track S2
 // ============================================================
 #include "ButtonManager.h"
-#include "../menu/SatMenu.h"
-#include "../display/Display.h"
-#include "../protocol.h"          // FLAG_REC, FLAG_SOLO, FLAG_MUTE, FLAG_SELECT
+#include "menu/SatMenu.h"
+#include "display/Display.h"
+#include "protocol.h"          // FLAG_REC, FLAG_SOLO, FLAG_MUTE, FLAG_SELECT
 
 // ─── Variables de canal (definidas en main.cpp) ───────────────
 extern bool recStates, soloStates, muteStates, selectStates;

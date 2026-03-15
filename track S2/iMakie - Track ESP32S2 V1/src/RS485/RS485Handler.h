@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include "RS485.h"          // ← mismo nivel, no "../"
 #include "../protocol.h"
-#include "../fader/FaderADC.h"
+#include "hardware/fader/FaderADC.h" 
 #include "../menu/SatMenu.h"
 
 namespace RS485Handler {

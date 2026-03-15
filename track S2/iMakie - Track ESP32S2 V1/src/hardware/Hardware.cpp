@@ -97,9 +97,6 @@ void initHardware() {
     faderTouchThreshold = faderTouchBaseLine * FADER_TOUCH_THRESHOLD_PERCENTAGE / 100;
 }
 
-bool readFaderTouch() {
-    return false;  // AT42QT1011 eliminado en rev2
-}
 
 // ===================================
 // --- updateButtons ---

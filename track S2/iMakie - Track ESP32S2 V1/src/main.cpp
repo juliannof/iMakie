@@ -6,6 +6,8 @@
 #include "config.h"
 #include "display/Display.h"
 #include "display/LovyanGFX_config.h"
+#include "hardware/fader/FaderADC.h"
+#include "hardware/fader/FaderTouch.h"
 #include "hardware/encoder/Encoder.h"
 #include "hardware/Hardware.h"
 #include "hardware/Neopixels/Neopixel.h"
@@ -13,9 +15,8 @@
 #include "RS485/RS485.h"
 #include "RS485/RS485Handler.h"       // ← onMasterData vive aquí
 #include "protocol.h"
-#include "button/ButtonManager.h"
+#include "hardware/button/ButtonManager.h"
 #include "menu/SatMenu.h"
-#include "fader/FaderADC.h"
 
 // ─── Objetos globales ──────────────────────────────────────────
 LGFX        tft;
@@ -60,6 +61,9 @@ void setup() {
     initDisplay();       // 1. LovyanGFX — reserva periféricos SPI/DMA
     initNeopixels();     // 2. NeoPixelBus I2S — DESPUÉS del display
     initHardware();      // 3. Botones, encoder, touch
+    FaderTouch::init();
+    FaderTouch::onTouch([]()   { digitalWrite(LED_BUILTIN_PIN, HIGH); });
+    FaderTouch::onRelease([]() { digitalWrite(LED_BUILTIN_PIN, LOW);  });
     setVPotLevel(VPOT_DEFAULT_LEVEL);
     Encoder::begin();
 
@@ -123,7 +127,7 @@ void loop() {
     faderADC.update();
     Motor::setADC(faderADC.getFaderPos());
 
-    if (isFaderTouched) {
+    if (FaderTouch::isTouched()) {   // ← sustituye isFaderTouched
         Motor::stop();
     } else {
         Motor::update();
@@ -132,7 +136,7 @@ void loop() {
     // ── Encoder ───────────────────────────────────────────────
     Encoder::update();
     if (Encoder::hasChanged()) {
-        int newLevel = constrain((int)Encoder::getCount(), -7, 7);
+        int newLevel = constrain((int)(Encoder::getCount() / 4), -7, 7);
         if (newLevel != Encoder::currentVPotLevel) {
             Encoder::currentVPotLevel = newLevel;
             needsVPotRedraw = true;

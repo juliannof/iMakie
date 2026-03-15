@@ -1,93 +1,63 @@
 #include "Encoder.h"
+#include "../../config.h"
 
-// Variables estáticas
-int Encoder::lastStateA = HIGH;
-int Encoder::lastStateB = HIGH;
-unsigned long Encoder::lastDebounceTime = 0;
-volatile long Encoder::counter = 0;
-long Encoder::lastPrintedValue = 0;
-bool Encoder::initialized = false;
-int currentVPotLevel = 0;
+volatile long    Encoder::_counter      = 0;
+long             Encoder::_lastReported = 0;
+volatile uint8_t Encoder::_state        = 0;
+int              Encoder::currentVPotLevel = 0;
 
-// ¡Definición de la variable estática de la clase!
-int Encoder::currentVPotLevel = 0;
-// =======================
-// Implementación
-// =======================
+// Tabla Gray code — índice: (prevA<<3)|(prevB<<2)|(currA<<1)|(currB)
+// Devuelve: -1, 0, +1
+static const int8_t ENC_TABLE[16] = {
+     0, -1, +1,  0,
+    +1,  0,  0, -1,
+    -1,  0,  0, +1,
+     0, +1, -1,  0
+};
+
+void IRAM_ATTR Encoder::_isr() {
+    // Lectura directa de registro — segura en ISR
+    uint32_t reg = GPIO.in;  // lee los 32 GPIOs de una vez
+    uint8_t curr = ((reg >> ENCODER_PIN_A) & 1) << 1
+                 | ((reg >> ENCODER_PIN_B) & 1);
+    int8_t  step = ENC_TABLE[(_state << 2) | curr];
+    _counter    += step;
+    _state       = curr;
+}
 
 void Encoder::begin() {
-    pinMode(PIN_A, INPUT);
-    pinMode(PIN_B, INPUT);
-    lastStateA = digitalRead(PIN_A);
-    lastStateB = digitalRead(PIN_B);
-    lastDebounceTime = millis();
-    initialized = true;
-    Serial.println("✅ Encoder inicializado - Izquierda:-1 Derecha:+1");
+    pinMode(ENCODER_PIN_A, INPUT);   // pull-ups externos
+    pinMode(ENCODER_PIN_B, INPUT);
+
+    _state = ((uint8_t)digitalRead(ENCODER_PIN_A) << 1)
+           |  (uint8_t)digitalRead(ENCODER_PIN_B);
+
+    attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_A), _isr, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_B), _isr, CHANGE);
 }
 
-void Encoder::update() {
-    if (!initialized) return;
-
-    int currentStateA = digitalRead(PIN_A);
-    int currentStateB = digitalRead(PIN_B);
-
-    if (millis() - lastDebounceTime > DEBOUNCE_DELAY) {
-        if (currentStateA != lastStateA) {
-            if (currentStateA == LOW) {
-
-                if (currentStateB == HIGH) {
-                    counter--;   // Derecha
-                } else {
-                    counter++;   // Izquierda
-                }
-
-                // --- LIMITAR RANGO ---
-                if (counter > 7)  counter = 7;
-                if (counter < -7) counter = -7;
-            }
-
-            lastStateA = currentStateA;
-            lastDebounceTime = millis();
-        }
-
-        if (currentStateB != lastStateB) {
-            lastStateB = currentStateB;
-            lastDebounceTime = millis();
-        }
-    }
-}
-
+void Encoder::update() { /* ISR lo maneja — no hacer nada */ }
 
 long Encoder::getCount() {
-    return counter;
-}
-
-void Encoder::reset() {
-    Encoder::currentVPotLevel = 0;  // <<<< importante
-    counter = 0;
-    lastPrintedValue = 0;
+    noInterrupts();
+    long v = _counter;
+    interrupts();
+    return v;
 }
 
 bool Encoder::hasChanged() {
-    bool changed = (counter != lastPrintedValue);
-    if (changed) lastPrintedValue = counter;
-    return changed;
-}
-
-String Encoder::getDirection() {
-    // Por ahora solo devuelve N/A, puedes implementarlo si quieres
-    return "N/A";
-}
-
-void Encoder::printStatus() {
-    if (hasChanged()) {
-        Serial.print("Encoder: ");
-        Serial.print(counter);
-
-        if (counter > lastPrintedValue) {
-            Serial.println(" ➡️ (Derecha)");
-        } else {
-            Serial.println(" ⬅️ (Izquierda)");
-        }
+    long cur = getCount();
+    if (cur != _lastReported) {
+        _lastReported = cur;
+        return true;
     }
+    return false;
+}
+
+void Encoder::reset() {
+    noInterrupts();
+    _counter      = 0;
+    interrupts();
+    _lastReported = 0;
+    // currentVPotLevel NO se toca
 }
