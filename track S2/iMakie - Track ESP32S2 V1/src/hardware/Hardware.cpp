@@ -141,35 +141,65 @@ void handleButtonLedState(ButtonId id) {
         case ButtonId::REC:
             shouldBeOn    = recStates;
             neopixelIndex = NEOPIXEL_FOR_REC;
-            r = BUTTON_REC_LED_COLOR_R; g = BUTTON_REC_LED_COLOR_G; b = BUTTON_REC_LED_COLOR_B;
+            r = BUTTON_REC_LED_COLOR_R;
+            g = BUTTON_REC_LED_COLOR_G;
+            b = BUTTON_REC_LED_COLOR_B;
             break;
         case ButtonId::SOLO:
             shouldBeOn    = soloStates;
             neopixelIndex = NEOPIXEL_FOR_SOLO;
-            r = BUTTON_SOLO_LED_COLOR_R; g = BUTTON_SOLO_LED_COLOR_G; b = BUTTON_SOLO_LED_COLOR_B;
+            r = BUTTON_SOLO_LED_COLOR_R;
+            g = BUTTON_SOLO_LED_COLOR_G;
+            b = BUTTON_SOLO_LED_COLOR_B;
             break;
         case ButtonId::MUTE:
             shouldBeOn    = muteStates;
             neopixelIndex = NEOPIXEL_FOR_MUTE;
-            r = BUTTON_MUTE_LED_COLOR_R; g = BUTTON_MUTE_LED_COLOR_G; b = BUTTON_MUTE_LED_COLOR_B;
+            r = BUTTON_MUTE_LED_COLOR_R;
+            g = BUTTON_MUTE_LED_COLOR_G;
+            b = BUTTON_MUTE_LED_COLOR_B;
             break;
         case ButtonId::SELECT: {
             shouldBeOn    = selectStates;
             neopixelIndex = NEOPIXEL_FOR_SELECT;
-            uint8_t bri   = (uint16_t)255 * NEOPIXEL_COLOR_3_BRIGHTNESS_FACTOR / 100;
-            r = g = b = bri;
+            r = BUTTON_SELECT_LED_COLOR_R;
+            g = BUTTON_SELECT_LED_COLOR_G;
+            b = BUTTON_SELECT_LED_COLOR_B;
             break;
         }
         default: return;
     }
 
-    if (neopixelIndex != -1) {
-        uint8_t scale = shouldBeOn ? 255 : NEOPIXEL_DIM_BRIGHTNESS;
-        setNeopixelState(neopixelIndex,
-                     (uint8_t)((r * scale) / 255),
-                     (uint8_t)((g * scale) / 255),
-                     (uint8_t)((b * scale) / 255));
+    if (neopixelIndex == -1) return;
+
+    uint8_t fr, fg, fb;
+    // Escala plena = NEOPIXEL_DEFAULT_BRIGHTNESS
+    // Escala tenue = NEOPIXEL_DIM_BRIGHTNESS
+    // Los colores R/G/B son solo el tono — el brillo lo mandan los defines
+
+    if (id == ButtonId::SELECT) {
+        uint8_t s = shouldBeOn ? NEOPIXEL_DEFAULT_BRIGHTNESS : 0;
+        fr = (r * s) / 255;
+        fg = (g * s) / 255;
+        fb = (b * s) / 255;
+    } else {
+        // REC, SOLO, MUTE
+        if (selectStates) {
+            // Canal seleccionado: ON=pleno, OFF=apagado
+            uint8_t s = shouldBeOn ? NEOPIXEL_DEFAULT_BRIGHTNESS : 0;
+            fr = (r * s) / 255;
+            fg = (g * s) / 255;
+            fb = (b * s) / 255;
+        } else {
+            // Canal no seleccionado: ON=atenuado, OFF=apagado
+            uint8_t s = shouldBeOn ? NEOPIXEL_DIM_BRIGHTNESS : 0;
+            fr = (r * s) / 255;
+            fg = (g * s) / 255;
+            fb = (b * s) / 255;
+        }
     }
+
+    setNeopixelState(neopixelIndex, fr, fg, fb);
 }
 
 void updateAllNeopixels() {

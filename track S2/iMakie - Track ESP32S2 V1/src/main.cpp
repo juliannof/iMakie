@@ -23,7 +23,6 @@ LGFX_Sprite header(&tft), mainArea(&tft), vuSprite(&tft), vPotSprite(&tft);
 FaderADC    faderADC;
 
 // ─── Estado de canal (externs consumidos por Display / Hardware) ──
-String assignmentString = "CH-01 ";
 String trackName        = "Track  ";
 bool  recStates    = false;
 bool  soloStates   = false;

@@ -122,18 +122,14 @@ static uint16_t _posicionMaximaADC       = 0;
 #define BUTTON_PIN_SELECT   40
 #define BUTTON_USE_INTERNAL_PULLUP true // Usar pull-up internos para los botones
 
-
-
-
 // Porcentaje del valor base táctil para el umbral de detección (80% significa que detecta si el valor cae por debajo del 80% del valor base).
 #define FADER_TOUCH_THRESHOLD_PERCENTAGE 80
-
 
 // --- NEOPixel ---
 #define NEOPIXEL_PIN        36  // Pin GPIO donde están conectados los Neopixels
 #define NEOPIXEL_COUNT      4   // Número total de Neopixels
-#define NEOPIXEL_DEFAULT_BRIGHTNESS 10 // Brillo inicial por defecto (0-255)
-#define NEOPIXEL_DIM_BRIGHTNESS 1   // brillo atenuado cuando estado = OFF (0-255)
+#define NEOPIXEL_DEFAULT_BRIGHTNESS 25 // Brillo inicial por defecto (0-255)
+#define NEOPIXEL_DIM_BRIGHTNESS 5   // brillo atenuado cuando estado = OFF (0-255)
 
 
 // --- COLORES PREDETERMINADOS DE LOS BOTONES (PARA CADA NEOPixel) ---
@@ -289,7 +285,6 @@ extern unsigned long vuLastUpdateTime;
 extern float vuPeakLevels;             
 extern unsigned long vuPeakLastUpdateTime;
 extern float faderPositions; 
-extern String assignmentString; 
 
 // --- BANDERAS DE REDIBUJO (Declaradas en Display.cpp) ---
 extern bool needsTOTALRedraw;      

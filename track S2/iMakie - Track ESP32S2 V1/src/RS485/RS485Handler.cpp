@@ -49,7 +49,15 @@ void onMasterData(const MasterPacket& pkt) {
     if (recStates    != nr) { recStates    = nr; handleButtonLedState(ButtonId::REC);    needsMainAreaRedraw = true; }
     if (soloStates   != ns) { soloStates   = ns; handleButtonLedState(ButtonId::SOLO);   needsMainAreaRedraw = true; }
     if (muteStates   != nm) { muteStates   = nm; handleButtonLedState(ButtonId::MUTE);   needsMainAreaRedraw = true; }
-    if (selectStates != nq) { selectStates = nq; handleButtonLedState(ButtonId::SELECT); needsHeaderRedraw   = true; }
+    if (selectStates != nq) {
+        selectStates = nq;
+        handleButtonLedState(ButtonId::SELECT);
+        handleButtonLedState(ButtonId::REC);     // ← redibujar con nuevo selectStates
+        handleButtonLedState(ButtonId::SOLO);
+        handleButtonLedState(ButtonId::MUTE);
+        showNeopixels();          // ← forzar show inmediato
+        needsHeaderRedraw = true;
+    }
 
     // ── VU meter ──────────────────────────────────────────────
     float newVu = pkt.vuLevel / 127.0f;

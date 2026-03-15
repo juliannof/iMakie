@@ -86,26 +86,16 @@ static void _onRecPressed(Button2& btn) {
 static void _onRecReleased(Button2& btn) {
     (void)btn;
     if (!_holding) return;
-
     unsigned long held = millis() - _holdStart;
     _holding = false;
 
-    if (_fired) {
-        // El SAT ya se abrió — no hacer nada más
-        _fired = false;
-        return;
-    }
+    if (_fired) { _fired = false; return; }
 
-    // Short press (<1 s): comportamiento normal de REC
     _clearBar();
     if (_sat && _sat->isOpen()) return;
 
     if (held < HOLD_MS) {
-        recStates = !recStates;
-        handleButtonLedState(ButtonId::REC);
-        needsMainAreaRedraw = true;
-        if (recStates) _flags |=  FLAG_REC;
-        else           _flags &= ~FLAG_REC;
+        _flags |= FLAG_REC;   // solo enviar — Logic confirma
     }
 }
 
@@ -115,25 +105,13 @@ static void _onButtonEvent(ButtonId id) {
 
     switch (id) {
         case ButtonId::SOLO:
-            soloStates = !soloStates;
-            handleButtonLedState(ButtonId::SOLO);
-            needsMainAreaRedraw = true;
-            if (soloStates) _flags |=  FLAG_SOLO;
-            else            _flags &= ~FLAG_SOLO;
+            _flags |= FLAG_SOLO;
             break;
         case ButtonId::MUTE:
-            muteStates = !muteStates;
-            handleButtonLedState(ButtonId::MUTE);
-            needsMainAreaRedraw = true;
-            if (muteStates) _flags |=  FLAG_MUTE;
-            else            _flags &= ~FLAG_MUTE;
+            _flags |= FLAG_MUTE;
             break;
         case ButtonId::SELECT:
-            selectStates = !selectStates;
-            handleButtonLedState(ButtonId::SELECT);
-            needsHeaderRedraw = true;
-            if (selectStates) _flags |=  FLAG_SELECT;
-            else              _flags &= ~FLAG_SELECT;
+            _flags |= FLAG_SELECT;
             break;
         case ButtonId::ENCODER_SELECT:
             _encoderBtnCount++;
