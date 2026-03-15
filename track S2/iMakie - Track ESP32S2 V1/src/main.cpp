@@ -46,6 +46,9 @@ float vuLevels        = 0.0f;
 unsigned long vuLastUpdateTime     = 0;
 unsigned long vuPeakLastUpdateTime = 0;
 
+
+
+
 // ─── RS485 response packet ────────────────────────────────────
 static SlavePacket _resp = {};
 
@@ -85,6 +88,17 @@ static uint8_t  readFaderTouch() {
     static uint32_t base = 0;
     if (base == 0 && v > 100) base = v;
     return (base > 0 && v < base * 0.80f) ? 1 : 0;
+}
+
+// Colores de modo de automatización — sincronizados con el header
+static uint16_t autoModeColor(uint8_t mode) {
+    switch (mode) {
+        case 1: return TFT_MCU_GREEN;              // READ  — verde
+        case 2: return 0x801F;                     // WRITE — púrpura
+        case 3: return TFT_ORANGE;                 // TOUCH — naranja
+        case 4: return COLOR_16_BITS(180, 80, 0);  // LATCH — naranja oscuro
+        default: return TFT_MCU_GRAY;              // OFF   — gris
+    }
 }
 
 // =============================================================
@@ -129,11 +143,17 @@ static void onMasterData(const MasterPacket& pkt) {
     Serial.println("[S2] FLAG_CALIB recibido");
     Motor::startCalib();
     }
-    AutoMode newAutoMode = getAutoMode(pkt.flags);
+   // Extraer autoMode de bits 5-7 y actualizar display
+uint8_t newAutoMode = (pkt.flags >> 5) & 0x07;
 if (newAutoMode != currentAutoMode) {
-    currentAutoMode  = newAutoMode;
-    needsHeaderRedraw = true;
+    setAutoMode((pkt.flags >> 5) & 0x07);
+    needsVPotRedraw    = true;
+    needsHeaderRedraw  = true;   // header también cambia de color
 }
+// VPot display desde Logic
+    setVPotRaw(pkt.vpotValue);
+    setVPotRaw(pkt.vpotValue);
+    setAutoMode((pkt.flags >> 5) & 0x07);
 }
 
 void setup() {
@@ -199,10 +219,11 @@ void loop() {
             _resp.touchState    = readFaderTouch();
             _resp.buttons       = ButtonManager::getButtonFlags();
             _resp.encoderDelta  = (int8_t)constrain(Encoder::getCount(), -127, 127);
-            _resp.encoderButton = 0;
+            _resp.encoderButton = ButtonManager::getEncoderButton();
             rs485.sendResponse(_resp);
 
             ButtonManager::clearButtonFlags();
+            ButtonManager::clearEncoderButton();
             Encoder::reset();
         }
 

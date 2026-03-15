@@ -31,5 +31,7 @@ namespace ButtonManager {
     // Byte de flags RS485 (se actualiza en cada evento de botón)
     uint8_t getButtonFlags();
     void    clearButtonFlags();
+    uint8_t getEncoderButton();
+    void    clearEncoderButton();
 
 } // namespace ButtonManager

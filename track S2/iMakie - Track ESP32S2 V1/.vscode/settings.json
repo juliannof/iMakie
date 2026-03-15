@@ -3,5 +3,8 @@
     "files.associations": {
         "*.tcc": "cpp",
         "fstream": "cpp"
-    }
+    },
+    "C_Cpp.intelliSenseEngine": "disabled",
+    "C_Cpp.autocomplete": "disabled",
+    "C_Cpp.errorSquiggles": "disabled"
 }

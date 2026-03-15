@@ -20,6 +20,7 @@ struct ChannelData {
     uint8_t   flags         = 0;
     uint16_t  faderTarget   = 8192;
     uint8_t   vuLevel       = 0;
+    uint8_t  vpotValue  = 0;   // ← NUEVO
     bool      dirty         = true;
     bool      calibrate     = false;   // one-shot: FLAG_CALIB → se limpia tras enviar
     AutoMode  autoMode      = AUTO_OFF; // bits 5-7 de flags
@@ -31,6 +32,8 @@ struct ChannelData {
     uint8_t  prevButtons   = 0;
     int8_t   encoderDelta  = 0;
     uint8_t  encoderButton = 0;
+    uint8_t prevEncoderButton = 0;
+
     bool     responded     = false;
 };
 
@@ -47,12 +50,14 @@ public:
     void setFlags      (uint8_t id, uint8_t flags);
     void setFaderTarget(uint8_t id, uint16_t value14bit);
     void setVuLevel    (uint8_t id, uint8_t value);
+    void setVPotValue(uint8_t id, uint8_t rawCC);   // ← NUEVO
     void setCalibrate  (uint8_t id);               // one-shot calibración
     void setAutoMode   (uint8_t id, AutoMode mode); // modo de automatización
 
     // API RS485 → Core 0 (slaves → MIDI)
     bool               hasNewSlaveData(uint8_t id);
     const ChannelData& getChannel     (uint8_t id);
+
 
     void printStats() const;
     void resetStats();

@@ -113,6 +113,7 @@ void RS485Master::_sendPacket(uint8_t id) {
         }
         pkt.faderTarget = _ch[id].faderTarget;
         pkt.vuLevel     = _ch[id].vuLevel;
+        pkt.vpotValue  = _ch[id].vpotValue;   // ← NUEVO
         extern uint8_t g_logicConnected;
         pkt.connected   = g_logicConnected;
         _ch[id].dirty   = false;
@@ -174,6 +175,7 @@ void RS485Master::_handleResponse() {
         _ch[_currentId].prevButtons   = _ch[_currentId].buttons;
         _ch[_currentId].buttons       = resp->buttons;
         _ch[_currentId].encoderDelta  = resp->encoderDelta;
+        _ch[_currentId].prevEncoderButton = _ch[_currentId].encoderButton;
         _ch[_currentId].encoderButton = resp->encoderButton;
         _ch[_currentId].responded     = true;
         xSemaphoreGive(_mutex);
@@ -226,6 +228,15 @@ void RS485Master::setVuLevel(uint8_t id, uint8_t value) {
     if (id < 1 || id > _numSlaves) return;
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
         _ch[id].vuLevel = value;
+        xSemaphoreGive(_mutex);
+    }
+}
+
+void RS485Master::setVPotValue(uint8_t id, uint8_t rawCC) {
+    if (id < 1 || id > _numSlaves) return;
+    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+        _ch[id].vpotValue = rawCC & 0x7F;   // 7 bits útiles
+        _ch[id].dirty     = true;
         xSemaphoreGive(_mutex);
     }
 }

@@ -252,7 +252,22 @@ void handleMcuHandshake(byte* challenge_code) {
 void processControlChange(byte channel, byte controller, byte value) {
     log_d("CC CH=%d, CC=%d, Val=0x%02X", channel, controller, value);
 
-    if ((channel != 0 && channel != 15) || (controller < 64 || controller > 73)) return;
+    if (channel != 0 && channel != 15) return;  // solo filtro de canal
+
+    // VPot LED Ring: CC 48-55 → strips 1-8
+    if (controller >= 48 && controller <= 55) {
+        uint8_t strip = controller - 48;
+        rs485.setVPotValue(strip + 1, value);
+        log_v("[VPot] strip=%u raw=0x%02X mode=%u pos=%u center=%u",
+              strip, value,
+              (value >> 4) & 0x03,
+              value & 0x0F,
+              (value >> 6) & 0x01);
+        return;
+    }
+
+    // Timecode digits: CC 64-73
+    if (controller < 64 || controller > 73) return;
 
     int digit_index  = 73 - controller;
     byte char_code   = value & 0x3F;
@@ -266,21 +281,9 @@ void processControlChange(byte channel, byte controller, byte value) {
     needsHeaderRedraw = true;
 }
 
-String formatBeatString() {
-    char formatted[24];
-    int pos = 0;
-    for (int i = 0; i < 10; i++) {
-        byte b = beatsChars_clean[i];
-        char c = b & 0x7F;
-        if (c < 32) c = ' ';
-        formatted[pos++] = c;
-        if (i == 2 || i == 4 || i == 6) formatted[pos++] = '.';
-    }
-    formatted[pos] = '\0';
-    String result = String(formatted);
-    result.trim();
-    return (result.length() == 0) ? "---.---.---.---" : result;
-}
+// ****************************************************************************
+// Helper para formatear la cadena de timecode a mostrar en pantalla
+// ****************************************************************************
 
 String formatTimecodeString() {
     char formatted[14];
@@ -297,6 +300,27 @@ String formatTimecodeString() {
     String result = String(formatted);
     result.trim();
     return (result.length() == 0) ? "--:--:--:--" : result;
+}
+
+// ****************************************************************************
+// Helper para formatear la cadena de beats a mostrar en pantalla
+// ****************************************************************************
+
+String formatBeatString() {
+    char formatted[14];
+    int pos = 0;
+    for (int i = 0; i < 10; i++) {
+        byte b = beatsChars_clean[i];
+        char c = b & 0x7F;
+        if (c == 0 || c < 32) c = '.';
+        if (c == ';') c = '.';
+        formatted[pos++] = c;
+        if (b & 0x80) formatted[pos++] = '.';
+    }
+    formatted[pos] = '\0';
+    String result = String(formatted);
+    result.trim();
+    return (result.length() == 0) ? "  1.  1.  1.  1" : result;
 }
 
 

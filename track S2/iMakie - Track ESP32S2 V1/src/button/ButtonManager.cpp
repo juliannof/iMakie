@@ -21,6 +21,8 @@ static LovyanGFX* _tft      = nullptr;
 static SatMenu*   _sat      = nullptr;
 static uint8_t    _flags    = 0;
 
+static uint8_t _encoderBtnCount = 0;
+
 // Long-press state
 static bool          _holding    = false;
 static unsigned long _holdStart  = 0;
@@ -134,6 +136,7 @@ static void _onButtonEvent(ButtonId id) {
             else              _flags &= ~FLAG_SELECT;
             break;
         case ButtonId::ENCODER_SELECT:
+            _encoderBtnCount++;
             Encoder::reset();
             needsVPotRedraw = true;
             break;
@@ -176,5 +179,7 @@ void update() {
 void setSatMenu(SatMenu* sat) { _sat = sat; }
 uint8_t getButtonFlags()      { return _flags; }
 void    clearButtonFlags()    { _flags = 0; }
+uint8_t getEncoderButton()  { return _encoderBtnCount; }
+void    clearEncoderButton(){ _encoderBtnCount = 0; }
 
 } // namespace ButtonManager

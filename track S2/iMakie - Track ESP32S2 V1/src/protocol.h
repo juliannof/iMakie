@@ -55,20 +55,19 @@ inline uint8_t rs485_crc8(const uint8_t* data, size_t len) {
     return crc;
 }
 
-// --- Master → Slave (15 bytes — sin cambio de tamaño) ---
+// --- Master → Slave (16 bytes) ---
 struct __attribute__((packed)) MasterPacket {
     uint8_t  header;        // 0xAA
     uint8_t  id;            // 1-17
     char     trackName[7];  // Mackie Scribble Strip (7 chars, sin null)
-    uint8_t  flags;         // bits 0-3: REC/SOLO/MUTE/SELECT
-                            // bit  4  : FLAG_CALIB (one-shot)
-                            // bits 5-7: AutoMode (AUTO_OFF..AUTO_LATCH)
+    uint8_t  flags;         // FLAG_REC | FLAG_SOLO | FLAG_MUTE | FLAG_SELECT
     uint16_t faderTarget;   // Pitch Bend 14-bit: 0-16383
     uint8_t  vuLevel;       // 0-127
+    uint8_t  vpotValue;     // ← NUEVO: raw CC byte (bit6=center, 5-4=modo, 3-0=pos)
     uint8_t  connected;     // 1=CONNECTED, 0=DISCONNECTED
     uint8_t  crc;
 };
-static_assert(sizeof(MasterPacket) == 15, "MasterPacket debe ser 15 bytes");
+static_assert(sizeof(MasterPacket) == 16, "MasterPacket debe ser 16 bytes");
 
 // --- Slave → Master (9 bytes) ---
 struct __attribute__((packed)) SlavePacket {

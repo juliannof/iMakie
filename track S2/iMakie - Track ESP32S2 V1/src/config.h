@@ -19,6 +19,7 @@ enum class ConnectionState {
     CONNECTED
 };
 
+
 // ===================================
 // --- 1. DEFINICIONES (Macros y Constantes) ---
 // ===================================
@@ -250,8 +251,8 @@ static uint16_t _posicionMaximaADC       = 0;
 #define TFT_MCU_GRAY     0x3186 // Gris azulado estándar TFT
 #define TFT_MCU_DARKGRAY 0x0842 // Gris oscuro MCU
 #define TFT_AUTO_OFF    0x0842   // gris oscuro (= TFT_MCU_DARKGRAY)
-#define TFT_AUTO_READ   0x3F20   // verde (= TFT_MCU_GREEN)
-#define TFT_AUTO_WRITE  TFT_MAGENTA   // lila
+#define TFT_AUTO_READ   0x2500   // verde (= TFT_MCU_GREEN)
+#define TFT_AUTO_WRITE  0x500A// lila
 #define TFT_AUTO_TOUCH  0xFD20   // naranja vivo
 #define TFT_AUTO_LATCH  0xA900   // naranja oscuro
 

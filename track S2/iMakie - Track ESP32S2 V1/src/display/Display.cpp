@@ -31,6 +31,8 @@ bool needsVUMetersRedraw = false;
 bool needsVPotRedraw     = false;
 volatile ConnectionState logicConnectionState = ConnectionState::DISCONNECTED;
 
+
+static uint8_t currentVPotRaw = 0;
 static int8_t currentVPotLevel = VPOT_DEFAULT_LEVEL;
 AutoMode currentAutoMode = AUTO_OFF;
 
@@ -359,40 +361,103 @@ void handleVUMeterDecay() {
     if (changed) needsVUMetersRedraw = true;
 }
 
+static uint16_t autoModeColor(AutoMode mode) {
+    static const uint16_t AUTO_COLORS[] = {
+        TFT_AUTO_OFF,    // 0 — OFF
+        TFT_AUTO_READ,   // 1 — READ
+        TFT_AUTO_WRITE,  // 2 — WRITE
+        TFT_AUTO_OFF,    // 3 — TRIM
+        TFT_AUTO_TOUCH,  // 4 — TOUCH
+        TFT_AUTO_LATCH,  // 5 — LATCH
+    };
+    uint8_t idx = (uint8_t)mode;
+    if (idx >= 6) idx = 0;
+    return AUTO_COLORS[idx];
+}
+
 // ════════════════════════════════════════════════════════════
 //  drawVPotDisplay
 // ════════════════════════════════════════════════════════════
 void drawVPotDisplay() {
     vPotSprite.fillSprite(TFT_MCU_DARKGRAY);
-    int level = Encoder::currentVPotLevel;
 
-    const int totalSegments = 7;
-    const int centerWidth   = 30;
-    const int gapVPot       = 2;
-    const int cornerRadius  = 5;
+    const uint8_t raw    = currentVPotRaw;
+    const uint8_t pos    = raw & 0x0F;         // 0=off, 1-11
+    const uint8_t mode   = (raw >> 4) & 0x03;  // 0=dot 1=boost/cut 2=bar 3=spread
+    const bool    center = (raw >> 6) & 0x01;
+    const uint16_t litColor = autoModeColor(currentAutoMode);
 
-    int segW   = (vPotSprite.width() - centerWidth - (2 * totalSegments * gapVPot)) / (2 * totalSegments);
-    int totalW = (2 * totalSegments * segW) + (2 * totalSegments * gapVPot) + centerWidth;
-    int startX = (vPotSprite.width() - totalW) / 2;
-    int seg_y  = 3;
-    int seg_h  = vPotSprite.height() - 6;
+    const int N      = 5;   // segmentos por lado
+    const int gapV   = 3;
+    const int cornerR= 4;
+    const int seg_y  = 3;
+    const int seg_h  = vPotSprite.height() - 6;
 
-    for (int i = 0; i < totalSegments; i++) {
-        int x    = startX + i * (segW + gapVPot);
-        bool act = (level < 0 && i >= totalSegments + level);
-        vPotSprite.fillRoundRect(x, seg_y, segW, seg_h, cornerRadius, act ? TFT_MCU_BLUE : TFT_MCU_GRAY);
+    // Distribuir ancho: N segs izq + centro + N segs der
+    const int totalW = vPotSprite.width() - 4;
+    const int segW   = (totalW - (2*N + 1) * gapV) / (2*N + 1);
+    const int ctrW   = segW;  // centro = mismo ancho
+    const int startX = (vPotSprite.width() - (segW * (2*N+1) + gapV * (2*N))) / 2;
+
+    // pos 1-5 = izquierda (índice 4..0), pos 6 = centro, pos 7-11 = derecha (índice 0..4)
+    for (int i = 0; i < N; i++) {
+        int seg = N - 1 - i;  // seg 4=más lejano, 0=más cercano al centro
+        int posL = i + 1;;   // posición Mackie correspondiente (1-5)
+        bool lit = false;
+        if (pos > 0) {
+            switch (mode) {
+                case 0: lit = (pos == posL);              break; // dot
+                case 1: lit = (pos <= 5 && posL >= pos); break; // boost/cut izq
+                case 2: lit = false;                      break; // bar: solo derecha
+                case 3: lit = (pos >= 6 && (6 - posL) <= (int)pos - 6) ||
+                              (pos <= 5 && posL >= pos);  break; // spread
+            }
+        }
+        int x = startX + i * (segW + gapV);
+        vPotSprite.fillRoundRect(x, seg_y, segW, seg_h, cornerR, lit ? litColor : TFT_MCU_GRAY);
     }
-    int cx = startX + totalSegments * (segW + gapVPot);
-    vPotSprite.fillRoundRect(cx, seg_y, centerWidth, seg_h, cornerRadius, TFT_MCU_BLUE);
-    for (int i = 0; i < totalSegments; i++) {
-        int x    = cx + centerWidth + gapVPot + i * (segW + gapVPot);
-        bool act = (level > 0 && i < level);
-        vPotSprite.fillRoundRect(x, seg_y, segW, seg_h, cornerRadius, act ? TFT_MCU_BLUE : TFT_MCU_GRAY);
+
+    // Centro (pos 6)
+    int cx = startX + N * (segW + gapV);
+    bool ctrLit = (pos > 0) && (center || pos == 6 ||
+                  mode == 2 || (mode == 1 && pos == 6));
+    vPotSprite.fillRoundRect(cx, seg_y, ctrW, seg_h, cornerR,
+                          ctrLit ? litColor : TFT_MCU_GRAY);
+
+    // Derecha (pos 7-11)
+    for (int i = 0; i < N; i++) {
+        int posR = i + 7;  // posición Mackie 7-11
+        bool lit = false;
+        if (pos > 0) {
+            switch (mode) {
+                case 0: lit = (pos == posR);         break; // dot
+                case 1: lit = (pos >= 7 && posR <= pos); break; // boost/cut der
+                case 2: lit = (posR <= pos);         break; // bar
+                case 3: lit = (pos >= 6 && posR <= pos) ||
+                              (pos <= 5 && posR <= (12 - pos)); break; // spread
+            }
+        }
+        int x = cx + ctrW + gapV + i * (segW + gapV);
+        vPotSprite.fillRoundRect(x, seg_y, segW, seg_h, cornerR, lit ? litColor : TFT_MCU_GRAY);
     }
 
-    
-    
     vPotSprite.pushSprite(0, MAINAREA_HEIGHT + HEADER_HEIGHT);
+}
+
+void setVPotRaw(uint8_t raw) {
+    if ((raw & 0x7F) != currentVPotRaw) {
+        currentVPotRaw  = raw & 0x7F;
+        needsVPotRedraw = true;
+    }
+}
+
+void setAutoMode(uint8_t mode) {
+    AutoMode m = (AutoMode)(mode & 0x07);
+    if (m != currentAutoMode) {
+        currentAutoMode   = m;
+        needsVPotRedraw   = true;
+        needsHeaderRedraw = true;
+    }
 }
 
 void setVPotLevel(int8_t level) {
