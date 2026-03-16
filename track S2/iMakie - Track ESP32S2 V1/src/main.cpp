@@ -17,6 +17,9 @@
 #include "protocol.h"
 #include "hardware/button/ButtonManager.h"
 #include "menu/SatMenu.h"
+#include <driver/dac_oneshot.h>
+
+
 
 // ─── Objetos globales ──────────────────────────────────────────
 LGFX        tft;
@@ -47,29 +50,45 @@ static SatMenu* satMenu = nullptr;
 // =============================================================
 void setup() {
     Serial.begin(115200);
-    delay(500);
-    // Motor pins — PRIMERO, antes de cualquier init
+    Serial.setDebugOutput(true);
+    delay(1500);
+    log_i("=== iMakie PTxx BOOT ===");
+
+    // Motor pins
     pinMode(MOTOR_IN1, OUTPUT);
     pinMode(MOTOR_IN2, OUTPUT);
     pinMode(MOTOR_EN,  OUTPUT);
     digitalWrite(MOTOR_IN1, LOW);
     digitalWrite(MOTOR_IN2, LOW);
     digitalWrite(MOTOR_EN,  LOW);
+    log_i("Motor pins init OK");
 
-    dacWrite(FADER_VCC_PIN, 77);
+    dac_oneshot_handle_t _dacHandle;
+    dac_oneshot_config_t _dacCfg = { .chan_id = DAC_CHAN_0 };  // GPIO17
+    dac_oneshot_new_channel(&_dacCfg, &_dacHandle);
+    dac_oneshot_output_voltage(_dacHandle, 77);  // ≈ 1.0V
     delay(30);
     faderADC.begin();
+    log_i("Fader ADC OK");
 
-    initDisplay();       // 1. LovyanGFX — reserva periféricos SPI/DMA
-    initNeopixels();     // 2. NeoPixelBus I2S — DESPUÉS del display
-    initHardware();      // 3. Botones, encoder, touch
+    initDisplay();
+    log_i("Display OK");
+
+    initNeopixels();
+    log_i("NeoPixels OK");
+
+    initHardware();
+    log_i("Hardware OK");
+
     FaderTouch::init();
     FaderTouch::onTouch([]()   { digitalWrite(LED_BUILTIN_PIN, HIGH); });
     FaderTouch::onRelease([]() { digitalWrite(LED_BUILTIN_PIN, LOW);  });
+    log_i("FaderTouch OK");
+
     setVPotLevel(VPOT_DEFAULT_LEVEL);
     Encoder::begin();
+    log_i("Encoder OK");
 
-    // SAT menu
     satMenu = new SatMenu(&tft);
     satMenu->onMotorOff  ([]() { Motor::stop();    _suspended = true;  });
     satMenu->onMotorOn   ([]() { Motor::begin();   _suspended = false; });
@@ -81,14 +100,23 @@ void setup() {
     satMenu->onConfigSaved([](const SatConfig& cfg) {
         rs485.begin(cfg.trackId);
     });
+    log_i("SatMenu OK");
 
     uint8_t slaveId = satMenu->getConfig().trackId;
+    log_i("Track ID: %d", slaveId);
     rs485.begin(slaveId);
-    if (slaveId == 0) satMenu->open();
+    if (slaveId == 0) {
+        log_w("Track ID=0 — forzando SAT menu");
+        satMenu->open();
+    }
 
     ButtonManager::begin(&tft, satMenu);
+    log_i("ButtonManager OK");
 
-    Motor::begin();      // ÚLTIMO — todo ya inicializado
+    Motor::begin();
+    log_i("Motor OK");
+
+    log_i("=== BOOT completo | heap libre: %d bytes ===", ESP.getFreeHeap());
 }
 
 // =============================================================
@@ -147,6 +175,7 @@ void loop() {
 
     // ── Hardware (botones + touch) ────────────────────────────
     updateButtons();
+    FaderTouch::update();    // ← faltaba
 
     // ── Display ───────────────────────────────────────────────
     updateDisplay();

@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <NeoPixelBus.h>
+#include "../Hardware.h"   // ButtonId
 #include "../../config.h"
 
 // ─────────────────────────────────────────────
@@ -36,3 +37,11 @@ void showNeopixels();
 // Brillo global 0-255 (escala los valores R/G/B en setNeopixelState)
 void setNeopixelGlobalBrightness(uint8_t brightness);
 uint8_t getNeopixelBrightness();
+// Flag para mantener el azul de espera de handshake
+extern bool neoWaitingHandshake;  // true = mantener azul, ignorar updateAllNeopixels
+
+void handleButtonLedState(ButtonId id);
+void updateAllNeopixels();
+void setNeopixelState(int index, uint8_t r, uint8_t g, uint8_t b);
+void showNeopixels();
+void setNeopixelGlobalBrightness(uint8_t brightness);

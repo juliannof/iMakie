@@ -29,6 +29,10 @@ void onMasterData(const MasterPacket& pkt) {
     if (newState != logicConnectionState) {
         logicConnectionState = newState;
         needsTOTALRedraw = true;
+        if (newState == ConnectionState::CONNECTED) {
+            neoWaitingHandshake = false;  // ← liberar azul de espera
+            updateAllNeopixels();          // ← render inmediato con estado real
+        }
     }
     if (logicConnectionState != ConnectionState::CONNECTED) return;
 

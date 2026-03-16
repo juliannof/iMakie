@@ -3,6 +3,7 @@
 #include "Display.h"
 #include "hardware/encoder/Encoder.h"
 #include "../hardware/Hardware.h"
+#include "../hardware/Neopixels/Neopixel.h"
 #include "../config.h"
 
 extern LGFX        tft;

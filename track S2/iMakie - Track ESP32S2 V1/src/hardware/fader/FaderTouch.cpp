@@ -1,6 +1,6 @@
-// src/hardware/touch/FaderTouch.cpp
+#include <Arduino.h>
 #include "FaderTouch.h"
-#include "../../config.h"
+#include "config.h"
 
 // ─── Constantes internas ──────────────────────────────────────
 static constexpr uint32_t POLL_MS        = 20;    // intervalo de lectura
@@ -24,14 +24,23 @@ static uint32_t _sample() {
     return touchRead(FADER_TOUCH_PIN);   // Arduino ESP32-S2 API
 }
 
+// promedio de 8 muestras para reducir ruido
+static uint32_t _sampleAvg() {
+    uint32_t sum = 0;
+    for (uint8_t i = 0; i < 8; i++) sum += touchRead(FADER_TOUCH_PIN);
+    return sum / 8;
+}
+
+
 static void _captureBaseline() {
+    delay(100);    // ← dejar estabilizar el periférico
     uint32_t sum = 0;
     for (uint8_t i = 0; i < BASELINE_SAMPS; i++) {
         sum += _sample();
         delay(3);
     }
     uint32_t avg = sum / BASELINE_SAMPS;
-    if (avg > 50) _base = avg;   // guarda solo si parece válido
+    if (avg > 50) _base = avg;
 }
 
 // ─── API pública ─────────────────────────────────────────────
@@ -47,27 +56,34 @@ bool update() {
     if (now - _lastPoll < POLL_MS) return false;
     _lastPoll = now;
 
-    // Reintento lazy si el baseline no se capturó en init
     if (_base == 0) {
         uint32_t v = _sample();
         if (v > 50) _base = v;
         return false;
     }
 
-    _raw = _sample();
-    Serial.printf("T raw=%lu  base=%lu\n", _raw, _base);  // ← debug
+    _raw = _sampleAvg();
+
+// congelar baseline si hay sospecha de toque
+bool suspect = (_raw > _base * 1.02f);   // 2% ya es sospechoso
+if (!suspect && !_touched) {
+    _base = (_base * 63 + _raw) / 64;    // IIR muy lento
+}
+
+log_i("T raw=%lu  base=%lu  suspect=%d", _raw, _base, suspect);
 
     bool prev = _touched;
-    if (!_touched && _raw < _base * THR_TOUCH)   _touched = true;
-    if ( _touched && _raw > _base * THR_RELEASE) _touched = false;
+    if (!_touched && _raw > _base * THR_TOUCH)   _touched = true;
+    if ( _touched && _raw < _base * THR_RELEASE) _touched = false;
 
     if (_touched != prev) {
         if (_touched  && _cbTouch)   _cbTouch();
         if (!_touched && _cbRelease) _cbRelease();
-        return true;   // estado cambió
+        return true;
     }
     return false;
 }
+
 
 bool     isTouched()  { return _touched; }
 uint32_t getRaw()     { return _raw;     }

@@ -32,7 +32,7 @@ enum class ConnectionState {
 
 #define RS485_RX_PIN             9
 #define RS485_TX_PIN             8
-#define RS485_ENABLE_PIN        35
+#define RS485_ENABLE_PIN        35   // GPIO35 — libre en S2FN4R2 (PSRAM QSPI interna, no usa GPIO matrix)
 #define RS485_BAUD          500000
 
 #define RS485_START_BYTE      0xAA
@@ -40,9 +40,13 @@ enum class ConnectionState {
 
 // Fader
 #define FADER_POT_PIN           10   // ADC1_CH9 — sin cambio
-#define FADER_VCC_PIN           17   // DAC_1: salida ~1.1V al VCC del pot
+#define FADER_VCC_PIN    17   // DAC_CHANNEL_1 — GPIO17, salida ~1.0V (77/255×3.3V)
+                              // API: dac_output_enable / dac_output_voltage — NO dacWrite()
+
 // --- SENSOR TÁCTIL DEL FADER ---
 #define FADER_TOUCH_PIN     T1 // Pin táctil para el fader (GPIO1 en ESP32-S2)
+// Porcentaje del valor base táctil para el umbral de detección (80% significa que detecta si el valor cae por debajo del 80% del valor base).
+#define FADER_TOUCH_THRESHOLD_PERCENTAGE 103
 
 #define MOTOR_IN1    18
 #define MOTOR_IN2    16
@@ -122,13 +126,12 @@ static uint16_t _posicionMaximaADC       = 0;
 #define BUTTON_PIN_SELECT   40
 #define BUTTON_USE_INTERNAL_PULLUP true // Usar pull-up internos para los botones
 
-// Porcentaje del valor base táctil para el umbral de detección (80% significa que detecta si el valor cae por debajo del 80% del valor base).
-#define FADER_TOUCH_THRESHOLD_PERCENTAGE 80
+
 
 // --- NEOPixel ---
 #define NEOPIXEL_PIN        36  // Pin GPIO donde están conectados los Neopixels
 #define NEOPIXEL_COUNT      4   // Número total de Neopixels
-#define NEOPIXEL_DEFAULT_BRIGHTNESS 25 // Brillo inicial por defecto (0-255)
+#define NEOPIXEL_DEFAULT_BRIGHTNESS 20 // Brillo inicial por defecto (0-255)
 #define NEOPIXEL_DIM_BRIGHTNESS 5   // brillo atenuado cuando estado = OFF (0-255)
 
 
