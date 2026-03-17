@@ -6,13 +6,13 @@
 #include <Arduino.h>
 #include <LovyanGFX.hpp>
 #include <Preferences.h>
-#include "hardware/Neopixels/Neopixel.h"
-#include "../config.h"   // Única fuente de verdad para pines
+#include <NeoPixelBus.h>
+#include "../config.h"
 
 // ─── Colores RGB565 ───────────────────────────────────────────
 #define C_BG      0xFFFF
 #define C_TEXT    0x0000
-#define C_ACCENT  0xE94A   // #e94560
+#define C_ACCENT  0xE94A
 #define C_GRAY    0xC618
 #define C_DARK    0x4208
 #define C_BLACK   0x0000
@@ -42,26 +42,27 @@ struct SatConfig {
     uint8_t touchThreshold;
 };
 
-using CbVoid    = std::function<void()>;
-using CbMotor   = std::function<void(int pwm)>;  // >0 arriba, <0 abajo, 0 stop
-using CbConfig  = std::function<void(const SatConfig&)>;
+using CbVoid   = std::function<void()>;
+using CbMotor  = std::function<void(int pwm)>;
+using CbConfig = std::function<void(const SatConfig&)>;
 
 // ─────────────────────────────────────────────────────────────
 class SatMenu {
 public:
     explicit SatMenu(LovyanGFX* tft);
 
-    void onMotorOff   (CbVoid   cb) { _cbMotorOff  = cb; }
-    void onMotorOn    (CbVoid   cb) { _cbMotorOn   = cb; }
-    void onMotorDrive (CbMotor  cb) { _cbMotorDrv  = cb; }
-    void onRS485Off   (CbVoid   cb) { _cbRS485Off  = cb; }
-    void onRS485On    (CbVoid   cb) { _cbRS485On   = cb; }
-    void onReboot     (CbVoid   cb) { _cbReboot    = cb; }
-    void onWiFiLaunch (CbVoid   cb) { _cbWiFi      = cb; }
-    void onConfigSaved(CbConfig cb) { _cbSaved     = cb; }
-    void onBrightness (std::function<void(uint8_t)> cb, uint8_t currentBrightness = 255) {
+    void onMotorOff   (CbVoid   cb) { _cbMotorOff   = cb; }
+    void onMotorOn    (CbVoid   cb) { _cbMotorOn    = cb; }
+    void onMotorDrive (CbMotor  cb) { _cbMotorDrv   = cb; }
+    void onRS485Off   (CbVoid   cb) { _cbRS485Off   = cb; }
+    void onRS485On    (CbVoid   cb) { _cbRS485On    = cb; }
+    void onReboot     (CbVoid   cb) { _cbReboot     = cb; }
+    void onWiFiConfig (CbVoid   cb) { _cbWiFiConfig = cb; }
+    void onWiFiOta    (CbVoid   cb) { _cbWiFiOta    = cb; }
+    void onConfigSaved(CbConfig cb) { _cbSaved      = cb; }
+    void onBrightness(std::function<void(uint8_t)> cb, uint8_t cur = 255) {
         _cbBrightness    = cb;
-        _savedBrightness = currentBrightness;
+        _savedBrightness = cur;
     }
 
     void update();
@@ -73,7 +74,8 @@ public:
 private:
     enum class Scr {
         MAIN, IDENTIDAD, MOTOR, TOUCH, DIAG,
-        CONFIG_WIFI, REINICIAR,
+        CONFIG_WIFI, WIFI,
+        REINICIAR,
         EDIT_TRACKID, EDIT_LABEL,
         EDIT_PWMMIN, EDIT_PWMMAX, EDIT_TOUCHTHR,
         CONFIRM, TOAST,
@@ -82,7 +84,6 @@ private:
 
     struct Item { const char* badge; const char* label; Scr target; };
 
-    // ── Core state ───────────────────────────────────────────
     LovyanGFX* _tft;
     bool       _open  = false;
     Scr        _scr   = Scr::MAIN;
@@ -92,60 +93,54 @@ private:
     bool       _dirty = true;
     SatConfig  _cfg, _tmp;
 
-    // ── Editor numérico ───────────────────────────────────────
     int         _eVal=0, _eMin=0, _eMax=255;
     const char* _eTitle="";
+    int         _lblIdx = 0;
 
-    // ── Editor label ──────────────────────────────────────────
-    int  _lblIdx = 0;
+    unsigned long _toastT   = 0;
+    const char*   _toastMsg = "";
+    Scr           _toastRet = Scr::MAIN;
+    const char*   _confMsg  = "";
+    Scr           _confYes  = Scr::MAIN;
 
-    // ── Toast / Confirm ───────────────────────────────────────
-    unsigned long _toastT  = 0;
-    const char*   _toastMsg= "";
-    Scr           _toastRet= Scr::MAIN;
-    const char*   _confMsg = "";
-    Scr           _confYes = Scr::MAIN;
-
-    // ── Debounce ──────────────────────────────────────────────
     unsigned long _debT = 0;
 
-    // ── NVS ───────────────────────────────────────────────────
     Preferences _prefs;
 
-    // ── Callbacks ─────────────────────────────────────────────
-    CbVoid   _cbMotorOff, _cbMotorOn, _cbRS485Off, _cbRS485On, _cbReboot, _cbWiFi;
+    CbVoid   _cbMotorOff, _cbMotorOn, _cbRS485Off, _cbRS485On, _cbReboot;
+    CbVoid   _cbWiFiConfig, _cbWiFiOta;
     CbMotor  _cbMotorDrv;
     CbConfig _cbSaved;
     std::function<void(uint8_t)> _cbBrightness;
     uint8_t  _savedBrightness = 255;
 
-    // ── NeoPixel (referencia al objeto global) ────────────────
-    NeoStrip* _neo = nullptr;
+    // NeoPixelBus — I2S backend, sin conflicto con LovyanGFX/RMT
+    NeoPixelBus<NeoGrbFeature, NeoEsp32I2s0800KbpsMethod> _neo;
 
-    // ── Test Display ──────────────────────────────────────────
+    // Test Display
     int           _dPat   = 0;
     bool          _dAuto  = false;
     unsigned long _dAutoT = 0;
 
-    // ── Test Encoder ──────────────────────────────────────────
-    long          _encCnt    = 0;
-    int           _encLastA  = HIGH;
-    int           _encLastB  = HIGH;
-    bool          _encSW     = false;
-    bool          _encSWlast = false;
-    unsigned long _encDebT   = 0;
+    // Test Encoder
+    long          _encCnt     = 0;
+    int           _encLastA   = HIGH;
+    int           _encLastB   = HIGH;
+    bool          _encSW      = false;
+    bool          _encSWlast  = false;
+    unsigned long _encDebT    = 0;
     static const int ENC_HIST = 20;
     int8_t        _encHist[ENC_HIST] = {};
     int           _encHistIdx = 0;
 
-    // ── Test NeoPixel ─────────────────────────────────────────
-    int           _neoSel     = 0;
+    // Test NeoPixel
+    int           _neoSel      = 0;
     int           _neoColorIdx = 0;
-    unsigned long _neoAnimT   = 0;
+    unsigned long _neoAnimT    = 0;
     int           _neoAnimStep = 0;
-    bool          _neoAnim    = false;
+    bool          _neoAnim     = false;
 
-    // ── Test Fader ────────────────────────────────────────────
+    // Test Fader
     int           _fadRaw    = 0;
     float         _fadPct    = 0.0f;
     int           _tchRaw    = 0;
@@ -158,9 +153,8 @@ private:
     static const int FAD_HIST = 80;
     uint8_t       _fadHist[FAD_HIST] = {};
     int           _fadHistIdx = 0;
-    unsigned long _fadHistT  = 0;
+    unsigned long _fadHistT   = 0;
 
-    // ── Helpers render ────────────────────────────────────────
     enum class Btn { NONE, UP, DOWN, BACK, ENTER };
     Btn  _readBtn();
 
@@ -182,6 +176,7 @@ private:
     void _hMotor(Btn b);
     void _hTouch(Btn b);
     void _hDiag(Btn b);
+    void _hWifi(Btn b);
     void _hEditVal(Btn b);
     void _hEditLbl(Btn b);
     void _hConfirm(Btn b);
@@ -195,11 +190,16 @@ private:
     void _motorStop();
     void _motorDrive(int pwm);
 
+    // NeoPixel helpers (encapsulan API NeoPixelBus)
+    void _neoClear();
+    void _neoShow();
+    void _neoSet(uint8_t idx, uint8_t r, uint8_t g, uint8_t b);
+
     void _load();
     void _save();
 
-    void _goto(Scr s)  { _prev=_scr; _scr=s; _dirty=true; _cur=0; _scrl=0; }
-    void _back()       { _goto(_prev); }
+    void _goto(Scr s) { _prev=_scr; _scr=s; _dirty=true; _cur=0; _scrl=0; }
+    void _back()      { _goto(_prev); }
     void _toast(const char* msg, Scr ret);
     void _confirm(const char* msg, Scr yes);
 
@@ -208,5 +208,6 @@ private:
     static const Item _motorItems[];
     static const Item _touchItems[];
     static const Item _diagItems[];
-    static const int  _mainN, _identN, _motorN, _touchN, _diagN;
+    static const Item _wifiItems[];
+    static const int  _mainN, _identN, _motorN, _touchN, _diagN, _wifiN;
 };

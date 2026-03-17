@@ -4,7 +4,7 @@
 #include "RS485.h"          // ← mismo nivel, no "../"
 #include "../protocol.h"
 #include "hardware/fader/FaderADC.h" 
-#include "../menu/SatMenu.h"
+#include "../SAT/SatMenu.h"
 
 namespace RS485Handler {
 

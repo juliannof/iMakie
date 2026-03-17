@@ -6,6 +6,7 @@
 #include "config.h"
 #include "display/Display.h"
 #include "display/LovyanGFX_config.h"
+#include "OTA/OtaManager.h"
 #include "hardware/fader/FaderADC.h"
 #include "hardware/fader/FaderTouch.h"
 #include "hardware/encoder/Encoder.h"
@@ -16,7 +17,7 @@
 #include "RS485/RS485Handler.h"       // ← onMasterData vive aquí
 #include "protocol.h"
 #include "hardware/button/ButtonManager.h"
-#include "menu/SatMenu.h"
+#include "../SAT/SatMenu.h"
 #include <driver/dac_oneshot.h>
 
 
@@ -52,9 +53,12 @@ void setup() {
     Serial.begin(115200);
     Serial.setDebugOutput(true);
     delay(1500);
+
+    otaManager.begin();                          // ← AÑADIR
+    log_i("OtaManager OK");
+
     log_i("=== iMakie PTxx BOOT ===");
 
-    // Motor pins
     pinMode(MOTOR_IN1, OUTPUT);
     pinMode(MOTOR_IN2, OUTPUT);
     pinMode(MOTOR_EN,  OUTPUT);
@@ -64,9 +68,9 @@ void setup() {
     log_i("Motor pins init OK");
 
     dac_oneshot_handle_t _dacHandle;
-    dac_oneshot_config_t _dacCfg = { .chan_id = DAC_CHAN_0 };  // GPIO17
+    dac_oneshot_config_t _dacCfg = { .chan_id = DAC_CHAN_0 };
     dac_oneshot_new_channel(&_dacCfg, &_dacHandle);
-    dac_oneshot_output_voltage(_dacHandle, 77);  // ≈ 1.0V
+    dac_oneshot_output_voltage(_dacHandle, 77);
     delay(30);
     faderADC.begin();
     log_i("Fader ADC OK");
@@ -100,6 +104,8 @@ void setup() {
     satMenu->onConfigSaved([](const SatConfig& cfg) {
         rs485.begin(cfg.trackId);
     });
+    satMenu->onWiFiConfig([]() { otaManager.launchPortal();    });  // ← AÑADIR
+    satMenu->onWiFiOta   ([]() { otaManager.enableForUpload(); }); // ← AÑADIR
     log_i("SatMenu OK");
 
     uint8_t slaveId = satMenu->getConfig().trackId;
@@ -123,6 +129,8 @@ void setup() {
 //  loop
 // =============================================================
 void loop() {
+    otaManager.tick();
+
     // SAT abierto: solo menú
     if (satMenu && satMenu->isOpen()) {
         satMenu->update();

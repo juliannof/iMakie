@@ -18,20 +18,18 @@
 class SatMenu;
 
 namespace ButtonManager {
-
+ 
     // setup(): registra callback en Hardware + configura long-press
     void begin(LovyanGFX* tft, SatMenu* sat);
-
+ 
     // loop(): actualiza barra de progreso mientras REC está mantenido
     void update();
-
+ 
     // Actualizar referencia al SAT si se crea después del begin
     void setSatMenu(SatMenu* sat);
-
+ 
     // Byte de flags RS485 (se actualiza en cada evento de botón)
     uint8_t getButtonFlags();
     void    clearButtonFlags();
-    uint8_t getEncoderButton();
-    void    clearEncoderButton();
-
+ 
 } // namespace ButtonManager
