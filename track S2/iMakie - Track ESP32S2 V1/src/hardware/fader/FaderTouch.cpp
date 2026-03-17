@@ -24,11 +24,10 @@ static uint32_t _sample() {
     return touchRead(FADER_TOUCH_PIN);   // Arduino ESP32-S2 API
 }
 
-// promedio de 8 muestras para reducir ruido
 static uint32_t _sampleAvg() {
     uint32_t sum = 0;
-    for (uint8_t i = 0; i < 8; i++) sum += touchRead(FADER_TOUCH_PIN);
-    return sum / 8;
+    for (uint8_t i = 0; i < 16; i++) sum += touchRead(FADER_TOUCH_PIN);
+    return sum / 16;
 }
 
 
@@ -64,13 +63,16 @@ bool update() {
 
     _raw = _sampleAvg();
 
-// congelar baseline si hay sospecha de toque
-bool suspect = (_raw > _base * 1.02f);   // 2% ya es sospechoso
-if (!suspect && !_touched) {
-    _base = (_base * 63 + _raw) / 64;    // IIR muy lento
-}
 
-log_i("T raw=%lu  base=%lu  suspect=%d", _raw, _base, suspect);
+    // baseline solo sigue valores altos (reposo real)
+    // los valores bajos son ruido o toque — ignorar para el IIR
+    if (!_touched && _raw > _base * 0.98f) {
+        _base = (_base * 63 + _raw) / 64;
+    }
+
+    bool suspect = (_raw > _base * 1.02f);
+
+    log_i("T raw=%lu  base=%lu  suspect=%d", _raw, _base, suspect);
 
     bool prev = _touched;
     if (!_touched && _raw > _base * THR_TOUCH)   _touched = true;
