@@ -1,0 +1,42 @@
+#!/bin/bash
+# ============================================================
+#  ota_upload.sh — iMakie PTxx Track S2
+#  Uso: ./ota_upload.sh [ip] [password]
+#  Defaults: ip=192.168.1.15  password=9821
+# ============================================================
+
+IP="${1:-192.168.1.15}"
+PASSWORD="${2:-9821}"
+ESPOTA="$HOME/.platformio/packages/framework-arduinoespressif32/tools/espota.py"
+
+# Buscar el firmware más reciente
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+FIRMWARE="$SCRIPT_DIR/.pio/build/lolin_s2_mini_ota/firmware.bin"
+
+if [ ! -f "$FIRMWARE" ]; then
+    echo "[OTA] Error: firmware no encontrado en $FIRMWARE"
+    echo "[OTA] Compila primero con PlatformIO (Build, no Upload)"
+    exit 1
+fi
+
+echo "[OTA] IP       : $IP"
+echo "[OTA] Firmware : $FIRMWARE"
+echo "[OTA] Tamaño   : $(du -h "$FIRMWARE" | cut -f1)"
+echo ""
+echo "[OTA] Activar OTA desde SAT → Config WiFi → Activar OTA"
+echo "[OTA] Esperando 3 segundos..."
+sleep 3
+
+python3 "$ESPOTA" \
+    -i "$IP" \
+    -p 3232 \
+    --auth="$PASSWORD" \
+    -f "$FIRMWARE" \
+    -d
+
+if [ $? -eq 0 ]; then
+    echo "[OTA] Subida completada OK"
+else
+    echo "[OTA] Error en la subida"
+    exit 1
+fi

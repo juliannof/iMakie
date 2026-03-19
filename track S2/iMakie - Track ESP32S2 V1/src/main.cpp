@@ -53,7 +53,10 @@ static void _satReboot()    { ESP.restart(); }
 static void _satMotorDrive(int pwm)   { Motor::driveRaw(pwm); }
 static void _satConfigSaved(const SatConfig& cfg) { rs485.begin(cfg.trackId); }
 static void _satWiFiConfig() { otaManager.launchPortal();    }
-static void _satWiFiOta()    { otaManager.enableForUpload(); }
+static void _satWiFiOta() {
+    otaManager.enableForUpload();
+    satMenu->close();   // ← cerrar SAT para que el loop quede libre
+}
 static void _satLedsOff() {
     neopixels.ClearTo(RgbColor(0));
     neopixels.Show();
@@ -182,6 +185,14 @@ void setup() {
 // =============================================================
 void loop() {
     otaManager.tick();
+
+    // OTA activo: prioridad máxima, no procesar nada más
+    if (otaManager.isOtaActive()) return;
+
+    if (satMenu && satMenu->isOpen()) {
+        satMenu->update();
+        return;
+    }
 
     if (satMenu && satMenu->isOpen()) {
         satMenu->update();

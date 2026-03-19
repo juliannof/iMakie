@@ -31,6 +31,7 @@ void OtaManager::begin() {
 // ─────────────────────────────────────────────────────────────
 void OtaManager::tick() {
     if (_otaActive) {
+        log_i("OTA tick");   // ← temporal
         ArduinoOTA.handle();
     }
 }
@@ -108,12 +109,14 @@ void OtaManager::enableForUpload() {
     // ── ArduinoOTA ───────────────────────────────────────────
     ArduinoOTA.setPort(OTA_PORT);
     ArduinoOTA.setHostname(PORTAL_SSID);
+    ArduinoOTA.setRebootOnSuccess(true);   // ← añadir
 
     if (strlen(otaPass) > 0) {
         ArduinoOTA.setPassword(otaPass);
     }
 
     ArduinoOTA.onStart([this]() {
+        Serial.end();
         _status("OTA: iniciando...");
     });
 
