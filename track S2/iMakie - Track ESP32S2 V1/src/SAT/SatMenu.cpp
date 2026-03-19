@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────
 const SatMenu::Item SatMenu::_mainItems[] = {
     {"ID","Identidad",   Scr::IDENTIDAD   },
+    {"OT","Activar OTA", Scr::OTA         },
     {"MT","Motor",       Scr::MOTOR       },
     {"TC","Touch",       Scr::TOUCH       },
     {"DG","Diagnostico", Scr::DIAG        },
@@ -37,7 +38,7 @@ const SatMenu::Item SatMenu::_wifiItems[] = {
     {"CF","Configurar red", Scr::WIFI},
     {"OT","Activar OTA",    Scr::WIFI},
 };
-const int SatMenu::_mainN  = 6;
+const int SatMenu::_mainN  = 7;
 const int SatMenu::_identN = 2;
 const int SatMenu::_motorN = 2;
 const int SatMenu::_touchN = 2;
@@ -569,6 +570,10 @@ void SatMenu::_hMain(Btn b) {
     if (b == Btn::ENTER) {
         switch (_mainItems[_cur].target) {
             case Scr::IDENTIDAD:   _goto(Scr::IDENTIDAD); break;
+            case Scr::OTA:
+                if (_cbWiFiOta) _cbWiFiOta();
+                _toast("Activando OTA...", Scr::MAIN);
+            break;
             case Scr::MOTOR:       _goto(Scr::MOTOR);     break;
             case Scr::TOUCH:       _goto(Scr::TOUCH);     break;
             case Scr::DIAG:        _goto(Scr::DIAG);      break;

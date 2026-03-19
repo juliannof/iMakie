@@ -74,7 +74,7 @@ public:
 private:
     enum class Scr {
         MAIN, IDENTIDAD, MOTOR, TOUCH, DIAG,
-        CONFIG_WIFI, WIFI, REINICIAR,
+        CONFIG_WIFI, WIFI, OTA, REINICIAR,
         EDIT_TRACKID, EDIT_LABEL,
         EDIT_PWMMIN, EDIT_PWMMAX, EDIT_TOUCHTHR,
         CONFIRM, TOAST,
