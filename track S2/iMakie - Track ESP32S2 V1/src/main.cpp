@@ -1,6 +1,5 @@
 // ============================================================
 //  main.cpp  —  iMakie PTxx Track S2
-//  Solo orquesta. Cero lógica de negocio aquí.
 // ============================================================
 #include <Arduino.h>
 #include "config.h"
@@ -14,20 +13,19 @@
 #include "hardware/Neopixels/Neopixel.h"
 #include "hardware/Motor/Motor.h"
 #include "RS485/RS485.h"
-#include "RS485/RS485Handler.h"       // ← onMasterData vive aquí
+#include "RS485/RS485Handler.h"
 #include "protocol.h"
 #include "hardware/button/ButtonManager.h"
-#include "../SAT/SatMenu.h"
+#include "SAT/SatMenu.h"
+#include "display/SpriteUtils.h"   // en main.cpp
 #include <driver/dac_oneshot.h>
 
-
-
-// ─── Objetos globales ──────────────────────────────────────────
+// ─── Objetos globales ─────────────────────────────────────────
 LGFX        tft;
 LGFX_Sprite header(&tft), mainArea(&tft), vuSprite(&tft), vPotSprite(&tft);
 FaderADC    faderADC;
 
-// ─── Estado de canal (externs consumidos por Display / Hardware) ──
+// ─── Estado de canal ──────────────────────────────────────────
 String trackName        = "Track  ";
 bool  recStates    = false;
 bool  soloStates   = false;
@@ -40,11 +38,65 @@ float vuLevels        = 0.0f;
 unsigned long vuLastUpdateTime     = 0;
 unsigned long vuPeakLastUpdateTime = 0;
 
-// ─── Estado de conexión ───────────────────────────────────────
-static bool _suspended = false;
+static bool    _suspended = false;
+static SatMenu* satMenu   = nullptr;
 
-// ─── SAT menu ─────────────────────────────────────────────────
-static SatMenu* satMenu = nullptr;
+// ─────────────────────────────────────────────────────────────
+//  Callbacks SAT — funciones estáticas nombradas
+//  (evitan el ICE del compilador xtensa con demasiadas lambdas)
+// ─────────────────────────────────────────────────────────────
+static void _satMotorOff()  { Motor::stop();   _suspended = true;  }
+static void _satMotorOn()   { Motor::begin();  _suspended = false; }
+static void _satRS485Off()  { _suspended = true;  }
+static void _satRS485On()   { _suspended = false; needsTOTALRedraw = true; }
+static void _satReboot()    { ESP.restart(); }
+static void _satMotorDrive(int pwm)   { Motor::driveRaw(pwm); }
+static void _satConfigSaved(const SatConfig& cfg) { rs485.begin(cfg.trackId); }
+static void _satWiFiConfig() { otaManager.launchPortal();    }
+static void _satWiFiOta()    { otaManager.enableForUpload(); }
+static void _satLedsOff() {
+    neopixels.ClearTo(RgbColor(0));
+    neopixels.Show();
+}
+static void _satSuspendSprites() {
+    header.deleteSprite();
+    mainArea.deleteSprite();
+    vuSprite.deleteSprite();
+    vPotSprite.deleteSprite();
+    log_i("Sprites suspendidos | PSRAM libre: %d", ESP.getFreePsram());
+}
+
+static void _satRestoreSprites() {
+    mainArea.setColorDepth(16);
+    mainArea.setPsram(true);          // ← añadir
+    mainArea.createSprite(MAINAREA_WIDTH, MAINAREA_HEIGHT);
+
+    header.setColorDepth(16);
+    header.setPsram(true);            // ← añadir
+    header.createSprite(TFT_WIDTH, HEADER_HEIGHT);
+
+    vuSprite.setColorDepth(16);
+    vuSprite.setPsram(true);          // ← añadir
+    vuSprite.createSprite(TFT_WIDTH - MAINAREA_WIDTH, MAINAREA_HEIGHT);
+
+    vPotSprite.setColorDepth(16);
+    vPotSprite.setPsram(true);        // ← añadir
+    vPotSprite.createSprite(TFT_WIDTH, VPOT_HEIGHT);
+
+    _logSpriteAlloc("header",    header);
+    _logSpriteAlloc("mainArea",  mainArea);
+    _logSpriteAlloc("vuSprite",  vuSprite);
+    _logSpriteAlloc("vPotSprite",vPotSprite);
+    needsTOTALRedraw = true;
+}
+
+static void _otaStatus(const char* msg) {
+    if (satMenu && satMenu->isOpen())
+        satMenu->showStatus(msg);
+}
+ 
+
+
 
 // =============================================================
 //  setup
@@ -54,9 +106,9 @@ void setup() {
     Serial.setDebugOutput(true);
     delay(1500);
 
-    otaManager.begin();                          // ← AÑADIR
+    otaManager.begin();
+    otaManager.onStatus(_otaStatus);   // ← aquí
     log_i("OtaManager OK");
-
     log_i("=== iMakie PTxx BOOT ===");
 
     pinMode(MOTOR_IN1, OUTPUT);
@@ -94,18 +146,18 @@ void setup() {
     log_i("Encoder OK");
 
     satMenu = new SatMenu(&tft);
-    satMenu->onMotorOff  ([]() { Motor::stop();    _suspended = true;  });
-    satMenu->onMotorOn   ([]() { Motor::begin();   _suspended = false; });
-    satMenu->onMotorDrive([](int pwm) { Motor::driveRaw(pwm); });
-    satMenu->onRS485Off  ([]() { _suspended = true;  });
-    satMenu->onRS485On   ([]() { _suspended = false; });
-    satMenu->onReboot    ([]() { ESP.restart(); });
-    satMenu->onBrightness([](uint8_t b) { setScreenBrightness(b); }, 255);
-    satMenu->onConfigSaved([](const SatConfig& cfg) {
-        rs485.begin(cfg.trackId);
-    });
-    satMenu->onWiFiConfig([]() { otaManager.launchPortal();    });  // ← AÑADIR
-    satMenu->onWiFiOta   ([]() { otaManager.enableForUpload(); }); // ← AÑADIR
+    satMenu->onMotorOff      (_satMotorOff);
+    satMenu->onMotorOn       (_satMotorOn);
+    satMenu->onMotorDrive    (_satMotorDrive);
+    satMenu->onRS485Off      (_satRS485Off);
+    satMenu->onRS485On       (_satRS485On);
+    satMenu->onReboot        (_satReboot);
+    satMenu->onConfigSaved   (_satConfigSaved);
+    satMenu->onWiFiConfig    (_satWiFiConfig);
+    satMenu->onWiFiOta       (_satWiFiOta);
+    satMenu->onLedsOff       (_satLedsOff);
+    satMenu->onSuspendSprites(_satSuspendSprites);
+    satMenu->onRestoreSprites(_satRestoreSprites);
     log_i("SatMenu OK");
 
     uint8_t slaveId = satMenu->getConfig().trackId;
@@ -131,24 +183,22 @@ void setup() {
 void loop() {
     otaManager.tick();
 
-    // SAT abierto: solo menú
     if (satMenu && satMenu->isOpen()) {
         satMenu->update();
         return;
     }
 
-    // Long-press REC → barra de progreso
     ButtonManager::update();
     if (satMenu && satMenu->isOpen()) return;
 
-    // ── RS485 ────────────────────────────────────────────────
+    // ── RS485 ─────────────────────────────────────────────────
     if (!_suspended) {
         rs485.update();
         static unsigned long lastRxTime = 0;
 
         if (rs485.hasNewData()) {
             lastRxTime = millis();
-            RS485Handler::onMasterData(rs485.getData());   // ← lógica en su módulo
+            RS485Handler::onMasterData(rs485.getData());
 
             SlavePacket resp = RS485Handler::buildResponse(faderADC, *satMenu);
             rs485.sendResponse(resp);
@@ -158,14 +208,14 @@ void loop() {
             Encoder::reset();
         }
 
-        RS485Handler::checkTimeout(lastRxTime);            // desconexión por silencio
+        RS485Handler::checkTimeout(lastRxTime);
     }
 
-    // ── Fader + Motor ─────────────────────────────────────────
+    // ── Fader + Motor ──────────────────────────────────────────
     faderADC.update();
     Motor::setADC(faderADC.getFaderPos());
 
-    if (FaderTouch::isTouched()) {   // ← sustituye isFaderTouched
+    if (FaderTouch::isTouched()) {
         Motor::stop();
     } else {
         Motor::update();
@@ -181,9 +231,9 @@ void loop() {
         }
     }
 
-    // ── Hardware (botones + touch) ────────────────────────────
+    // ── Hardware ──────────────────────────────────────────────
     updateButtons();
-    FaderTouch::update();    // ← faltaba
+    FaderTouch::update();
 
     // ── Display ───────────────────────────────────────────────
     updateDisplay();

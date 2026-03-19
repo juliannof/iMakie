@@ -3,6 +3,7 @@
 #include "RS485.h"
 #include "../display/Display.h"
 #include "../hardware/Hardware.h"
+#include "../hardware/Neopixels/Neopixel.h"   // ← neoWaitingHandshake, updateAllNeopixels, showNeopixels
 #include "../hardware/Motor/Motor.h"
 #include "../hardware/encoder/Encoder.h"
 #include "../hardware/fader/FaderTouch.h"
@@ -15,6 +16,9 @@ extern bool   recStates, soloStates, muteStates, selectStates;
 extern bool   vuClipState;
 extern float  vuPeakLevels, faderPositions, vuLevels;
 extern unsigned long vuLastUpdateTime, vuPeakLastUpdateTime;
+
+// ─── handleButtonLedState definida en Hardware.cpp ───────────
+extern void handleButtonLedState(ButtonId id);
 
 namespace RS485Handler {
 
@@ -30,8 +34,8 @@ void onMasterData(const MasterPacket& pkt) {
         logicConnectionState = newState;
         needsTOTALRedraw = true;
         if (newState == ConnectionState::CONNECTED) {
-            neoWaitingHandshake = false;  // ← liberar azul de espera
-            updateAllNeopixels();          // ← render inmediato con estado real
+            neoWaitingHandshake = false;
+            updateAllNeopixels();
         }
     }
     if (logicConnectionState != ConnectionState::CONNECTED) return;
@@ -57,10 +61,10 @@ void onMasterData(const MasterPacket& pkt) {
     if (selectStates != nq) {
         selectStates = nq;
         handleButtonLedState(ButtonId::SELECT);
-        handleButtonLedState(ButtonId::REC);     // ← redibujar con nuevo selectStates
+        handleButtonLedState(ButtonId::REC);
         handleButtonLedState(ButtonId::SOLO);
         handleButtonLedState(ButtonId::MUTE);
-        showNeopixels();          // ← forzar show inmediato
+        showNeopixels();
         needsHeaderRedraw = true;
     }
 
@@ -105,10 +109,10 @@ void onMasterData(const MasterPacket& pkt) {
 SlavePacket buildResponse(FaderADC& faderADC, SatMenu& satMenu) {
     SlavePacket resp = {};
     resp.faderPos      = Motor::getRawADC();
-    resp.touchState = FaderTouch::isTouched() ? 1 : 0;
+    resp.touchState    = FaderTouch::isTouched() ? 1 : 0;
     resp.buttons       = ButtonManager::getButtonFlags();
     resp.encoderDelta  = (int8_t)constrain(Encoder::getCount(), -127, 127);
-    resp.encoderButton = ButtonManager::getEncoderButton();
+    resp.encoderButton = ButtonManager::getEncoderButton();   // ← ver nota abajo
     return resp;
 }
 

@@ -4,6 +4,7 @@
 #include "hardware/encoder/Encoder.h"
 #include "../hardware/Hardware.h"
 #include "../hardware/Neopixels/Neopixel.h"
+#include "SpriteUtils.h"           // en Display.cpp                                                          
 #include "../config.h"
 
 extern LGFX        tft;
@@ -51,15 +52,19 @@ void initDisplay() {
     tft.fillScreen(TFT_BG_COLOR);
 
     mainArea.setColorDepth(16);
+    mainArea.setPsram(true);          // ← añadir
     mainArea.createSprite(MAINAREA_WIDTH, MAINAREA_HEIGHT);
 
     header.setColorDepth(16);
+    header.setPsram(true);            // ← añadir
     header.createSprite(TFT_WIDTH, HEADER_HEIGHT);
 
     vuSprite.setColorDepth(16);
+    vuSprite.setPsram(true);          // ← añadir
     vuSprite.createSprite(TFT_WIDTH - MAINAREA_WIDTH, MAINAREA_HEIGHT);
 
     vPotSprite.setColorDepth(16);
+    vPotSprite.setPsram(true);        // ← añadir
     vPotSprite.createSprite(TFT_WIDTH, VPOT_HEIGHT);
 
     Serial.printf("tft       : %d x %d\n", tft.width(), tft.height());
@@ -78,6 +83,11 @@ void initDisplay() {
     Serial.printf("Heap libre:  %u bytes\n", ESP.getFreeHeap());
     Serial.printf("PSRAM libre: %u bytes\n", ESP.getFreePsram());
     Serial.println("[SETUP] Display iniciado - LovyanGFX");
+
+    _logSpriteAlloc("header",    header);
+    _logSpriteAlloc("mainArea",  mainArea);
+    _logSpriteAlloc("vuSprite",  vuSprite);
+    _logSpriteAlloc("vPotSprite",vPotSprite);
 
     needsTOTALRedraw = true;
 }

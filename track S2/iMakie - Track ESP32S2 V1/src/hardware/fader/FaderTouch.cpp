@@ -72,7 +72,7 @@ bool update() {
 
     bool suspect = (_raw > _base * 1.02f);
 
-    log_i("T raw=%lu  base=%lu  suspect=%d", _raw, _base, suspect);
+    log_v("T raw=%lu  base=%lu  suspect=%d", _raw, _base, suspect);
 
     bool prev = _touched;
     if (!_touched && _raw > _base * THR_TOUCH)   _touched = true;

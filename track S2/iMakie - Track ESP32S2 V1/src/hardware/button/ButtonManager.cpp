@@ -4,48 +4,46 @@
 #include "ButtonManager.h"
 #include "SAT/SatMenu.h"
 #include "display/Display.h"
-#include "protocol.h"          // FLAG_REC, FLAG_SOLO, FLAG_MUTE, FLAG_SELECT
+#include "protocol.h"
 
-// ─── Variables de canal (definidas en main.cpp) ───────────────
 extern bool recStates, soloStates, muteStates, selectStates;
 extern bool needsMainAreaRedraw, needsHeaderRedraw;
 extern void handleButtonLedState(ButtonId id);
-
-// ─── Button2 instances (definidas en Hardware.cpp) ───────────
 extern Button2 buttonRec;
 
 namespace ButtonManager {
 
-// ─── Privado ──────────────────────────────────────────────────
-static LovyanGFX* _tft      = nullptr;
-static SatMenu*   _sat      = nullptr;
-static uint8_t    _flags    = 0;
+static LovyanGFX* _tft   = nullptr;
+static SatMenu*   _sat   = nullptr;
+static uint8_t    _flags = 0;
+static uint8_t    _encoderBtnCount = 0;
 
-static uint8_t _encoderBtnCount = 0;
+static bool          _holding   = false;
+static unsigned long _holdStart = 0;
+static int           _lastBarW  = -1;
+static bool          _fired     = false;
 
-// Long-press state
-static bool          _holding    = false;
-static unsigned long _holdStart  = 0;
-static int           _lastBarW   = -1;
-static bool          _fired      = false;
-
-static constexpr unsigned long HOLD_MS   = 1000;
-static constexpr int           BAR_H     = 6;
-static constexpr int           BAR_MAR   = 16;
-static constexpr int           LABEL_H   = 14;
-static constexpr uint16_t      COL_ACCENT = 0xE94A;
-static constexpr uint16_t      COL_TRACK  = 0x4208;
+static constexpr unsigned long HOLD_MS     = 1000;
+static constexpr unsigned long BAR_SHOW_MS = 300;    // esperar antes de mostrar barra
+static constexpr uint16_t      COL_ACCENT = 0xF800;   // rojo puro
+static constexpr uint16_t      COL_TRACK  = 0x2104;   // gris oscuro
 static constexpr uint16_t      COL_BG     = 0x0000;
 static constexpr uint16_t      COL_TEXT   = 0xFFFF;
 
-// ─── Dibujo barra de progreso ─────────────────────────────────
+// Barra centrada en pantalla — no interfiere con ningún sprite
+static constexpr int BAR_W  = 180;
+static constexpr int BAR_H  = 8;
+static constexpr int BAR_CX = 120;   // centro 240px
+static constexpr int BAR_CY = 140;   // centro 280px
+static constexpr int LABEL_Y = BAR_CY - 16;
+
+// ─────────────────────────────────────────────────────────────
 static void _drawBar(float pct) {
     if (!_tft) return;
-    int bx = BAR_MAR;
-    int bw = _tft->width() - BAR_MAR * 2;
-    int by = _tft->height() - BAR_H - 4;
-    int fill = (int)(bw * pct);
+    if (_sat && _sat->isOpen()) return;   // SAT gestiona su propia pantalla
 
+    int bx   = BAR_CX - BAR_W / 2;
+    int fill = (int)(BAR_W * pct);
     if (fill == _lastBarW) return;
     _lastBarW = fill;
 
@@ -53,25 +51,21 @@ static void _drawBar(float pct) {
         _tft->setTextColor(COL_TEXT, COL_BG);
         _tft->setTextSize(1);
         _tft->setTextDatum(textdatum_t::middle_center);
-        _tft->drawString("Mantener para menu SAT...",
-                         _tft->width() / 2, by - LABEL_H / 2 - 1);
+        _tft->drawString("Mantener para SAT...", BAR_CX, LABEL_Y);
     }
-
-    _tft->fillRect(bx, by, bw, BAR_H, COL_TRACK);
+    _tft->fillRect(bx, BAR_CY, BAR_W, BAR_H, COL_TRACK);
     if (fill > 0)
-        _tft->fillRect(bx, by, fill, BAR_H, COL_ACCENT);
+        _tft->fillRect(bx, BAR_CY, fill, BAR_H, COL_ACCENT);
 }
 
 static void _clearBar() {
     if (!_tft) return;
-    int by = _tft->height() - BAR_H - 4;
-    _tft->fillRect(0, by - LABEL_H - 2,
-                   _tft->width(), BAR_H + LABEL_H + 8, COL_BG);
+    _tft->fillRect(BAR_CX - BAR_W/2 - 2, LABEL_Y - 8,
+                   BAR_W + 4, BAR_H + 28, COL_BG);
     _lastBarW = -1;
 }
 
-// ─── Callbacks Button2 para REC ───────────────────────────────
-// Button2 llama a pressed cuando el pin baja
+// ─────────────────────────────────────────────────────────────
 static void _onRecPressed(Button2& btn) {
     (void)btn;
     if (_sat && _sat->isOpen()) return;
@@ -79,10 +73,9 @@ static void _onRecPressed(Button2& btn) {
     _fired     = false;
     _holdStart = millis();
     _lastBarW  = -1;
-    _drawBar(0.0f);
+    // No dibujar nada aún — update() esperará BAR_SHOW_MS
 }
 
-// Button2 llama a released cuando el pin sube
 static void _onRecReleased(Button2& btn) {
     (void)btn;
     if (!_holding) return;
@@ -95,54 +88,41 @@ static void _onRecReleased(Button2& btn) {
     if (_sat && _sat->isOpen()) return;
 
     if (held < HOLD_MS) {
-        _flags |= FLAG_REC;   // solo enviar — Logic confirma
+        _flags |= FLAG_REC;
     }
 }
 
-// ─── Callback genérico para los demás botones ─────────────────
 static void _onButtonEvent(ButtonId id) {
     if (_sat && _sat->isOpen()) return;
 
     switch (id) {
-        case ButtonId::SOLO:
-            _flags |= FLAG_SOLO;
-            break;
-        case ButtonId::MUTE:
-            _flags |= FLAG_MUTE;
-            break;
-        case ButtonId::SELECT:
-            _flags |= FLAG_SELECT;
-            break;
-        case ButtonId::ENCODER_SELECT:
-            _encoderBtnCount++;
-            Encoder::reset();
-            needsVPotRedraw = true;
-            break;
+        case ButtonId::SOLO:           _flags |= FLAG_SOLO; break;
+        case ButtonId::MUTE:           _flags |= FLAG_MUTE; break;
+        case ButtonId::SELECT:         _flags |= FLAG_SELECT; break;
+        case ButtonId::ENCODER_SELECT: _encoderBtnCount++; Encoder::reset(); needsVPotRedraw = true; break;
         default: break;
     }
 }
 
-// ─── API pública ──────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
 void begin(LovyanGFX* tft, SatMenu* sat) {
     _tft   = tft;
     _sat   = sat;
     _flags = 0;
-
-    // REC: gestión manual via pressed/released para long-press
     buttonRec.setPressedHandler (_onRecPressed);
     buttonRec.setReleasedHandler(_onRecReleased);
-
-    // El resto via callback genérico de Hardware
-    // (REC ya no llega aquí porque tiene sus propios handlers)
-    registerButtonEventCallback(_onButtonEvent);
+    registerButtonEventCallback (_onButtonEvent);
 }
 
 void update() {
-    // Progreso del long-press de REC mientras se mantiene
     if (!_holding || _fired) return;
     if (_sat && _sat->isOpen()) { _holding = false; _clearBar(); return; }
 
     unsigned long elapsed = millis() - _holdStart;
+
+    // No mostrar nada hasta BAR_SHOW_MS — short press no deja rastro
+    if (elapsed < BAR_SHOW_MS) return;
+
     float pct = constrain((float)elapsed / HOLD_MS, 0.0f, 1.0f);
     _drawBar(pct);
 
@@ -157,7 +137,7 @@ void update() {
 void setSatMenu(SatMenu* sat) { _sat = sat; }
 uint8_t getButtonFlags()      { return _flags; }
 void    clearButtonFlags()    { _flags = 0; }
-uint8_t getEncoderButton()  { return _encoderBtnCount; }
-void    clearEncoderButton(){ _encoderBtnCount = 0; }
+uint8_t getEncoderButton()    { return _encoderBtnCount; }
+void    clearEncoderButton()  { _encoderBtnCount = 0; }
 
 } // namespace ButtonManager
