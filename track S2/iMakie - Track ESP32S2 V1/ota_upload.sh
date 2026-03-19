@@ -24,8 +24,7 @@ echo "[OTA] Firmware : $FIRMWARE"
 echo "[OTA] Tamaño   : $(du -h "$FIRMWARE" | cut -f1)"
 echo ""
 echo "[OTA] Activar OTA desde SAT → Config WiFi → Activar OTA"
-echo "[OTA] Esperando 3 segundos..."
-sleep 3
+
 
 python3 "$ESPOTA" \
     -i "$IP" \
