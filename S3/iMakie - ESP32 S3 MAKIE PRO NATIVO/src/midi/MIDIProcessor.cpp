@@ -43,6 +43,8 @@ namespace {
     // Añadir junto a las otras variables estáticas del namespace
     static int8_t  g_selectedChannel    = -1;      // canal activo (0-7)
     static uint8_t g_channelAutoMode[8] = {};       // AutoMode por canal
+    static unsigned long connectedSinceTime  = 0;
+    static const unsigned long CONNECT_GRACE_MS = 1500;
 }
 
 // --- Prototipos privados ---
@@ -623,7 +625,6 @@ void processNote(byte status, byte note, byte velocity) {
 // processPitchBend — ← RS485: enviar faderTarget al slave
 // ****************************************************************************
 void processPitchBend(byte channel, int bendValue) {
-    // bendValue ya llega como 0-16383 desde el parser — NO sumar 8192
     log_e("PB ch%d raw:%d", channel, bendValue);
 
     if (channel > 9) return;
@@ -631,6 +632,9 @@ void processPitchBend(byte channel, int bendValue) {
     // --- Detección de desconexión: fader mínimo = 0 ---
     if (bendValue == 0) {
         if (logicConnectionState == ConnectionState::CONNECTED) {
+            // Grace period — ignorar faders a 0 justo tras conectar
+            if (millis() - connectedSinceTime < CONNECT_GRACE_MS) return;
+
             unsigned long now = millis();
             if (fadersAtMinMask == 0) firstFaderMinTime = now;
             fadersAtMinMask |= (1 << channel);
@@ -640,7 +644,6 @@ void processPitchBend(byte channel, int bendValue) {
                 unsigned long elapsed = now - firstFaderMinTime;
                 logicConnectionState = ConnectionState::DISCONNECTED;
                 g_logicConnected = 0;
-
                 needsTOTALRedraw = true;
                 fadersAtMinMask = 0;
                 firstFaderMinTime = 0;
@@ -659,15 +662,16 @@ void processPitchBend(byte channel, int bendValue) {
     // --- Transición HANDSHAKE_COMPLETE → CONNECTED ---
     if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) {
         logicConnectionState = ConnectionState::CONNECTED;
-        g_logicConnected = 1;  // ← NUEVO
-        needsTOTALRedraw = true;
-        fadersAtMinMask = 0;
+        g_logicConnected     = 1;
+        connectedSinceTime   = millis();
+        needsTOTALRedraw     = true;
+        fadersAtMinMask      = 0;
         log_d("DAW conectado: Primer PitchBend Track %d -> CONNECTED.", channel + 1);
     }
 
     // --- Actualizar posición fader ---
     if (channel < 9) {
-        uint16_t fader14bit = (uint16_t)bendValue;  // ya es 0-16383
+        uint16_t fader14bit = (uint16_t)bendValue;
 
         if (channel < 8) {
             rs485.setFaderTarget(channel + 1, fader14bit);
