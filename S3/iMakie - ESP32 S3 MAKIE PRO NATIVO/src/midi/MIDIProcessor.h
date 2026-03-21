@@ -14,3 +14,5 @@ void processPitchBend(byte channel, int bendValue);
 void checkMidiTimeout();   // ← AÑADIR
 String formatBeatString();
 String formatTimecodeString();
+
+extern uint8_t g_channelAutoMode[8];

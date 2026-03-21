@@ -42,7 +42,6 @@ namespace {
     const unsigned long VERSION_REPLY_COOLDOWN_MS = 200;
     // Añadir junto a las otras variables estáticas del namespace
     static int8_t  g_selectedChannel    = -1;      // canal activo (0-7)
-    static uint8_t g_channelAutoMode[8] = {};       // AutoMode por canal
     static unsigned long connectedSinceTime  = 0;
     static const unsigned long CONNECT_GRACE_MS = 1500;
 }
@@ -62,6 +61,11 @@ float masterMeterLevel = 0.0f;
 float masterPeakLevel = 0.0f;
 bool masterClip = false;
 unsigned long masterMeterDecayTimer = 0;
+
+extern bool btnFlashPG1[32];
+extern bool btnFlashPG2[32];
+uint8_t g_channelAutoMode[8] = {};       // AutoMode por canal
+
 
 
 /* =========================================================
@@ -554,7 +558,8 @@ void processMackieSysEx(byte* payload, int len) {
 // processNote — ← RS485: enviar flags al slave
 // ****************************************************************************
 void processNote(byte status, byte note, byte velocity) {
-    bool is_on = ((status & 0xF0) == 0x90 && velocity > 0);
+    bool is_on       = ((status & 0xF0) == 0x90 && velocity > 0);
+    bool is_flashing = ((status & 0xF0) == 0x90 && velocity == 1);
 
     if (note == 113) { if (is_on) { currentTimecodeMode = MODE_SMPTE; needsHeaderRedraw = true; } return; }
     if (note == 114) { if (is_on) { currentTimecodeMode = MODE_BEATS; needsHeaderRedraw = true; } return; }
@@ -577,7 +582,6 @@ void processNote(byte status, byte note, byte velocity) {
 
         if (stateChanged) {
             needsMainAreaRedraw = true;
-
             uint8_t slaveId = track_idx + 1;
             uint8_t flags = 0;
             if (recStates[track_idx])    flags |= FLAG_REC;
@@ -598,28 +602,35 @@ void processNote(byte status, byte note, byte velocity) {
         g_channelAutoMode[g_selectedChannel] = (uint8_t)mode;
         rs485.setAutoMode(g_selectedChannel + 1, mode);
 
-        // ← Actualizar botones en display y trellis
         for (int key = 0; key < 32; key++) {
             if (MIDI_NOTES_PG1[key] != 0x00 && MIDI_NOTES_PG1[key] == note) {
-                btnStatePG1[key] = is_on;
+                btnStatePG1[key]  = is_on;
+                btnFlashPG1[key]  = is_flashing;
+            }
         }
-    }
-    needsMainAreaRedraw = true;
-    return;
+        needsMainAreaRedraw = true;
+        return;
     }
 
     bool stateChanged = false;
     for (int key = 0; key < 32; key++) {
         if (MIDI_NOTES_PG1[key] != 0x00 && MIDI_NOTES_PG1[key] == note) {
-            if (btnStatePG1[key] != is_on) { btnStatePG1[key] = is_on; stateChanged = true; }
+            if (btnStatePG1[key] != is_on || btnFlashPG1[key] != is_flashing) {
+                btnStatePG1[key]  = is_on;
+                btnFlashPG1[key]  = is_flashing;
+                stateChanged = true;
+            }
         }
         if (MIDI_NOTES_PG2[key] != 0x00 && MIDI_NOTES_PG2[key] == note) {
-            if (btnStatePG2[key] != is_on) { btnStatePG2[key] = is_on; stateChanged = true; }
+            if (btnStatePG2[key] != is_on || btnFlashPG2[key] != is_flashing) {
+                btnStatePG2[key]  = is_on;
+                btnFlashPG2[key]  = is_flashing;
+                stateChanged = true;
+            }
         }
     }
     if (stateChanged) needsMainAreaRedraw = true;
 }
-
 
 // ****************************************************************************
 // processPitchBend — ← RS485: enviar faderTarget al slave
@@ -632,7 +643,6 @@ void processPitchBend(byte channel, int bendValue) {
     // --- Detección de desconexión: fader mínimo = 0 ---
     if (bendValue == 0) {
         if (logicConnectionState == ConnectionState::CONNECTED) {
-            // Grace period — ignorar faders a 0 justo tras conectar
             if (millis() - connectedSinceTime < CONNECT_GRACE_MS) return;
 
             unsigned long now = millis();
@@ -666,6 +676,16 @@ void processPitchBend(byte channel, int bendValue) {
         connectedSinceTime   = millis();
         needsTOTALRedraw     = true;
         fadersAtMinMask      = 0;
+
+        // Limpiar todos los SELECT al conectar
+        for (uint8_t i = 0; i < 8; i++) {
+            if (selectStates[i]) {
+                byte offMsg[3] = { 0x80, (uint8_t)(24 + i), 0x00 };
+                sendMIDIBytes(offMsg, 3);
+                selectStates[i] = false;
+            }
+        }
+
         log_d("DAW conectado: Primer PitchBend Track %d -> CONNECTED.", channel + 1);
     }
 

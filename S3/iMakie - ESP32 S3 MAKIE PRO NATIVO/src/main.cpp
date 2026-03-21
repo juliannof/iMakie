@@ -76,6 +76,9 @@ int currentPage = 1;
 int currentMasterFader = 0;
 int currentMeterValue = 0;
 
+bool btnFlashPG1[32] = {false};
+bool btnFlashPG2[32] = {false};
+
 uint8_t g_logicConnected = 0;
 
 // Handles de tareas dual core
@@ -86,20 +89,21 @@ TaskHandle_t taskCore1Handle = NULL;
    HELPER RS485 → MIDI
    Convierte respuesta de un slave en mensajes MIDI para Logic
    ========================================================= */
-static void processSlaveResponse(uint8_t slaveId) {
+
+// =========================================================
+// HELPER RS485 → MIDI
+// =========================================================
+void processSlaveResponse(uint8_t slaveId) {    // ← definición completa, no solo prototipo
     const ChannelData& ch = rs485.getChannel(slaveId);
     uint8_t midiCh = slaveId - 1;
 
-    // --- Fader → Pitch Bend (solo si el usuario lo toca) ---
     if (ch.touchState) {
         uint16_t pb = map(ch.faderPos, 0, 4095, 0, 16383);
         byte msg[3] = { (byte)(0xE0 | midiCh), (byte)(pb & 0x7F), (byte)(pb >> 7) };
-        extern void sendMIDIBytes(const byte* data, size_t len);
         sendMIDIBytes(msg, 3);
         log_v("[RS485→MIDI] PitchBend ch%u: %u", slaveId, pb);
     }
 
-    // --- Botones físicos → Note On/Off ---
     uint8_t changed = ch.buttons ^ ch.prevButtons;
     if (changed) {
         const uint8_t noteBase[4] = { 0, 8, 16, 24 };
@@ -107,47 +111,44 @@ static void processSlaveResponse(uint8_t slaveId) {
             if (changed & (1 << bit)) {
                 bool isOn    = (ch.buttons & (1 << bit)) != 0;
                 uint8_t note = noteBase[bit] + midiCh;
-                uint8_t vel  = isOn ? 127 : 0;
-                byte msg[3]  = { (byte)(isOn ? 0x90 : 0x80), note, vel };
-                extern void sendMIDIBytes(const byte* data, size_t len);
+
+                if (bit == 3 && isOn) {
+                    for (uint8_t other = 0; other < 8; other++) {
+                        if (other != midiCh && selectStates[other]) {
+                            byte offMsg[3] = { 0x80, (uint8_t)(24 + other), 0x00 };
+                            sendMIDIBytes(offMsg, 3);
+                            selectStates[other] = false;
+                            uint8_t flags = 0;
+                            if (recStates[other])  flags |= FLAG_REC;
+                            if (soloStates[other]) flags |= FLAG_SOLO;
+                            if (muteStates[other]) flags |= FLAG_MUTE;
+                            flags = setAutoMode(flags, (AutoMode)g_channelAutoMode[other]);
+                            rs485.setFlags(other + 1, flags);
+                        }
+                    }
+                }
+
+                uint8_t vel = isOn ? 127 : 0;
+                byte msg[3] = { (byte)(isOn ? 0x90 : 0x80), note, vel };
                 sendMIDIBytes(msg, 3);
                 log_v("[RS485→MIDI] Note %s ch%u note=%u", isOn ? "On" : "Off", slaveId, note);
             }
         }
     }
 
-    // --- Encoder → CC (modo relativo Mackie) ---
     if (ch.encoderDelta != 0) {
-        uint8_t cc      = 16 + midiCh;
-        int8_t  delta   = ch.encoderDelta;
-        int     total   = abs(delta) * 6;
-        uint8_t dir_bit = (delta > 0) ? 0x40 : 0x00;
-
-    while (total > 0) {
-        uint8_t chunk = (uint8_t)min(total, 4);
-        byte msg[3] = { (byte)(0xB0 | midiCh), cc, (uint8_t)(dir_bit | chunk) };
+        uint8_t cc  = 16 + midiCh;
+        uint8_t val = (ch.encoderDelta > 0) ? 65 : 63;
+        byte msg[3] = { (byte)(0xB0 | midiCh), cc, val };
         sendMIDIBytes(msg, 3);
-        total -= chunk;
-    }
-    }
-
-    // --- Encoder button → V-Select (nota 32+ch), una por pulsación ---
-    if (ch.encoderButton > 0) {
-        uint8_t note = 32 + midiCh;
-        byte msgOn[3]  = { 0x90, note, 127 };
-        byte msgOff[3] = { 0x80, note, 0   };
-        extern void sendMIDIBytes(const byte* data, size_t len);
-        for (uint8_t i = 0; i < ch.encoderButton; i++) {
-            sendMIDIBytes(msgOn,  3);
-            sendMIDIBytes(msgOff, 3);
-        }
-        log_v("[RS485→MIDI] VSelect ch%u x%u", slaveId, ch.encoderButton);
+        log_v("[RS485→MIDI] Encoder ch%u delta=%d CC=%u val=%u",
+              slaveId, ch.encoderDelta, cc, val);
     }
 }
 
-/* =========================================================
-   TAREA CORE 0 — MIDI (tiempo real) + leer slaves RS485
-   ========================================================= */
+// =========================================================
+// TAREA CORE 0
+// =========================================================
 void taskCore0(void* pvParameters) {
     log_e("MIDI task arrancando en Core %d", xPortGetCoreID());
     for (;;) {

@@ -204,6 +204,9 @@ extern String timeCodeString;
 extern String beatsString;
 extern char tempoString[12];
 
+extern bool btnFlashPG1[32];
+extern bool btnFlashPG2[32];
+
 // --- Display por CC ---
 extern char timeCodeChars[13];
 extern char beatsChars[13];
