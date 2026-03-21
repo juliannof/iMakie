@@ -145,7 +145,7 @@ public:
 
 // --- Protocolo ---
 #define RS485_BAUD        500000
-#define NUM_SLAVES             2   // ← actualizar al añadir hardware
+#define NUM_SLAVES             3   // ← actualizar al añadir hardware
 
 // --- Timing (µs) ---
 #define RS485_TX_ENABLE_US     10
@@ -287,13 +287,13 @@ static const byte LED_COLORS_PG2[32] = {
     6, 2, 7, 7, 7, 7, 2, 2
 };
 
+// Colores PG3: REC=rojo, SOLO=amarillo, MUTE=verde, SELECT=azul
 static const byte LED_COLORS_PG3[32] = {
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 2
+    1, 1, 1, 1, 1, 1, 1, 1,   // REC  — rojo     (1)
+    4, 4, 4, 4, 4, 4, 4, 4,   // SOLO — amarillo  (4)
+    3, 3, 3, 3, 3, 3, 3, 3,   // MUTE — azul      (3)
+    7, 7, 7, 7, 7, 7, 7, 7    // SEL  — cyan      (5)
 };
-
 
 // ====================================================================
 // --- 6. LABELS Y NOTAS MIDI ---
@@ -333,3 +333,18 @@ static const char* labels_PG1_SHIFT[32] = {
     "SHIFT",  "ALT",     "OPT",   "CMD",    "CHAN <", "CHAN >","ZOOM -", "ZOOM +",
     "REDO",   "SAVE AS", "OK",    "CNCL",   "MARKER", "NUDGE", "TAP",    ">>PG2"
 };
+
+static const char* labels_PG3[32] = {
+    "REC1", "REC2", "REC3", "REC4", "REC5", "REC6", "REC7", "REC8",
+    "SOL1", "SOL2", "SOL3", "SOL4", "SOL5", "SOL6", "SOL7", "SOL8",
+    "MUT1", "MUT2", "MUT3", "MUT4", "MUT5", "MUT6", "MUT7", "MUT8",
+    "SEL1", "SEL2", "SEL3", "SEL4", "SEL5", "SEL6", "SEL7", "SEL8"
+};
+
+static const byte MIDI_NOTES_PG3[32] = {
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+    0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F
+};
+

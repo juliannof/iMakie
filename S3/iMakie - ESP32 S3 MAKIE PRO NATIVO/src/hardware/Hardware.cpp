@@ -244,58 +244,76 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
     int key      = evt.bit.NUM;
     bool isPress = (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_RISING);
 
-    if (isPress) log_e("TRELLIS key=%d note=0x%02X", key, 
-                       (currentPage==1?MIDI_NOTES_PG1:MIDI_NOTES_PG2)[key]);
+    static unsigned long pg3Key31PressTime = 0;
+    static constexpr unsigned long PG3_LONG_PRESS_MS = 600;
 
-    // ── Botón de página ──────────────────────────────────────────
-    if (key == 31 && isPress) {
-        currentPage = (currentPage % 3) + 1;
-        updateLeds();
-        needsMainAreaRedraw = true;
-        return 0;
-    }
+    if (isPress) log_e("TRELLIS key=%d note=0x%02X", key,
+                       (currentPage==1 ? MIDI_NOTES_PG1 :
+                        currentPage==2 ? MIDI_NOTES_PG2 :
+                                         MIDI_NOTES_PG3)[key]);
 
-    // ── Botón SHIFT ──────────────────────────────────────────────
-    if (key == 26) {
-        globalShiftPressed = isPress;
-        if (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_RISING ||
-            evt.bit.EDGE == SEESAW_KEYPAD_EDGE_FALLING) {
-            needsMainAreaRedraw = true;
+    // ── Botón de página (PG1/PG2: press corto key 31) ────────────
+    if (key == 31 && currentPage != 3) {
+        if (isPress) {
+            currentPage = (currentPage % 3) + 1;
+            if (currentPage == 3) pg3Key31PressTime = millis();
             updateLeds();
+            needsMainAreaRedraw = true;
         }
-    }
-
-    // ── Botón SMPTE/BEATS (key 15) ───────────────────────────────
-    if (key == 15 && isPress) {
-        byte midiMsg[3] = { 0x90, 0x35, 0x7F };  // nota 53 = 0x35
-        sendMIDIBytes(midiMsg, 3);
-        // SIN tocar currentTimecodeMode aquí — Logic confirma con nota 113/114
         return 0;
     }
 
-    // ── CALIB (key 16) → calibrar fader de pista activa ─────────
-    if (key == 16 && isPress) {
-        log_i("[CAL] key 16 presionado");
+    // ── Botón key 31 en PG3: press corto = SEL8, largo = página ──
+    if (key == 31 && currentPage == 3) {
+        if (isPress) {
+            pg3Key31PressTime = millis();
+        } else {
+            unsigned long held = millis() - pg3Key31PressTime;
+            if (held < PG3_LONG_PRESS_MS) {
+                byte noteOn[3]  = { 0x90, 0x1F, 0x7F };
+                byte noteOff[3] = { 0x90, 0x1F, 0x00 };
+                sendMIDIBytes(noteOn,  3);
+                sendMIDIBytes(noteOff, 3);
+            } else {
+                currentPage = (currentPage % 3) + 1;
+                updateLeds();
+                needsMainAreaRedraw = true;
+            }
+        }
+        return 0;
+    }
+
+    // ── Botón SHIFT (key 26, solo PG1/PG2) ───────────────────────
+    if (key == 26 && currentPage != 3) {
+        globalShiftPressed = isPress;
+        needsMainAreaRedraw = true;
+        updateLeds();
+    }
+
+    // ── Botón SMPTE/BEATS (key 15, solo PG1) ─────────────────────
+    if (key == 15 && currentPage == 1 && isPress) {
+        byte midiMsg[3] = { 0x90, 0x35, 0x7F };
+        sendMIDIBytes(midiMsg, 3);
+        return 0;
+    }
+
+    // ── CALIB (key 16, solo PG1) ──────────────────────────────────
+    if (key == 16 && currentPage == 1 && isPress) {
         if (_onCalibrateRequest) {
-            _onCalibrateRequest(1);  // hardcode canal 1 para test
-            log_i("[CAL] callback registrado");
             for (int i = 0; i < 8; i++) {
                 if (selectStates[i]) {
-                    log_i("[CAL] SELECT activo en track %d", i + 1);
-                    //_onCalibrateRequest(i + 1);
-                    _onCalibrateRequest(1);  // hardcode canal 1 para test
+                    _onCalibrateRequest(i + 1);
                     break;
                 }
             }
-            log_i("[CAL] ningún SELECT activo");
-        } else {
-            log_w("[CAL] _onCalibrateRequest no registrado");
         }
         return 0;
     }
 
-    // ── Enviar MIDI — Logic confirma el estado de vuelta ─────────
-    const byte* currentMap = (currentPage == 1) ? MIDI_NOTES_PG1 : MIDI_NOTES_PG2;
+    // ── Enviar MIDI ───────────────────────────────────────────────
+    const byte* currentMap = (currentPage == 1) ? MIDI_NOTES_PG1 :
+                             (currentPage == 2) ? MIDI_NOTES_PG2 :
+                                                  MIDI_NOTES_PG3;
     byte noteToSend = currentMap[key];
 
     if (noteToSend != 0x00) {
@@ -304,8 +322,6 @@ TrellisCallback onTrellisEvent(keyEvent evt) {
         midiMsg[1] = noteToSend;
         midiMsg[2] = isPress ? 127 : 0;
         sendMIDIBytes(midiMsg, 3);
-        // Sin btnState aquí — Logic responde con Note On/Off
-        // y processNote() actualiza el estado
     }
 
     return 0;
