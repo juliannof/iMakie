@@ -125,9 +125,14 @@ void OtaManager::enableForUpload() {
     });
 
     ArduinoOTA.onProgress([this](unsigned int prog, unsigned int total) {
+    static uint8_t lastPct = 255;
+    uint8_t pct = (prog * 100) / total;
+    if (pct / 20 != lastPct / 20) {
+        lastPct = pct;
         static char buf[32];
-        snprintf(buf, sizeof(buf), "OTA: %u%%", (prog * 100) / total);
+        snprintf(buf, sizeof(buf), "OTA: %u%%", pct);
         _status(buf);
+    }
     });
 
     ArduinoOTA.onError([this](ota_error_t err) {

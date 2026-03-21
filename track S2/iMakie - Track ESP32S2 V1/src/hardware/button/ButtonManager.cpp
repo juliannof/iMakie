@@ -87,19 +87,48 @@ static void _onRecReleased(Button2& btn) {
     _clearBar();
     if (_sat && _sat->isOpen()) return;
 
+    static unsigned long lastRecTime = 0;
+    unsigned long now = millis();
     if (held < HOLD_MS) {
-        _flags |= FLAG_REC;
+        if (now - lastRecTime >= 300) {
+            lastRecTime = now;
+            _flags |= FLAG_REC;
+        }
     }
 }
 
 static void _onButtonEvent(ButtonId id) {
     if (_sat && _sat->isOpen()) return;
 
+    static unsigned long lastRecTime    = 0;
+    static unsigned long lastSoloTime   = 0;
+    static unsigned long lastMuteTime   = 0;
+    static unsigned long lastSelectTime = 0;
+    static constexpr unsigned long DEBOUNCE_MS = 300;
+
+    unsigned long now = millis();
+
     switch (id) {
-        case ButtonId::SOLO:           _flags |= FLAG_SOLO; break;
-        case ButtonId::MUTE:           _flags |= FLAG_MUTE; break;
-        case ButtonId::SELECT:         _flags |= FLAG_SELECT; break;
-        case ButtonId::ENCODER_SELECT: _encoderBtnCount++; Encoder::reset(); needsVPotRedraw = true; break;
+        case ButtonId::SOLO:
+            if (now - lastSoloTime < DEBOUNCE_MS) break;
+            lastSoloTime = now;
+            _flags |= FLAG_SOLO;
+            break;
+        case ButtonId::MUTE:
+            if (now - lastMuteTime < DEBOUNCE_MS) break;
+            lastMuteTime = now;
+            _flags |= FLAG_MUTE;
+            break;
+        case ButtonId::SELECT:
+            if (now - lastSelectTime < DEBOUNCE_MS) break;
+            lastSelectTime = now;
+            _flags |= FLAG_SELECT;
+            break;
+        case ButtonId::ENCODER_SELECT:
+            _encoderBtnCount++;
+            Encoder::reset();
+            needsVPotRedraw = true;
+            break;
         default: break;
     }
 }
