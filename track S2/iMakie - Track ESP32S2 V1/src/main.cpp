@@ -47,6 +47,7 @@ static SatMenu* satMenu   = nullptr;
 // ─────────────────────────────────────────────────────────────
 static void _satMotorOff()  { Motor::stop();   _suspended = true;  }
 static void _satMotorOn()   { Motor::begin();  _suspended = false; }
+static void _satBrightness(uint8_t b) { setScreenBrightness(b); }
 static void _satRS485Off()  { _suspended = true;  }
 static void _satRS485On()   { _suspended = false; needsTOTALRedraw = true; }
 static void _satReboot()    { ESP.restart(); }
@@ -149,6 +150,7 @@ void setup() {
     satMenu->onMotorOff      (_satMotorOff);
     satMenu->onMotorOn       (_satMotorOn);
     satMenu->onMotorDrive    (_satMotorDrive);
+    satMenu->onBrightness(_satBrightness);
     satMenu->onRS485Off      (_satRS485Off);
     satMenu->onRS485On       (_satRS485On);
     satMenu->onReboot        (_satReboot);

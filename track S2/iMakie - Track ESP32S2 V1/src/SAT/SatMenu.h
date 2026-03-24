@@ -63,6 +63,7 @@ public:
     void onConfigSaved    (CbConfig cb) { _cbSaved      = cb; }
     void onSuspendSprites (CbVoid   cb) { _cbSuspend    = cb; }
     void onRestoreSprites (CbVoid   cb) { _cbRestore    = cb; }
+    void onBrightness     (std::function<void(uint8_t)> cb) { _cbBrightness = cb; }
 
     void update();
     void open();
@@ -74,7 +75,7 @@ public:
 private:
     enum class Scr {
         MAIN, IDENTIDAD, MOTOR, TOUCH, DIAG,
-        CONFIG_WIFI, WIFI, OTA, REINICIAR,
+        CONFIG_WIFI, WIFI, REINICIAR,
         EDIT_TRACKID, EDIT_LABEL,
         EDIT_PWMMIN, EDIT_PWMMAX, EDIT_TOUCHTHR,
         CONFIRM, TOAST,
@@ -117,6 +118,7 @@ private:
     CbVoid   _cbWiFiConfig, _cbWiFiOta, _cbSuspend, _cbRestore;
     CbMotor  _cbMotorDrv;
     CbConfig _cbSaved;
+    std::function<void(uint8_t)> _cbBrightness;
 
     // ── Test Display ──────────────────────────────────────────
     int           _dPat   = 0;

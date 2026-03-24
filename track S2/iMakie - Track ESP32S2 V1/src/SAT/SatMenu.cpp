@@ -78,22 +78,15 @@ void SatMenu::open() {
     if (_cbMotorOff)   _cbMotorOff();
     if (_cbRS485Off)   _cbRS485Off();
     if (_cbLedsOff)    _cbLedsOff();
+    if (_cbBrightness) _cbBrightness(255);
 
-    // Liberar PSRAM de sprites normales antes de crear el sprite SAT
     if (_cbSuspend)    _cbSuspend();
 
     _spr.setColorDepth(16);
-    _spr.setPsram(true);   // forzar asignación en PSRAM
+    _spr.setPsram(true);
     _spr.createSprite(_tft->width(), _tft->height());
     _spr.setTextFont(1);
 
-    // Diagnóstico
-    void* buf = _spr.getBuffer();
-    log_i("SAT sprite: %dx%d  buf=%p  psram=%s",
-        _spr.width(), _spr.height(), buf,
-        esp_ptr_external_ram(buf) ? "SI" : "NO");
-
-    // Pantalla negra inmediata
     _spr.fillScreen(C_BG);
     _push();
 }
