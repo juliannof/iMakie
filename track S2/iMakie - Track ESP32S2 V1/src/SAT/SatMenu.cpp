@@ -33,6 +33,7 @@ const SatMenu::Item SatMenu::_diagItems[] = {
     {"DP","Test Display",  Scr::TEST_DISPLAY  },
     {"EC","Test Encoder",  Scr::TEST_ENCODER  },
     {"FD","Test Fader",    Scr::TEST_FADER    },
+    {"NP","Test Botones",  Scr::TEST_NEOPIXEL },
 };
 const SatMenu::Item SatMenu::_wifiItems[] = {
     {"CF","Configurar red", Scr::WIFI},
@@ -42,7 +43,7 @@ const int SatMenu::_mainN  = 7;
 const int SatMenu::_identN = 2;
 const int SatMenu::_motorN = 2;
 const int SatMenu::_touchN = 2;
-const int SatMenu::_diagN  = 3;
+const int SatMenu::_diagN  = 4;
 const int SatMenu::_wifiN  = 2;
 
 // ─────────────────────────────────────────────────────────────
@@ -111,9 +112,10 @@ void SatMenu::close() {
 void SatMenu::update() {
     if (!_open) return;
 
-    bool live = (_scr == Scr::TEST_DISPLAY  ||
-                 _scr == Scr::TEST_ENCODER  ||
-                 _scr == Scr::TEST_FADER);
+    bool live = (_scr == Scr::TEST_DISPLAY   ||
+                 _scr == Scr::TEST_ENCODER   ||
+                 _scr == Scr::TEST_FADER     ||
+                 _scr == Scr::TEST_NEOPIXEL);
 
     Btn b = _readBtn();
 
@@ -144,6 +146,7 @@ void SatMenu::update() {
         case Scr::TEST_DISPLAY:  _tickTestDisplay(b);  break;
         case Scr::TEST_ENCODER:  _tickTestEncoder(b);  break;
         case Scr::TEST_FADER:    _tickTestFader(b);    break;
+        case Scr::TEST_NEOPIXEL: _tickTestNeopixel(b); break;
         case Scr::REINICIAR:
             _confirm("Reiniciar dispositivo?", Scr::REINICIAR); break;
         default: break;
@@ -172,6 +175,7 @@ void SatMenu::_render() {
         case Scr::TEST_DISPLAY:  _tickTestDisplay(Btn::NONE);  return;
         case Scr::TEST_ENCODER:  _tickTestEncoder(Btn::NONE);  return;
         case Scr::TEST_FADER:    _tickTestFader(Btn::NONE);    return;
+        case Scr::TEST_NEOPIXEL: _tickTestNeopixel(Btn::NONE); return;
         default: break;
     }
 
@@ -635,6 +639,8 @@ void SatMenu::_hDiag(Btn b) {
             case 2: _motPWM=0; _fadCalMin=4095; _fadCalMax=0;
                     _fadHistIdx=0; memset(_fadHist,0,FAD_HIST);
                     _goto(Scr::TEST_FADER); break;
+            case 3: memset(_neoPressed,0,sizeof(_neoPressed));
+                    _goto(Scr::TEST_NEOPIXEL); break;
         }
     }
 }
@@ -863,6 +869,87 @@ void SatMenu::_toast(const char* msg,Scr ret) {
 void SatMenu::_confirm(const char* msg,Scr yes) {
     _confMsg=msg; _confYes=yes; _prev=_scr;
     _scr=Scr::CONFIRM; _dirty=true;
+}
+
+
+// ─────────────────────────────────────────────────────────────
+//  TEST NEOPIXEL + BOTONES
+//  Cada botón enciende su NeoPixel mientras está pulsado.
+//  REC→0 rojo, SOLO→1 amarillo, MUTE→2 verde, SELECT→3 blanco
+//  Salir: MUTE largo (vuelve a DIAG) — o los 4 pulsados a la vez
+// ─────────────────────────────────────────────────────────────
+void SatMenu::_tickTestNeopixel(Btn b) {
+    int W = _spr.width(), H = _spr.height();
+
+    // Leer pines directamente — sin debounce para ver respuesta inmediata
+    bool p[4] = {
+        digitalRead(BUTTON_PIN_REC)    == LOW,
+        digitalRead(BUTTON_PIN_SOLO)   == LOW,
+        digitalRead(BUTTON_PIN_MUTE)   == LOW,
+        digitalRead(BUTTON_PIN_SELECT) == LOW
+    };
+
+    // Long-press MUTE para salir (1 segundo)
+    if (p[2]) {
+        if (_neoMuteHoldT == 0) _neoMuteHoldT = millis();
+        if (millis() - _neoMuteHoldT >= 1000) {
+            if (_cbLedsTest) for (int i = 0; i < 4; i++) _cbLedsTest(i, 0, 0, 0);
+            _neoMuteHoldT = 0;
+            _goto(Scr::DIAG);
+            return;
+        }
+    } else {
+        _neoMuteHoldT = 0;
+    }
+
+    // Colores por botón
+    static const uint8_t COLORS[4][3] = {
+        {255,   0,   0},   // REC    → rojo
+        {255, 200,   0},   // SOLO   → amarillo
+        {  0, 255,   0},   // MUTE   → verde
+        {200, 200, 200},   // SELECT → blanco
+    };
+    static const char* NAMES[4] = {"REC", "SOLO", "MUTE", "SEL"};
+
+    // Actualizar LEDs via callback
+    if (_cbLedsTest) {
+        for (int i = 0; i < 4; i++) {
+            if (p[i]) _cbLedsTest(i, COLORS[i][0], COLORS[i][1], COLORS[i][2]);
+            else      _cbLedsTest(i, 0, 0, 0);
+        }
+    }
+
+    // Dibujar pantalla
+    _spr.fillScreen(C_BG);
+    _drawHdr("TEST BOTONES + LEDS");
+
+    int y = SAT_HDR_H + 10;
+    for (int i = 0; i < 4; i++) {
+        uint16_t col = p[i] ?
+            _spr.color565(COLORS[i][0], COLORS[i][1], COLORS[i][2]) : C_DARK;
+        int bx = 10 + i * 56, bw = 50, bh = 50;
+        _spr.fillRoundRect(bx, y, bw, bh, 6, col);
+        _spr.setTextColor(p[i] ? C_BLACK : C_GRAY, col);
+        _spr.setTextSize(1);
+        _spr.setTextDatum(textdatum_t::middle_center);
+        _spr.drawString(NAMES[i], bx + bw/2, y + bh/2);
+    }
+
+    y += 70;
+    _spr.setTextColor(C_TEXT, C_BG);
+    _spr.setTextSize(1);
+    _spr.setTextDatum(textdatum_t::middle_center);
+    _spr.drawString("Pulsa cada boton", W/2, y); y += 18;
+    _spr.setTextColor(C_GRAY, C_BG);
+    _spr.drawString("Se enciende su LED", W/2, y);
+
+    _spr.fillRect(0, H - SAT_HINT_H, W, SAT_HINT_H, C_BG);
+    _spr.drawFastHLine(0, H - SAT_HINT_H, W, C_DARK);
+    _spr.setTextColor(C_GRAY, C_BG);
+    _spr.setTextDatum(textdatum_t::middle_center);
+    _spr.drawString("MUT solo = salir", W/2, H - SAT_HINT_H/2);
+
+    _push();
 }
 
 void SatMenu::showStatus(const char* msg) {

@@ -95,6 +95,11 @@ static void _otaStatus(const char* msg) {
     if (satMenu && satMenu->isOpen())
         satMenu->showStatus(msg);
 }
+
+static void _satLedsTest(int idx, uint8_t r, uint8_t g, uint8_t b) {
+    setNeopixelState(idx, r, g, b);
+    showNeopixels();
+}
  
 
 
@@ -155,6 +160,7 @@ void setup() {
     satMenu->onConfigSaved   (_satConfigSaved);
     satMenu->onWiFiConfig    (_satWiFiConfig);
     satMenu->onWiFiOta       (_satWiFiOta);
+    satMenu->onLedsTest(_satLedsTest);
     satMenu->onLedsOff       (_satLedsOff);
     satMenu->onSuspendSprites(_satSuspendSprites);
     satMenu->onRestoreSprites(_satRestoreSprites);

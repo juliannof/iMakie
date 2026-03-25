@@ -1,18 +1,11 @@
 // src/hardware/Hardware.cpp
 #include "Hardware.h"
 #include "../config.h"
-#include "Neopixels/Neopixel.h"   // ← NeoPixelBus, sustituye Adafruit_NeoPixel.h
+#include "Neopixels/Neopixel.h"
 
-extern bool recStates;      
-extern bool soloStates;     
-extern bool muteStates;     
-extern bool selectStates;   
-extern bool vuClipState;
-extern float vuPeakLevels;
-extern float faderPositions;
-extern float vuLevels; 
-extern unsigned long vuLastUpdateTime;
-extern unsigned long vuPeakLastUpdateTime;
+// Hardware.cpp no gestiona estados de botones ni LEDs.
+// Solo detecta pulsaciones y notifica via callbacks.
+// RS485Handler es la fuente de verdad para recStates/soloStates/etc.
 
 // ** Sensor Táctil del Fader Variables **
 volatile bool     isFaderTouched            = false;
@@ -31,63 +24,50 @@ Button2 buttonEncoderSelect(ENCODER_SW_PIN, BUTTON_USE_INTERNAL_PULLUP);
 // ===================================
 // --- CALLBACKS GLOBALES ---
 // ===================================
-static ButtonPressCallback onButtonPressCallbacks[5] = {nullptr, nullptr, nullptr, nullptr, nullptr}; 
-static ButtonEventCallback globalButtonEventCallback  = nullptr; 
+static ButtonEventCallback globalButtonEventCallback  = nullptr;
 static ButtonPressCallback onFaderTouchCallback       = nullptr;
 static ButtonPressCallback onFaderReleaseCallback     = nullptr;
 
 // ===================================
-// --- ESTRUCTURA Y MAPEO DE BOTONES ---
+// --- MAPEO DE BOTONES ---
 // ===================================
 struct ButtonMapping {
     Button2& button;
     ButtonId id;
-    int      neopixelIndex;
-    uint8_t  r, g, b;
 };
 
 const ButtonMapping buttonMappings[] = {
-    {buttonRec,           ButtonId::REC,            NEOPIXEL_FOR_REC,    BUTTON_REC_LED_COLOR_R,    BUTTON_REC_LED_COLOR_G,    BUTTON_REC_LED_COLOR_B},
-    {buttonSolo,          ButtonId::SOLO,            NEOPIXEL_FOR_SOLO,   BUTTON_SOLO_LED_COLOR_R,   BUTTON_SOLO_LED_COLOR_G,   BUTTON_SOLO_LED_COLOR_B},
-    {buttonMute,          ButtonId::MUTE,            NEOPIXEL_FOR_MUTE,   BUTTON_MUTE_LED_COLOR_R,   BUTTON_MUTE_LED_COLOR_G,   BUTTON_MUTE_LED_COLOR_B},
-    {buttonSelect,        ButtonId::SELECT,          NEOPIXEL_FOR_SELECT, BUTTON_SELECT_LED_COLOR_R, BUTTON_SELECT_LED_COLOR_G, BUTTON_SELECT_LED_COLOR_B},
-    {buttonEncoderSelect, ButtonId::ENCODER_SELECT,  -1,                  0, 0, 0}
+    {buttonRec,           ButtonId::REC           },
+    {buttonSolo,          ButtonId::SOLO          },
+    {buttonMute,          ButtonId::MUTE          },
+    {buttonSelect,        ButtonId::SELECT        },
+    {buttonEncoderSelect, ButtonId::ENCODER_SELECT},
 };
 const size_t NUM_BUTTON2_BUTTONS = sizeof(buttonMappings) / sizeof(buttonMappings[0]);
 
 // ===================================
 // --- FORWARD DECLARATIONS ---
 // ===================================
-void handleButtonLedState(ButtonId id);
 static ButtonId getButtonIdFromInstance(Button2& btn);
-static void handleButtonEvent(Button2& btn, bool isPressed);
 static void handleButtonPress(Button2& btn);
 static void handleButtonRelease(Button2& btn);
 
 // =========================================================================
 // --- FUNCIONES PÚBLICAS ---
 // =========================================================================
-
 void initHardware() {
-    // --- Encoder ---
     pinMode(ENCODER_PIN_A, INPUT);
     pinMode(ENCODER_PIN_B, INPUT);
 
-    // --- NeoPixels ---
-    // initNeopixels() se llama desde main.cpp DESPUÉS de initDisplay()
-    // NO llamar aquí para evitar conflicto RMT/I2S con LovyanGFX
-
-    // --- Botones (Button2) ---
     for (size_t i = 0; i < NUM_BUTTON2_BUTTONS; ++i) {
         buttonMappings[i].button.setPressedHandler(handleButtonPress);
         buttonMappings[i].button.setReleasedHandler(handleButtonRelease);
     }
 
-    // --- LED integrado ---
     pinMode(LED_BUILTIN_PIN, OUTPUT);
     digitalWrite(LED_BUILTIN_PIN, LOW);
 
-    // --- Calibración táctil fader ---
+    // Calibración táctil fader
     uint32_t sum = 0;
     for (int i = 0; i < 20; i++) {
         sum += touchRead(FADER_TOUCH_PIN);
@@ -97,7 +77,6 @@ void initHardware() {
     faderTouchThreshold = faderTouchBaseLine * FADER_TOUCH_THRESHOLD_PERCENTAGE / 100;
 }
 
-
 // ===================================
 // --- updateButtons ---
 // ===================================
@@ -105,16 +84,14 @@ void updateButtons() {
     for (size_t i = 0; i < NUM_BUTTON2_BUTTONS; ++i) {
         buttonMappings[i].button.loop();
     }
-    
+
     unsigned long currentTime = millis();
     if (currentTime - faderTouchLastReadTime >= FADER_TOUCH_READ_INTERVAL_MS) {
-        uint32_t touchValue    = touchRead(FADER_TOUCH_PIN);
-        bool currentlyTouched  = (touchValue < faderTouchThreshold);
+        uint32_t touchValue   = touchRead(FADER_TOUCH_PIN);
+        bool currentlyTouched = (touchValue < faderTouchThreshold);
 
         if (currentlyTouched != isFaderTouched) {
             isFaderTouched = currentlyTouched;
-            handleButtonLedState(ButtonId::FADER_TOUCH);
-
             if (isFaderTouched) {
                 if (onFaderTouchCallback)   onFaderTouchCallback();
             } else {
@@ -126,15 +103,9 @@ void updateButtons() {
     }
 }
 
-
-
 // ===================================
 // --- Callbacks ---
 // ===================================
-void registerButtonPressCallback(ButtonId id, ButtonPressCallback callback) {
-    if (static_cast<int>(id) >= 0 && static_cast<int>(id) <= static_cast<int>(ButtonId::ENCODER_SELECT))
-        onButtonPressCallbacks[static_cast<int>(id)] = callback;
-}
 void registerButtonEventCallback(ButtonEventCallback callback)  { globalButtonEventCallback = callback; }
 void registerFaderTouchCallback(ButtonPressCallback callback)   { onFaderTouchCallback      = callback; }
 void registerFaderReleaseCallback(ButtonPressCallback callback) { onFaderReleaseCallback    = callback; }
@@ -148,24 +119,16 @@ static ButtonId getButtonIdFromInstance(Button2& btn) {
     return ButtonId::UNKNOWN;
 }
 
-static void handleButtonEvent(Button2& btn, bool isPressed) {
+static void handleButtonPress(Button2& btn) {
     ButtonId id = getButtonIdFromInstance(btn);
-    
-    if (isPressed) {
-        switch (id) {
-            case ButtonId::REC:    recStates    = !recStates;    break;
-            case ButtonId::SOLO:   soloStates   = !soloStates;   break;
-            case ButtonId::MUTE:   muteStates   = !muteStates;   break;
-            case ButtonId::SELECT: selectStates = !selectStates; break;
-            default: break;
-        }
-    }
-    handleButtonLedState(id);
+    // Solo notificar — Logic decide el estado via RS485
     if (globalButtonEventCallback) globalButtonEventCallback(id);
 }
 
-static void handleButtonPress(Button2& btn)   { handleButtonEvent(btn, true);  }
-static void handleButtonRelease(Button2& btn) { handleButtonEvent(btn, false); }
+static void handleButtonRelease(Button2& btn) {
+    // Release no se notifica — RS485 gestiona los flags
+    (void)btn;
+}
 
 // ===================================
 // --- LED integrado ---

@@ -159,6 +159,9 @@ void taskCore0(void* pvParameters) {
             }
         }
 
+        // --- Calibración escalonada ──────────────────────────
+        tickCalibracion();   // ← AÑADIR
+
         // --- RS485: leer respuestas de slaves → enviar a Logic ---
         if (logicConnectionState == ConnectionState::CONNECTED) {
             for (uint8_t id = 1; id <= NUM_SLAVES; id++) {

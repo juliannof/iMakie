@@ -33,69 +33,69 @@ static CalibPhase _phase = CalibPhase::IDLE;
 static uint32_t _stableStart = 0;
 static int      _stableRef   = 0;
 static uint16_t _adcTop      = 0;
-static bool _hasMoved = false;
-
+static uint32_t   _calibStart  = 0;   // ← esta línea
+static uint16_t _lastMidiTarget = 0;
 static bool _motorActive = false;  // ← aquí
 
 
+void setTarget(uint16_t midiTarget) {
+    _lastMidiTarget = midiTarget;              // ← guardar siempre
+    if (_phase != CalibPhase::DONE) return;
+    _targetADC = (uint16_t)map((long)midiTarget, 0, 14848, _adcMin, _adcMax);
+}
+
 // ─── Calibración ─────────────────────────────────────────────
 static void _calibTick() {
-    faderADC.update();
-    int adc = (int)faderADC.getFaderPos();
+    int adc = (int)_adcFiltered;
 
-    Serial.printf("[CALIB] %s  adc=%d\n",
-        _phase == CalibPhase::GOING_UP ? "UP" : "DOWN", adc);
+    log_i("[CALIB] %s  adc=%d  estable_ms=%lu",
+        _phase == CalibPhase::GOING_UP ? "UP" : "DOWN",
+        adc, millis() - _stableStart);
 
-    // Si el ADC cambia significativamente, actualizar referencia
-    if (abs(adc - _stableRef) > ADC_STABILITY_THRESHOLD) {
-        _stableRef   = adc;
-        _stableStart = millis();
-        
-        // Marcar que ha habido movimiento (solo la primera vez)
-        if (!_hasMoved) {
-            _hasMoved = true;
-        }
+    if (millis() - _calibStart > CALIB_TIMEOUT) {
+        _hwStop();
+        _phase = CalibPhase::ERROR;
+        log_e("[CALIB] TIMEOUT");
         return;
     }
 
-    // Si no ha habido movimiento aún, esperar
-    if (!_hasMoved) return;
-    
-    // Si no ha pasado suficiente tiempo estable, esperar
+    if (abs(adc - _stableRef) > ADC_STABILITY_THRESHOLD) {
+        _stableRef   = adc;
+        _stableStart = millis();
+        return;
+    }
+
     if (millis() - _stableStart < CALIB_STABLE_TIME) return;
 
-    // Detección de tope
     if (_phase == CalibPhase::GOING_UP) {
         _adcTop      = (uint16_t)adc;
         _stableRef   = adc;
         _stableStart = millis();
-        Serial.printf("[CALIB] Tope superior: %d\n", _adcTop);
+        log_i("[CALIB] Tope superior: %d", _adcTop);
         _phase = CalibPhase::GOING_DOWN;
         _hwDown(CALIB_KICK_PWM);
         delay(CALIB_KICK_MS);
         _hwDown(CALIB_PWM);
-
     } else {
         _hwStop();
         uint16_t adcBot = (uint16_t)adc;
-        Serial.printf("[CALIB] Tope inferior: %d\n", adcBot);
+        log_i("[CALIB] Tope inferior: %d", adcBot);
 
         if (_adcTop > adcBot + 200) {
             _adcMin    = adcBot + 20;
             _adcMax    = _adcTop - 20;
             _adcSpan   = _adcMax - _adcMin;
             _targetADC = (uint16_t)adc;
-            _phase     = CalibPhase::DONE;
-            Serial.printf("[CALIB] OK  MIN=%d  MAX=%d  span=%d\n",
-                          _adcMin, _adcMax, _adcSpan);
+            // Aplicar último target conocido inmediatamente
+            _targetADC = (uint16_t)map((long)_lastMidiTarget, 0, 14848, _adcMin, _adcMax);
+            log_i("[CALIB] OK  MIN=%d  MAX=%d  span=%d  target=%d",
+             _adcMin, _adcMax, _adcSpan, _targetADC);
         } else {
             _phase = CalibPhase::ERROR;
-            Serial.println("[CALIB] ERROR — rango invalido");
+            log_e("[CALIB] ERROR — rango invalido");
         }
     }
 }
-
-
 // ─── API pública ─────────────────────────────────────────────
 namespace Motor {
 
@@ -115,18 +115,18 @@ void begin() {
 }
 
 void startCalib() {
-    _hasMoved = false;
-
     if (_phase == CalibPhase::GOING_UP ||
         _phase == CalibPhase::GOING_DOWN) return;
+
     faderADC.update();
     _stableRef   = (int)faderADC.getFaderPos();
     _stableStart = millis();
+    _calibStart  = millis();
     _phase       = CalibPhase::GOING_UP;
     _hwUp(CALIB_KICK_PWM);
     delay(CALIB_KICK_MS);
     _hwUp(CALIB_PWM);
-    Serial.println("[CALIB] Iniciada");
+    log_i("[CALIB] Iniciada");
 }
 
 

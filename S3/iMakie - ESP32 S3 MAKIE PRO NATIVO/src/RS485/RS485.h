@@ -33,7 +33,8 @@ struct ChannelData {
     int8_t   encoderDelta  = 0;
     uint8_t  encoderButton = 0;
     uint8_t prevEncoderButton = 0;
-
+    bool calibrated = false;
+    
     bool     responded     = false;
 };
 

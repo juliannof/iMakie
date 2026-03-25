@@ -44,6 +44,8 @@ namespace {
     static int8_t  g_selectedChannel    = -1;      // canal activo (0-7)
     static unsigned long connectedSinceTime  = 0;
     static const unsigned long CONNECT_GRACE_MS = 1500;
+    static uint8_t  _calibPendingFrom = 0;
+    static uint32_t _calibNextTime    = 0;
 }
 
 // --- Prototipos privados ---
@@ -67,6 +69,20 @@ extern bool btnFlashPG2[32];
 uint8_t g_channelAutoMode[8] = {};       // AutoMode por canal
 
 
+void tickCalibracion() {
+    if (_calibPendingFrom == 0) return;
+    if (millis() < _calibNextTime) return;
+
+    rs485.setCalibrate(_calibPendingFrom);
+    log_i("[CALIB] Slave %d disparado", _calibPendingFrom);
+
+    _calibPendingFrom++;
+    if (_calibPendingFrom > NUM_SLAVES) {
+        _calibPendingFrom = 0;
+    } else {
+        _calibNextTime = millis() + 4000;
+    }
+}
 
 /* =========================================================
    sendMIDIBytes()

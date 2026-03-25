@@ -17,6 +17,9 @@
 #define FLAG_SELECT (1 << 3)
 // bit 4: orden de calibración (one-shot)
 #define FLAG_CALIB  (1 << 4)
+// bits 0-3: botones (FLAG_REC, SOLO, MUTE, SELECT ya definidos)
+#define SLAVE_FLAG_CALIB_DONE  (1 << 4)   // calibración OK
+#define SLAVE_FLAG_CALIB_ERROR (1 << 5)   // calibración fallida
 // bits 5-7: modo de automatización (3 bits = 8 valores)
 #define AUTOMODE_SHIFT  5
 #define AUTOMODE_MASK   (0x07 << AUTOMODE_SHIFT)

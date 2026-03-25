@@ -58,7 +58,7 @@ static constexpr uint8_t  CALIB_KICK_PWM  = 145;
 static constexpr uint32_t CALIB_KICK_MS   = 120;
 static constexpr uint32_t CALIB_TIMEOUT           = 5000;  // ms — timeout global
 static constexpr int      ADC_STABILITY_THRESHOLD = 700;    // counts
-static constexpr uint32_t CALIB_STABLE_TIME       = 500;   // ms
+static constexpr uint32_t CALIB_STABLE_TIME       = 150;   // ms
 
 // ─── Parámetros finales optimizados ────────────────────────
 static constexpr uint8_t PWM_MIN     = 40;      // Mínimo para mover (antes 40)

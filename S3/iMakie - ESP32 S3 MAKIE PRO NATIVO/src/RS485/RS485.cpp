@@ -163,21 +163,30 @@ void RS485Master::_handleResponse() {
     const SlavePacket* resp = reinterpret_cast<const SlavePacket*>(_rxBuf);
 
     uint8_t crc = rs485_crc8(_rxBuf, sizeof(SlavePacket) - 1);
-    if (crc != resp->crc) {
-        _crcErrors++;
-        return;
-    }
+    if (crc != resp->crc) { _crcErrors++; return; }
     if (resp->id != _currentId) return;
 
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(2)) == pdTRUE) {
         _ch[_currentId].faderPos      = resp->faderPos;
         _ch[_currentId].touchState    = resp->touchState;
         _ch[_currentId].prevButtons   = _ch[_currentId].buttons;
-        _ch[_currentId].buttons       = resp->buttons;
+        _ch[_currentId].buttons       = resp->buttons & 0x0F;  // ← solo bits 0-3
         _ch[_currentId].encoderDelta  = resp->encoderDelta;
         _ch[_currentId].prevEncoderButton = _ch[_currentId].encoderButton;
         _ch[_currentId].encoderButton = resp->encoderButton;
         _ch[_currentId].responded     = true;
+
+        // Estado de calibración
+        bool calibDone  = resp->buttons & SLAVE_FLAG_CALIB_DONE;
+        bool calibError = resp->buttons & SLAVE_FLAG_CALIB_ERROR;
+        if (calibDone && !_ch[_currentId].calibrated) {
+            _ch[_currentId].calibrated = true;
+            log_i("[RS485] Slave %d calibrado OK", _currentId);
+        }
+        if (calibError) {
+            log_w("[RS485] Slave %d ERROR calibracion", _currentId);
+        }
+
         xSemaphoreGive(_mutex);
     }
     _rxCount++;
