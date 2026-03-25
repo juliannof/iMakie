@@ -107,9 +107,7 @@ void setup() {
     Serial.setDebugOutput(true);
     delay(1500);
 
-    otaManager.begin();
-    otaManager.onStatus(_otaStatus);   // ← aquí
-    log_i("OtaManager OK");
+    otaManager.begin();    // solo apaga WiFi — sin status aún
     log_i("=== iMakie PTxx BOOT ===");
 
     pinMode(MOTOR_IN1, OUTPUT);
@@ -128,7 +126,7 @@ void setup() {
     faderADC.begin();
     log_i("Fader ADC OK");
 
-    initDisplay();
+    initDisplay();         // brillo 0 al arrancar
     log_i("Display OK");
 
     initNeopixels();
@@ -150,7 +148,7 @@ void setup() {
     satMenu->onMotorOff      (_satMotorOff);
     satMenu->onMotorOn       (_satMotorOn);
     satMenu->onMotorDrive    (_satMotorDrive);
-    satMenu->onBrightness(_satBrightness);
+    satMenu->onBrightness    (_satBrightness);
     satMenu->onRS485Off      (_satRS485Off);
     satMenu->onRS485On       (_satRS485On);
     satMenu->onReboot        (_satReboot);
@@ -160,14 +158,28 @@ void setup() {
     satMenu->onLedsOff       (_satLedsOff);
     satMenu->onSuspendSprites(_satSuspendSprites);
     satMenu->onRestoreSprites(_satRestoreSprites);
+
+    // Registrar status OTA DESPUÉS de satMenu — el display ya está listo
+    otaManager.onStatus(_otaStatus);
     log_i("SatMenu OK");
 
     uint8_t slaveId = satMenu->getConfig().trackId;
     log_i("Track ID: %d", slaveId);
     rs485.begin(slaveId);
+
     if (slaveId == 0) {
+        // Sin Track ID — SAT obligatorio, no se puede cerrar
         log_w("Track ID=0 — forzando SAT menu");
-        satMenu->open();
+        satMenu->open();   // open() pone brillo 255
+    } else if (!otaManager.hasCredentials()) {
+        // Track OK pero sin WiFi — abrir SAT y lanzar portal
+        log_w("Sin credenciales WiFi — lanzando portal");
+        satMenu->open();   // open() pone brillo 255
+        otaManager.launchPortal();   // bloqueante — feedback via showStatus
+    } else {
+        // Todo OK — encender display y operar
+        setScreenBrightness(255);
+        log_i("Boot OK — operacion normal");
     }
 
     ButtonManager::begin(&tft, satMenu);

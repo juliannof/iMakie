@@ -33,6 +33,7 @@ public:
     // ── Estado ────────────────────────────────────────────────
     bool isOtaActive()  const { return _otaActive; }
     bool isConnected()  const;
+    bool hasCredentials() const;
 
 private:
     bool     _otaActive  = false;

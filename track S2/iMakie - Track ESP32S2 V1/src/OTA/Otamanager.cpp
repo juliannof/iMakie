@@ -43,32 +43,42 @@ void OtaManager::tick() {
 //  Bloqueante hasta que el usuario guarda o se agota el timeout.
 // ─────────────────────────────────────────────────────────────
 void OtaManager::launchPortal() {
-    _status("Iniciando portal WiFi...");
+    // Reset completo del stack WiFi antes de arrancar el AP
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    delay(200);
+    WiFi.mode(WIFI_STA);
+    delay(200);
+
+    _status("AP: iMakie-PTxx");
+    delay(50);
+    _status("Conecta y abre 192.168.4.1");
+    delay(50);
 
     WiFiManager wm;
     wm.setConfigPortalTimeout(PORTAL_TIMEOUT);
     wm.setConnectTimeout(15);
-    wm.setBreakAfterConfig(true);   // salir aunque no conecte
+    wm.setBreakAfterConfig(true);
 
-    // Campo extra: contraseña OTA
     WiFiManagerParameter paramOtaPass("otapass", "OTA Password", "", 32);
     wm.addParameter(&paramOtaPass);
 
-    // Arrancar portal (bloqueante)
+    wm.setAPCallback([this](WiFiManager* wm) {
+        _status("Portal activo...");
+    });
+
     bool connected = wm.startConfigPortal(PORTAL_SSID);
 
     if (connected || wm.getWiFiSSID().length() > 0) {
         String ssid = wm.getWiFiSSID();
         String pass = wm.getWiFiPass();
         String ota  = String(paramOtaPass.getValue());
-
         _saveCredentials(ssid.c_str(), pass.c_str(), ota.c_str());
         _status("Credenciales guardadas.");
     } else {
         _status("Portal: sin cambios.");
     }
 
-    // Apagar WiFi al terminar — volver a modo silencioso
     WiFi.mode(WIFI_OFF);
     WiFi.disconnect(true);
     _otaActive = false;
@@ -161,9 +171,18 @@ void OtaManager::disable() {
     _status("WiFi apagado.");
 }
 
+
 // ─────────────────────────────────────────────────────────────
 bool OtaManager::isConnected() const {
     return WiFi.status() == WL_CONNECTED;
+}
+
+bool OtaManager::hasCredentials() const {
+    Preferences prefs;
+    prefs.begin(NVS_NS, true);
+    String s = prefs.getString(NVS_SSID, "");
+    prefs.end();
+    return s.length() > 0;
 }
 
 // ─────────────────────────────────────────────────────────────
