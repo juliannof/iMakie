@@ -119,6 +119,7 @@ void updateDisplay() {
 
     // Primera vez o redraw forzado
     if (needsTOTALRedraw) {
+        tft.setBrightness(screenBrightness);   // ← AÑADIR ESTO
         tft.fillScreen(TFT_BG_COLOR);
         drawHeaderSprite();
         drawMainArea();

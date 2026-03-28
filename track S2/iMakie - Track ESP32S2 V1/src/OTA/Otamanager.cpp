@@ -43,7 +43,6 @@ void OtaManager::tick() {
 //  Bloqueante hasta que el usuario guarda o se agota el timeout.
 // ─────────────────────────────────────────────────────────────
 void OtaManager::launchPortal() {
-    // Reset completo del stack WiFi antes de arrancar el AP
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
     delay(200);
@@ -55,13 +54,24 @@ void OtaManager::launchPortal() {
     _status("Conecta y abre 192.168.4.1");
     delay(50);
 
+    // ── AÑADIR: leer trackId actual para mostrarlo en el formulario ──
+    Preferences prefs;
+    prefs.begin(NVS_NS, true);
+    uint8_t currentId = prefs.getUChar("trackId", 0);
+    prefs.end();
+    char defaultId[4];
+    snprintf(defaultId, sizeof(defaultId), "%u", currentId);
+    // ────────────────────────────────────────────────────────────────
+
     WiFiManager wm;
     wm.setConfigPortalTimeout(PORTAL_TIMEOUT);
     wm.setConnectTimeout(15);
     wm.setBreakAfterConfig(true);
 
     WiFiManagerParameter paramOtaPass("otapass", "OTA Password", "", 32);
+    WiFiManagerParameter paramTrackId("trackid", "Track ID (1-17)", defaultId, 3); // ← AÑADIR
     wm.addParameter(&paramOtaPass);
+    wm.addParameter(&paramTrackId); // ← AÑADIR
 
     wm.setAPCallback([this](WiFiManager* wm) {
         _status("Portal activo...");
@@ -78,6 +88,19 @@ void OtaManager::launchPortal() {
     } else {
         _status("Portal: sin cambios.");
     }
+
+    // ── AÑADIR: guardar trackId si es válido ─────────────────────────
+    uint8_t newId = (uint8_t)atoi(paramTrackId.getValue());
+    if (newId >= 1 && newId <= 9) {
+        Preferences prefs;
+        prefs.begin(NVS_NS, false);
+        prefs.putUChar("trackId", newId);
+        prefs.end();
+        static char buf[32];
+        snprintf(buf, sizeof(buf), "Track ID: %u guardado.", newId);
+        _status(buf);
+    }
+    // ────────────────────────────────────────────────────────────────
 
     WiFi.mode(WIFI_OFF);
     WiFi.disconnect(true);

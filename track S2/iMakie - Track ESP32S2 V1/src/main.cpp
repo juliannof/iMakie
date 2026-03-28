@@ -112,7 +112,7 @@ void setup() {
     Serial.setDebugOutput(true);
     delay(1500);
 
-    otaManager.begin();    // solo apaga WiFi — sin status aún
+    otaManager.begin();    // apaga WiFi — sin status aún
     log_i("=== iMakie PTxx BOOT ===");
 
     pinMode(MOTOR_IN1, OUTPUT);
@@ -131,7 +131,7 @@ void setup() {
     faderADC.begin();
     log_i("Fader ADC OK");
 
-    initDisplay();         // brillo 0 al arrancar
+    initDisplay();
     log_i("Display OK");
 
     initNeopixels();
@@ -160,42 +160,46 @@ void setup() {
     satMenu->onConfigSaved   (_satConfigSaved);
     satMenu->onWiFiConfig    (_satWiFiConfig);
     satMenu->onWiFiOta       (_satWiFiOta);
-    satMenu->onLedsTest(_satLedsTest);
+    satMenu->onLedsTest      (_satLedsTest);
     satMenu->onLedsOff       (_satLedsOff);
     satMenu->onSuspendSprites(_satSuspendSprites);
     satMenu->onRestoreSprites(_satRestoreSprites);
 
-    // Registrar status OTA DESPUÉS de satMenu — el display ya está listo
+    // OTA status DESPUÉS de satMenu — display ya listo
     otaManager.onStatus(_otaStatus);
     log_i("SatMenu OK");
 
-    uint8_t slaveId = satMenu->getConfig().trackId;
-    log_i("Track ID: %d", slaveId);
-    rs485.begin(slaveId);
-
-    if (slaveId == 0) {
-        // Sin Track ID — SAT obligatorio, no se puede cerrar
-        log_w("Track ID=0 — forzando SAT menu");
-        satMenu->open();   // open() pone brillo 255
-    } else if (!otaManager.hasCredentials()) {
-        // Track OK pero sin WiFi — abrir SAT y lanzar portal
-        log_w("Sin credenciales WiFi — lanzando portal");
-        satMenu->open();   // open() pone brillo 255
-        otaManager.launchPortal();   // bloqueante — feedback via showStatus
-    } else {
-        // Todo OK — encender display y operar
-        setScreenBrightness(255);
-        log_i("Boot OK — operacion normal");
-    }
-
+    // ButtonManager y Motor ANTES del bloque slaveId
+    // — deben estar listos si el SAT se abre inmediatamente
     ButtonManager::begin(&tft, satMenu);
     log_i("ButtonManager OK");
 
     Motor::begin();
     log_i("Motor OK");
 
+    if (psramFound()) {
+        log_i("PSRAM: %u KB total, %u KB libre",
+            ESP.getPsramSize() / 1024, ESP.getFreePsram() / 1024);
+    } else {
+        log_e("ERROR: PSRAM no detectada");
+    }
+
+    uint8_t slaveId = satMenu->getConfig().trackId;
+    log_i("Track ID: %d", slaveId);
+    rs485.begin(slaveId);
+
+    if (!otaManager.hasCredentials()) {
+        log_w("Sin credenciales — lanzando portal");
+        otaManager.launchPortal();   // configura Track ID + WiFi + OTA pass
+        ESP.restart();               // reinicia con todo configurado
+    } else {
+        setScreenBrightness(255);
+        log_i("Boot OK — operacion normal");
+    }
+
     log_i("=== BOOT completo | heap libre: %d bytes ===", ESP.getFreeHeap());
 }
+
 
 // =============================================================
 //  loop
@@ -203,19 +207,16 @@ void setup() {
 void loop() {
     otaManager.tick();
 
-    // OTA activo: prioridad máxima, no procesar nada más
+    // OTA activo: prioridad máxima
     if (otaManager.isOtaActive()) return;
 
+    // SAT abierto
     if (satMenu && satMenu->isOpen()) {
         satMenu->update();
         return;
     }
 
-    if (satMenu && satMenu->isOpen()) {
-        satMenu->update();
-        return;
-    }
-
+    // Long-press REC → puede abrir SAT
     ButtonManager::update();
     if (satMenu && satMenu->isOpen()) return;
 
@@ -239,11 +240,13 @@ void loop() {
         RS485Handler::checkTimeout(lastRxTime);
     }
 
-    // ── Fader + Motor ──────────────────────────────────────────
+    // ── Fader + Touch + Motor ──────────────────────────────────
     faderADC.update();
+    FaderTouch::update();               // ← primero actualizar
+
     Motor::setADC(faderADC.getFaderPos());
 
-    if (FaderTouch::isTouched()) {
+    if (FaderTouch::isTouched()) {      // ← luego leer
         Motor::stop();
     } else {
         Motor::update();
@@ -261,7 +264,6 @@ void loop() {
 
     // ── Hardware ──────────────────────────────────────────────
     updateButtons();
-    FaderTouch::update();
 
     // ── Display ───────────────────────────────────────────────
     updateDisplay();

@@ -599,7 +599,7 @@ void SatMenu::_hIdent(Btn b) {
     if (b == Btn::DOWN) { if (_cur<_identN-1) { _cur++; _dirty=true; } }
     if (b == Btn::BACK) _goto(Scr::MAIN);
     if (b == Btn::ENTER) {
-        if (_cur==0) { _eTitle="Track ID"; _eVal=max((int)_tmp.trackId,1); _eMin=1; _eMax=8; _goto(Scr::EDIT_TRACKID); }
+        if (_cur==0) { _eTitle="Track ID"; _eVal=max((int)_tmp.trackId,1); _eMin=1; _eMax=9; _goto(Scr::EDIT_TRACKID); }
         else         { _lblIdx=0; _goto(Scr::EDIT_LABEL); }
     }
 }
