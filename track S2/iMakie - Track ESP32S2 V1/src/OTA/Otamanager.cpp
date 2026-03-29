@@ -4,64 +4,48 @@
 #include "OtaManager.h"
 
 #include <WiFi.h>
-#include <WiFiManager.h>   // tzapu/WiFiManager
+#include <WiFiManager.h>
 #include <ArduinoOTA.h>
 #include <Preferences.h>
 
-// ── Constantes ───────────────────────────────────────────────
 #define NVS_NS          "ptxx"
 #define NVS_SSID        "wifiSsid"
 #define NVS_PASS        "wifiPass"
 #define NVS_OTA_PASS    "otaPass"
 
-#define PORTAL_SSID     "iMakie-PTxx"   // Nombre del AP captive portal
-#define PORTAL_TIMEOUT  120             // segundos antes de abortar portal
+#define PORTAL_SSID     "iMakie-PTxx"
+#define PORTAL_TIMEOUT  120
 #define OTA_PORT        3232
 
-// Instancia global
 OtaManager otaManager;
 
 // ─────────────────────────────────────────────────────────────
 void OtaManager::begin() {
-    WiFi.mode(WIFI_OFF);
-    WiFi.disconnect(true);
+    // NO llamar WiFi.mode() aquí — bug GDMA en ESP32-S2 + IDF5
     _otaActive = false;
 }
 
 // ─────────────────────────────────────────────────────────────
 void OtaManager::tick() {
     if (_otaActive) {
-        log_i("OTA tick");   // ← temporal
         ArduinoOTA.handle();
     }
 }
 
 // ─────────────────────────────────────────────────────────────
-//  launchPortal()
-//  Abre un AP "iMakie-PTxx" con portal captive.
-//  El portal incluye un campo extra para la contraseña OTA.
-//  Bloqueante hasta que el usuario guarda o se agota el timeout.
-// ─────────────────────────────────────────────────────────────
 void OtaManager::launchPortal() {
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
-    delay(200);
-    WiFi.mode(WIFI_STA);
-    delay(200);
-
+    // NO llamar WiFi.mode() — WiFiManager gestiona el modo internamente
     _status("AP: iMakie-PTxx");
     delay(50);
     _status("Conecta y abre 192.168.4.1");
     delay(50);
 
-    // ── AÑADIR: leer trackId actual para mostrarlo en el formulario ──
     Preferences prefs;
     prefs.begin(NVS_NS, true);
     uint8_t currentId = prefs.getUChar("trackId", 0);
     prefs.end();
     char defaultId[4];
     snprintf(defaultId, sizeof(defaultId), "%u", currentId);
-    // ────────────────────────────────────────────────────────────────
 
     WiFiManager wm;
     wm.setConfigPortalTimeout(PORTAL_TIMEOUT);
@@ -69,9 +53,9 @@ void OtaManager::launchPortal() {
     wm.setBreakAfterConfig(true);
 
     WiFiManagerParameter paramOtaPass("otapass", "OTA Password", "", 32);
-    WiFiManagerParameter paramTrackId("trackid", "Track ID (1-17)", defaultId, 3); // ← AÑADIR
+    WiFiManagerParameter paramTrackId("trackid", "Track ID (1-17)", defaultId, 3);
     wm.addParameter(&paramOtaPass);
-    wm.addParameter(&paramTrackId); // ← AÑADIR
+    wm.addParameter(&paramTrackId);
 
     wm.setAPCallback([this](WiFiManager* wm) {
         _status("Portal activo...");
@@ -89,28 +73,21 @@ void OtaManager::launchPortal() {
         _status("Portal: sin cambios.");
     }
 
-    // ── AÑADIR: guardar trackId si es válido ─────────────────────────
     uint8_t newId = (uint8_t)atoi(paramTrackId.getValue());
     if (newId >= 1 && newId <= 9) {
-        Preferences prefs;
-        prefs.begin(NVS_NS, false);
-        prefs.putUChar("trackId", newId);
-        prefs.end();
+        Preferences prefs2;
+        prefs2.begin(NVS_NS, false);
+        prefs2.putUChar("trackId", newId);
+        prefs2.end();
         static char buf[32];
         snprintf(buf, sizeof(buf), "Track ID: %u guardado.", newId);
         _status(buf);
     }
-    // ────────────────────────────────────────────────────────────────
 
-    WiFi.mode(WIFI_OFF);
-    WiFi.disconnect(true);
+    // NO llamar WiFi.mode(WIFI_OFF) — bug GDMA
     _otaActive = false;
 }
 
-// ─────────────────────────────────────────────────────────────
-//  enableForUpload()
-//  Conecta la red guardada e inicia ArduinoOTA.
-//  No bloqueante: el loop() maneja OTA via tick().
 // ─────────────────────────────────────────────────────────────
 void OtaManager::enableForUpload() {
     char ssid[64]    = {};
@@ -124,10 +101,9 @@ void OtaManager::enableForUpload() {
 
     _status("Conectando WiFi...");
 
-    WiFi.mode(WIFI_STA);
+    // NO llamar WiFi.mode(WIFI_STA) — WiFi.begin() lo gestiona
     WiFi.begin(ssid, pass);
 
-    // Espera hasta 10 s
     uint32_t t0 = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - t0 < 10000) {
         delay(250);
@@ -135,14 +111,13 @@ void OtaManager::enableForUpload() {
 
     if (WiFi.status() != WL_CONNECTED) {
         _status("WiFi: no conectado.");
-        WiFi.mode(WIFI_OFF);
+        // NO llamar WiFi.mode(WIFI_OFF) — bug GDMA
         return;
     }
 
-    // ── ArduinoOTA ───────────────────────────────────────────
     ArduinoOTA.setPort(OTA_PORT);
     ArduinoOTA.setHostname(PORTAL_SSID);
-    ArduinoOTA.setRebootOnSuccess(true);   // ← añadir
+    ArduinoOTA.setRebootOnSuccess(true);
 
     if (strlen(otaPass) > 0) {
         ArduinoOTA.setPassword(otaPass);
@@ -158,14 +133,14 @@ void OtaManager::enableForUpload() {
     });
 
     ArduinoOTA.onProgress([this](unsigned int prog, unsigned int total) {
-    static uint8_t lastPct = 255;
-    uint8_t pct = (prog * 100) / total;
-    if (pct / 20 != lastPct / 20) {
-        lastPct = pct;
-        static char buf[32];
-        snprintf(buf, sizeof(buf), "OTA: %u%%", pct);
-        _status(buf);
-    }
+        static uint8_t lastPct = 255;
+        uint8_t pct = (prog * 100) / total;
+        if (pct / 20 != lastPct / 20) {
+            lastPct = pct;
+            static char buf[32];
+            snprintf(buf, sizeof(buf), "OTA: %u%%", pct);
+            _status(buf);
+        }
     });
 
     ArduinoOTA.onError([this](ota_error_t err) {
@@ -189,11 +164,10 @@ void OtaManager::disable() {
         ArduinoOTA.end();
         _otaActive = false;
     }
-    WiFi.mode(WIFI_OFF);
+    // NO llamar WiFi.mode(WIFI_OFF) — bug GDMA
     WiFi.disconnect(true);
     _status("WiFi apagado.");
 }
-
 
 // ─────────────────────────────────────────────────────────────
 bool OtaManager::isConnected() const {
@@ -209,11 +183,9 @@ bool OtaManager::hasCredentials() const {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  NVS helpers
-// ─────────────────────────────────────────────────────────────
 bool OtaManager::_loadCredentials(char* ssid, char* pass, char* otaPass) {
     Preferences prefs;
-    prefs.begin(NVS_NS, true);  // read-only
+    prefs.begin(NVS_NS, true);
     String s = prefs.getString(NVS_SSID, "");
     String p = prefs.getString(NVS_PASS, "");
     String o = prefs.getString(NVS_OTA_PASS, "");
@@ -229,7 +201,7 @@ bool OtaManager::_loadCredentials(char* ssid, char* pass, char* otaPass) {
 
 void OtaManager::_saveCredentials(const char* ssid, const char* pass, const char* otaPass) {
     Preferences prefs;
-    prefs.begin(NVS_NS, false);  // read-write
+    prefs.begin(NVS_NS, false);
     prefs.putString(NVS_SSID,     ssid);
     prefs.putString(NVS_PASS,     pass);
     prefs.putString(NVS_OTA_PASS, otaPass);
@@ -237,6 +209,6 @@ void OtaManager::_saveCredentials(const char* ssid, const char* pass, const char
 }
 
 void OtaManager::_status(const char* msg) {
-    Serial.printf("[OTA] %s\n", msg);   // S2: Serial.printf, no log_i
+    Serial.printf("[OTA] %s\n", msg);
     if (_cbStatus) _cbStatus(msg);
 }

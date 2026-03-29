@@ -110,12 +110,20 @@ static void _satLedsTest(int idx, uint8_t r, uint8_t g, uint8_t b) {
 void setup() {
     Serial.begin(115200);
     Serial.setDebugOutput(true);
-    Motor::init(); 
+    Motor::init();
     delay(1500);
 
-    otaManager.begin();    // apaga WiFi — sin status aún
+    otaManager.begin();
     log_i("=== iMakie PTxx BOOT ===");
 
+    // ── First-boot: portal ANTES de inicializar display/I2S ──
+    // Si no hay credenciales, nada compite con el WiFi.
+    // launchPortal() no retorna — hace ESP.restart() interno.
+    if (!otaManager.hasCredentials()) {
+        log_w("Sin credenciales — lanzando portal (early boot)");
+        otaManager.launchPortal();
+    }
+    // ─────────────────────────────────────────────────────────
 
     dac_oneshot_handle_t _dacHandle;
     dac_oneshot_config_t _dacCfg = { .chan_id = DAC_CHAN_0 };
@@ -159,15 +167,11 @@ void setup() {
     satMenu->onSuspendSprites(_satSuspendSprites);
     satMenu->onRestoreSprites(_satRestoreSprites);
 
-    // OTA status DESPUÉS de satMenu — display ya listo
     otaManager.onStatus(_otaStatus);
     log_i("SatMenu OK");
 
-    // ButtonManager y Motor ANTES del bloque slaveId
-    // — deben estar listos si el SAT se abre inmediatamente
     ButtonManager::begin(&tft, satMenu);
     log_i("ButtonManager OK");
-    
 
     Motor::begin();
     log_i("Motor OK");
@@ -183,18 +187,9 @@ void setup() {
     log_i("Track ID: %d", slaveId);
     rs485.begin(slaveId);
 
-    if (!otaManager.hasCredentials()) {
-        log_w("Sin credenciales — lanzando portal");
-        otaManager.launchPortal();   // configura Track ID + WiFi + OTA pass
-        ESP.restart();               // reinicia con todo configurado
-    } else {
-        setScreenBrightness(255);
-        log_i("Boot OK — operacion normal");
-    }
-
+    setScreenBrightness(255);
     log_i("=== BOOT completo | heap libre: %d bytes ===", ESP.getFreeHeap());
 }
-
 
 // =============================================================
 //  loop
