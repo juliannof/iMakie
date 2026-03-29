@@ -49,4 +49,7 @@ namespace Motor {
     float      getPosition();  // 0.0–1.0 posición real
     void driveRaw(int pwm);  // >0 arriba, <0 abajo, 0 stop
 
+    void off();   // corte incondicional — usar en desconexión
+
+
 } // namespace Motor                  

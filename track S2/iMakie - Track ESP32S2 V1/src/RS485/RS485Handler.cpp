@@ -31,13 +31,23 @@ void onMasterData(const MasterPacket& pkt) {
     ConnectionState newState = pkt.connected ?
         ConnectionState::CONNECTED : ConnectionState::DISCONNECTED;
     if (newState != logicConnectionState) {
-        logicConnectionState = newState;
-        needsTOTALRedraw = true;
-        if (newState == ConnectionState::CONNECTED) {
-            neoWaitingHandshake = false;
-            updateAllNeopixels();
-        }
+    logicConnectionState = newState;
+    needsTOTALRedraw = true;
+
+    if (newState == ConnectionState::CONNECTED) {
+        neoWaitingHandshake = false;
+        updateAllNeopixels();
+    } else {
+        // ── Desconexión limpia ────────────────────────────
+        Motor::off();  
+        Motor::setTarget(Motor::getRawADC()); 
+        recStates = soloStates = muteStates = selectStates = false;
+        vuLevels = vuPeakLevels = 0.0f;
+        setScreenBrightness(0); 
+        neoWaitingHandshake = true;
+        updateAllNeopixels();
     }
+}
     if (logicConnectionState != ConnectionState::CONNECTED) return;
 
     // ── Nombre de pista ───────────────────────────────────────

@@ -220,6 +220,18 @@ void stop() {
     _hwOff();
 }
 
+void off() {
+    _hwOff();
+    _motorActive = false;
+    _currentPWM  = 0;
+    if (_phase == CalibPhase::GOING_UP ||
+        _phase == CalibPhase::GOING_DOWN) {
+        _phase = CalibPhase::IDLE;   // aborta calibración en curso
+        log_i("[MOTOR] off() — calibración abortada por desconexión");
+    }
+}
+
+
 CalibState getCalibState() {
     switch (_phase) {
         case CalibPhase::GOING_UP:   return CalibState::CALIB_UP;
