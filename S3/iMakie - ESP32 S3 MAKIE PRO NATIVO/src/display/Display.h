@@ -2,6 +2,7 @@
 #pragma once
 #include <Arduino.h>
 #include <LovyanGFX.hpp>        // ← TFT_eSPI.h → LovyanGFX.hpp
+#include <LittleFS.h>   
 #include "../config.h"
 
 // --- Declaración de banderas globales de redibujo ---
@@ -32,7 +33,7 @@ void setScreenBrightness(uint8_t brightness);
  * @brief Dibuja la pantalla de estado "desconectado" o "esperando sesión".
  */
 void drawOfflineScreen();
-
+void tickOfflineAnimation();  
 /**
  * @brief Dibuja la pantalla de estado "MIDI Handshake completo, esperando datos DAW".
  */

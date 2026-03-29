@@ -6,7 +6,27 @@
 
 // --- Variables "Privadas" de este Módulo ---
 namespace {
-    uint8_t screenBrightness = 255;
+    uint8_t     screenBrightness   = 255;
+
+    // Ondas
+    LGFX_Sprite waveSprite(&tft);
+    bool        offlineSpriteReady = false;
+    float       wavePhase          = 0.0f;
+    uint8_t     blinkCounter       = 0;
+
+    constexpr int WAVE_TOP_Y = 15;
+    constexpr int WAVE_BOT_Y = 195;
+    constexpr int WAVE_H     = 90;
+
+    // Logo reveal
+    LGFX_Sprite logoSprite(&tft);
+    bool        logoSpriteReady = false;
+    int         logoReveal      = 0;
+
+    constexpr int LOGO_W = 300;
+    constexpr int LOGO_H = 57;
+    constexpr int LOGO_X = (480 - LOGO_W) / 2;   // 90
+    constexpr int LOGO_Y = (320 - LOGO_H) / 2;   // 131
 }
 
 
@@ -59,11 +79,159 @@ void setScreenBrightness(uint8_t brightness) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 void drawOfflineScreen() {
+    setScreenBrightness(180);
+    offlineSpriteReady = false;
+    logoSpriteReady    = false;
+    logoReveal         = 0;
+    wavePhase          = 0.0f;
+
     tft.fillScreen(TFT_BLACK);
-    tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_DARKGREY);
-    tft.drawString("iMakie Control", tft.width() / 2, tft.height() / 2);
+
+    if (!LittleFS.begin(false)) {
+        log_e("[Offline] LittleFS no montado");
+        goto create_sprite;
+    }
+
+    if (LittleFS.exists("/logo.jpg")) {
+        File f = LittleFS.open("/logo.jpg", "r");
+        if (f) {
+            size_t sz = f.size();
+            uint8_t* buf = (uint8_t*)ps_malloc(sz);
+            if (buf) {
+                f.read(buf, sz);
+                f.close();
+                LittleFS.end();
+
+                logoSprite.setColorDepth(16);
+                logoSprite.setPsram(true);
+                logoSprite.createSprite(LOGO_W, LOGO_H);
+                logoSprite.fillSprite(TFT_BLACK);
+                logoSprite.drawJpg(buf, sz, 0, 0, LOGO_W, LOGO_H);
+                free(buf);
+                logoSpriteReady = (logoSprite.width() > 0);
+                log_i("[Offline] logoSprite: %s", logoSpriteReady ? "OK" : "FALLO");
+            } else {
+                f.close();
+                LittleFS.end();
+                log_e("[Offline] ps_malloc falló");
+            }
+        } else {
+            LittleFS.end();
+        }
+    } else {
+        LittleFS.end();
+        log_w("[Offline] logo.jpg no encontrado");
+    }
+
+create_sprite:
+    tft.fillRect(0, WAVE_TOP_Y, 480, WAVE_H, TFT_BLACK);
+    tft.fillRect(0, WAVE_BOT_Y, 480, WAVE_H, TFT_BLACK);
+    waveSprite.setColorDepth(16);
+    waveSprite.setPsram(true);
+    waveSprite.createSprite(480, WAVE_H);
+    offlineSpriteReady = (waveSprite.width() > 0);
+    log_i("[Offline] waveSprite: %s", offlineSpriteReady ? "OK" : "FALLO");
 }
+
+void tickOfflineAnimation() {
+    static uint32_t lastTick  = 0;
+    static float    phase1    = 0.0f;
+    static float    phase2    = 0.0f;
+    static float    phase3    = 0.0f;
+    static float    phase4    = 0.0f;
+    static float    ampA      = 28.0f;
+    static float    ampB      = 16.0f;
+    static float    ampAdir   = 0.04f;
+    static float    ampBdir   = 0.03f;
+
+    uint32_t now = millis();
+    if (now - lastTick < 33) return;
+    lastTick = now;
+
+    if (!offlineSpriteReady) return;
+
+    // ── Reveal logo letra a letra ──
+    if (logoSpriteReady && logoReveal < LOGO_W) {
+        static uint32_t lastLetter = 0;
+        constexpr int   LETTER_W   = 60;    // 300px / 5 letras
+        constexpr uint32_t DELAY   = 100;   // ms entre letras
+
+        if (now - lastLetter >= DELAY) {
+            lastLetter = now;
+            logoReveal = min(logoReveal + LETTER_W, LOGO_W);
+            tft.fillRect(LOGO_X, LOGO_Y, LOGO_W, LOGO_H, TFT_BLACK);
+            tft.setClipRect(LOGO_X, LOGO_Y, logoReveal, LOGO_H);
+            logoSprite.pushSprite(LOGO_X, LOGO_Y);
+            tft.clearClipRect();
+        }
+    }
+
+    // Fases a velocidades distintas
+    phase1 += 0.061f;
+    phase2 += 0.037f;
+    phase3 += 0.083f;
+    phase4 += 0.019f;
+    if (phase1 > 628.f) phase1 -= 628.f;
+    if (phase2 > 628.f) phase2 -= 628.f;
+    if (phase3 > 628.f) phase3 -= 628.f;
+    if (phase4 > 628.f) phase4 -= 628.f;
+
+    // Amplitud que respira
+    ampA += ampAdir;
+    if (ampA > 32.f || ampA < 14.f) ampAdir = -ampAdir;
+    ampB += ampBdir;
+    if (ampB > 20.f || ampB <  8.f) ampBdir = -ampBdir;
+
+    // ── Dibujar sprite tenue ──
+    waveSprite.fillSprite(TFT_BLACK);
+    waveSprite.drawFastHLine(0, WAVE_H / 2, 480, waveSprite.color565(8, 8, 8));
+
+    // Onda A
+    for (int x = 0; x < 479; x++) {
+        auto yA = [&](int px) {
+            return (int)(WAVE_H/2
+                + ampA * sinf(px * 0.034f + phase1)
+                + (ampA * 0.3f) * sinf(px * 0.071f + phase2));
+        };
+        int y1 = constrain(yA(x),   1, WAVE_H - 2);
+        int y2 = constrain(yA(x+1), 1, WAVE_H - 2);
+        waveSprite.drawLine(x, y1, x+1, y2, waveSprite.color565(35, 35, 35));
+        waveSprite.drawPixel(x, y1 - 1, waveSprite.color565(12, 12, 12));
+        waveSprite.drawPixel(x, y1 + 1, waveSprite.color565(12, 12, 12));
+    }
+
+    // Onda B
+    for (int x = 0; x < 479; x++) {
+        auto yB = [&](int px) {
+            return (int)(WAVE_H/2
+                + ampB * sinf(px * 0.052f + phase3)
+                + (ampB * 0.4f) * sinf(px * 0.021f + phase4));
+        };
+        int y1 = constrain(yB(x),   1, WAVE_H - 2);
+        int y2 = constrain(yB(x+1), 1, WAVE_H - 2);
+        waveSprite.drawLine(x, y1, x+1, y2, waveSprite.color565(22, 22, 22));
+        waveSprite.drawPixel(x, y1 - 1, waveSprite.color565(8, 8, 8));
+        waveSprite.drawPixel(x, y1 + 1, waveSprite.color565(8, 8, 8));
+    }
+
+    waveSprite.pushSprite(0, WAVE_TOP_Y);
+    waveSprite.pushSprite(0, WAVE_BOT_Y);
+
+    // ── Texto parpadeante — solo visible cuando logo ya está completo ──
+    if (logoReveal >= LOGO_W) {
+        blinkCounter++;
+        if ((blinkCounter & 0x1F) == 0) {
+            bool show = (blinkCounter & 0x20);
+            tft.setTextDatum(MC_DATUM);
+            tft.setTextSize(1);
+            tft.setTextColor(show ? TFT_WHITE : TFT_BLACK, TFT_BLACK);
+            tft.drawString("Esperando Logic Pro...", 240, WAVE_BOT_Y + WAVE_H + 8);
+        }
+    }
+}
+
+
+
 
 void drawInitializingScreen() {
     log_v("drawInitializingScreen()");
@@ -458,8 +626,16 @@ void updateDisplay() {
     log_v("updateDisplay(): conexión=%d totalRedraw=%d",
           (int)logicConnectionState, needsTOTALRedraw);
 
+    if (logicConnectionState == ConnectionState::DISCONNECTED) {
+        tickOfflineAnimation();
+    }
+
     if (needsTOTALRedraw) {
         if (logicConnectionState == ConnectionState::CONNECTED) {
+            if (offlineSpriteReady) {
+                waveSprite.deleteSprite();
+                offlineSpriteReady = false;
+            }
             needsHeaderRedraw = true;
             drawHeaderSprite();
             drawMainArea();
@@ -488,7 +664,6 @@ void updateDisplay() {
         if (needsMainAreaRedraw) {
             drawMainArea();
             drawOverlay();
-            //updateLeds();
             needsMainAreaRedraw = false;
             needsVUMetersRedraw = false;
         }
