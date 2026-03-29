@@ -529,8 +529,12 @@ void SatMenu::_tickTestFader(Btn b) {
     if (barEnd>=center) _spr.fillRect(center,y,barEnd-center,14,_motPWM>0?C_GREEN:C_DARK);
     else                _spr.fillRect(barEnd,y,center-barEnd,14,C_ACCENT);
     _spr.drawFastVLine(center,y,14,C_WHITE);
-    snprintf(buf,32," PWM %+d",_motPWM);
-    _spr.setTextColor(C_TEXT,C_BG); _spr.drawString(buf,bx+bw+2,y); y+=18;
+    snprintf(buf,32,"PWM:%+d",_motPWM);                          // ← texto sobre la barra
+    _spr.setTextColor(C_TEXT,C_BG);
+    _spr.setTextDatum(textdatum_t::top_center);
+    _spr.drawString(buf,bx+bw/2,y);                              // ← centrado en la barra
+    _spr.setTextDatum(textdatum_t::top_left);
+    y+=18;
     snprintf(buf,32,"IN1=%s  IN2=%s  EN=%s",
         _motPWM>0?"PWM":"0",_motPWM<0?"PWM":"0",abs(_motPWM)>0?"HIGH":"LOW");
     _spr.setTextColor(C_GRAY,C_BG); _spr.drawString(buf,44,y); y+=16;

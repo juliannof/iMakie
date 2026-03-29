@@ -61,27 +61,25 @@ static constexpr int      ADC_STABILITY_THRESHOLD = 700;    // counts
 static constexpr uint32_t CALIB_STABLE_TIME       = 150;   // ms
 
 // ─── Parámetros finales optimizados ────────────────────────
-static constexpr uint8_t PWM_MIN     = 40;      // Mínimo para mover (antes 40)
+static constexpr uint8_t PWM_MIN     = 65;      // Mínimo para mover (antes 40)
 static constexpr uint8_t PWM_MAX     = 160;     // Máximo para mover
 static constexpr uint8_t PWM_SLEW    = 4;       // Cambio máximo por ciclo
 
-static constexpr int DEAD_ZONE       = 30;      // Zona muerta
-static constexpr int HOLD_ZONE       = 80;      // Zona de holding torque
 static constexpr uint8_t HOLD_MIN    = 35;      // Holding mínimo
 static constexpr uint8_t HOLD_MAX    = 50;      // Holding máximo
 static constexpr float HOLD_GAIN     = 0.35;    // Ganancia para holding
 
+static constexpr uint8_t  PWM_BURST     = 90;   // PWM fijo para correcciones pequeñas
+static constexpr int      BURST_ZONE    = 300;  // distancia donde usar burst
+static constexpr uint32_t MOTOR_COOLDOWN_MS = 400; // más tiempo de parada
+static constexpr uint8_t HOLD_PWM  = 20;   // justo por encima del umbral de movimiento
+static constexpr int     DEAD_ZONE = 100;
+static constexpr int     HOLD_ZONE = 150;  // zona donde aplicar holding
 
 
 static constexpr float   CURVE_GAMMA = 0.6f;
 
-// ─── Estado interno ───────────────────────────────────────────
-static uint16_t _adcMin      = 0;
-static uint16_t _adcMax      = 8191;
-static uint16_t _adcSpan     = 8191;
-static float    _adcFiltered = 0.0f;
-static uint16_t _targetADC   = 0;
-static int      _currentPWM  = 0;
+
 
 // Calibración — estado interno (igual que CalibrationManager)
 static uint32_t _tiempoInicioCalibracion = 0;

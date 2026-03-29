@@ -7,48 +7,49 @@ extern FaderADC faderADC;
 // ─── Hardware ────────────────────────────────────────────────
 static void _hwStop() {
     digitalWrite(MOTOR_EN, HIGH);
-    analogWrite (MOTOR_IN1, 255);
-    analogWrite (MOTOR_IN2, 255);
+    analogWrite(MOTOR_IN1, 255);
+    analogWrite(MOTOR_IN2, 255);
 }
 static void _hwOff() {
     digitalWrite(MOTOR_EN, LOW);
-    analogWrite (MOTOR_IN1, 0);
-    analogWrite (MOTOR_IN2, 0);
+    analogWrite(MOTOR_IN1, 0);
+    analogWrite(MOTOR_IN2, 0);
 }
 static void _hwUp(uint8_t pwm) {
     digitalWrite(MOTOR_EN, HIGH);
-    analogWrite (MOTOR_IN2, 0);
-    analogWrite (MOTOR_IN1, pwm);
+    analogWrite(MOTOR_IN2, 0);
+    analogWrite(MOTOR_IN1, pwm);
 }
 static void _hwDown(uint8_t pwm) {
     digitalWrite(MOTOR_EN, HIGH);
-    analogWrite (MOTOR_IN1, 0);
-    analogWrite (MOTOR_IN2, pwm);
+    analogWrite(MOTOR_IN1, 0);
+    analogWrite(MOTOR_IN2, pwm);
 }
 
-// ─── Estado de calibración ───────────────────────────────────
 enum class CalibPhase { IDLE, GOING_UP, GOING_DOWN, DONE, ERROR };
-static CalibPhase _phase = CalibPhase::IDLE;
-
-static uint32_t _stableStart = 0;
-static int      _stableRef   = 0;
-static uint16_t _adcTop      = 0;
-static uint32_t   _calibStart  = 0;   // ← esta línea
-static uint16_t _lastMidiTarget = 0;
-static bool _motorActive = false;  // ← aquí
-
-
-void setTarget(uint16_t midiTarget) {
-    _lastMidiTarget = midiTarget;              // ← guardar siempre
-    if (_phase != CalibPhase::DONE) return;
-    _targetADC = (uint16_t)map((long)midiTarget, 0, 14848, _adcMin, _adcMax);
-}
+static CalibPhase _phase             = CalibPhase::IDLE;
+static uint32_t   _stableStart       = 0;
+static int        _stableRef         = 0;
+static uint16_t   _adcTop            = 0;
+static uint32_t   _calibStart        = 0;
+static uint32_t   _calibMinDetectTime = 0;
+static uint16_t   _lastMidiTarget    = 0;
+static bool       _motorActive       = false;
+static uint32_t   _motorOffTime      = 0;
+static float      _adcFiltered       = 0.0f;
+static float      _adcControl        = 0.0f;
+static uint16_t   _adcMin            = 0;
+static uint16_t   _adcMax            = 8191;
+static uint16_t   _adcSpan           = 8191;
+static uint16_t   _targetADC         = 0;
+static int        _currentPWM        = 0;
 
 // ─── Calibración ─────────────────────────────────────────────
+
 static void _calibTick() {
     int adc = (int)_adcFiltered;
 
-    log_i("[CALIB] %s  adc=%d  estable_ms=%lu",
+    log_d("[CALIB] %s  adc=%d  estable_ms=%lu",
         _phase == CalibPhase::GOING_UP ? "UP" : "DOWN",
         adc, millis() - _stableStart);
 
@@ -59,6 +60,9 @@ static void _calibTick() {
         return;
     }
 
+    // Tiempo mínimo de viaje — evita detectar tope si fader ya estaba en posición
+    if (millis() < _calibMinDetectTime) return;
+
     if (abs(adc - _stableRef) > ADC_STABILITY_THRESHOLD) {
         _stableRef   = adc;
         _stableStart = millis();
@@ -68,34 +72,85 @@ static void _calibTick() {
     if (millis() - _stableStart < CALIB_STABLE_TIME) return;
 
     if (_phase == CalibPhase::GOING_UP) {
-        _adcTop      = (uint16_t)adc;
-        _stableRef   = adc;
+        _hwOff();
+        delay(80);
+        faderADC.update();
+        faderADC.update();
+        _adcTop      = faderADC.getFaderPos();
+        _stableRef   = (int)_adcTop;
         _stableStart = millis();
+        _calibMinDetectTime = millis() + 800;  // mínimo 800ms bajando
         log_i("[CALIB] Tope superior: %d", _adcTop);
         _phase = CalibPhase::GOING_DOWN;
         _hwDown(CALIB_KICK_PWM);
         delay(CALIB_KICK_MS);
         _hwDown(CALIB_PWM);
-    } else {
-        _hwStop();
-        uint16_t adcBot = (uint16_t)adc;
+
+    } else {  // GOING_DOWN
+        _hwOff();
+        delay(80);
+        faderADC.update();
+        faderADC.update();
+        uint16_t adcBot = faderADC.getFaderPos();
         log_i("[CALIB] Tope inferior: %d", adcBot);
 
         if (_adcTop > adcBot + 200) {
-            _adcMin    = adcBot + 20;
-            _adcMax    = _adcTop - 20;
-            _adcSpan   = _adcMax - _adcMin;
-            _targetADC = (uint16_t)adc;
-            // Aplicar último target conocido inmediatamente
-            _targetADC = (uint16_t)map((long)_lastMidiTarget, 0, 14848, _adcMin, _adcMax);
+            _adcMin      = adcBot + 20;
+            _adcMax      = _adcTop - 20;
+            _adcSpan     = _adcMax - _adcMin;
+            _targetADC   = (uint16_t)map((long)_lastMidiTarget, 0, 14848, _adcMin, _adcMax);
+            _adcFiltered = (float)adcBot;  // posición real → el motor verá el error y se moverá
+            _adcControl  = (float)adcBot;   // ← inicializar filtro lento también
+            _phase       = CalibPhase::DONE;
             log_i("[CALIB] OK  MIN=%d  MAX=%d  span=%d  target=%d",
-             _adcMin, _adcMax, _adcSpan, _targetADC);
+                  _adcMin, _adcMax, _adcSpan, _targetADC);
         } else {
             _phase = CalibPhase::ERROR;
             log_e("[CALIB] ERROR — rango invalido");
         }
     }
 }
+
+// ─── Posición ─────────────────────────────────────────────
+
+static void _positionTick() {
+    int pos    = (int)_adcControl;   // ← lento, filtra el ruido
+    int err    = (int)_targetADC - pos;
+    int absErr = abs(err);
+
+    log_d("[POS] pos=%d target=%d err=%d pwm=%d",
+          pos, _targetADC, err, _currentPWM);
+
+    // Zona muerta — apagar y listo
+    if (absErr < DEAD_ZONE) {
+        if (_motorActive) {
+            _motorActive = false;
+            _hwOff();
+            _currentPWM = 0;
+            log_i("[POS] Motor OFF  pos=%d target=%d err=%d", pos, _targetADC, err);
+        }
+        return;
+    }
+
+    // Encender con histéresis
+    if (!_motorActive) {
+        if (absErr < DEAD_ZONE) return;
+        _motorActive = true;
+        _currentPWM  = 0;
+        log_i("[POS] Motor ON  pos=%d target=%d err=%d", pos, _targetADC, err);
+    }
+
+    // PWM proporcional
+    int targetPWM = PWM_MIN + (min(absErr, 1000) * (PWM_MAX - PWM_MIN)) / 1000;
+    targetPWM = constrain(targetPWM, PWM_MIN, PWM_MAX);
+
+    int delta = constrain(targetPWM - _currentPWM, -PWM_SLEW, PWM_SLEW);
+    _currentPWM = constrain(_currentPWM + delta, 0, PWM_MAX);
+
+    if (err > 0) _hwUp((uint8_t)_currentPWM);
+    else         _hwDown((uint8_t)_currentPWM);
+}
+
 // ─── API pública ─────────────────────────────────────────────
 namespace Motor {
 
@@ -119,110 +174,17 @@ void startCalib() {
         _phase == CalibPhase::GOING_DOWN) return;
 
     faderADC.update();
-    _stableRef   = (int)faderADC.getFaderPos();
-    _stableStart = millis();
-    _calibStart  = millis();
-    _phase       = CalibPhase::GOING_UP;
+    _stableRef          = (int)faderADC.getFaderPos();
+    _stableStart        = millis();
+    _calibStart         = millis();
+    _calibMinDetectTime = millis() + 1000;  // mínimo 1s antes de detectar tope superior
+    _motorActive        = false;
+    _phase              = CalibPhase::GOING_UP;
     _hwUp(CALIB_KICK_PWM);
     delay(CALIB_KICK_MS);
     _hwUp(CALIB_PWM);
     log_i("[CALIB] Iniciada");
 }
-
-
-//***************************************
-// POSITION TICK
-// **************************************
-
-static void _positionTick() {
-    int pos    = (int)_adcFiltered;
-    int err    = (int)_targetADC - pos;
-    int absErr = abs(err);
-    
-    static int lastErr = 0;
-    static int stableCount = 0;
-    
-    //Serial.printf("[POS] pos=%d target=%d err=%d pwm=%d active=%d\n",
-    //    pos, _targetADC, err, _currentPWM, _motorActive);
-
-    // ─── HOLDING TORQUE CONTINUO ───────────────────────────
-    if (absErr < HOLD_ZONE) {
-    // Siempre aplicar holding torque cuando estamos cerca
-    int holdPWM;
-    
-    if (absErr < DEAD_ZONE) {
-        // Dentro de zona muerta: holding mínimo pero suficiente
-        holdPWM = HOLD_MIN;  // Ahora 35, no 25
-        stableCount++;
-        
-        // Solo desactivar después de MUCHO tiempo estable y error casi cero
-        if (stableCount > 200 && absErr < 5) {  // Más ciclos y error muy pequeño
-            _motorActive = false;
-            _hwOff();
-            _currentPWM = 0;
-            return;
-        }
-    } else {
-        // En zona de aproximación: holding proporcional
-        holdPWM = HOLD_MIN + (absErr * HOLD_GAIN);
-        holdPWM = constrain(holdPWM, HOLD_MIN, HOLD_MAX);
-        stableCount = 0;
-    }
-    
-    // Aplicar holding torque en dirección correcta
-    if (err > 0) {
-        _hwUp((uint8_t)holdPWM);
-    } else {
-        _hwDown((uint8_t)holdPWM);
-    }
-    _currentPWM = holdPWM;
-    _motorActive = true;
-    return;
-}
-    
-    // ─── CONTROL NORMAL ────────────────────────────────────
-    stableCount = 0;
-    
-    if (!_motorActive && absErr > DEAD_ZONE) {
-        _motorActive = true;
-    }
-    
-    if (!_motorActive) {
-        _hwOff();
-        return;
-    }
-
-    // Calcular PWM (con ganancia proporcional)
-    int targetPWM;
-    int maxError = 1000;  // Error para PWM máximo
-    
-    if (absErr >= maxError) {
-        targetPWM = PWM_MAX;
-    } else {
-        // Fórmula lineal simple
-        targetPWM = PWM_MIN + (absErr * (PWM_MAX - PWM_MIN)) / maxError;
-    }
-    
-    targetPWM = constrain(targetPWM, PWM_MIN, PWM_MAX);
-
-    // Slew rate
-    int delta = targetPWM - _currentPWM;
-    if (delta > PWM_SLEW) delta = PWM_SLEW;
-    if (delta < -PWM_SLEW) delta = -PWM_SLEW;
-    _currentPWM += delta;
-    _currentPWM = constrain(_currentPWM, 0, PWM_MAX);
-
-    // Aplicar dirección
-    if (err > 0) {
-        _hwUp((uint8_t)_currentPWM);
-    } else {
-        _hwDown((uint8_t)_currentPWM);
-    }
-}
-
-// **********************************
-// UPDATE PRINCIPAL (LLAMAR EN LOOP)
-// **********************************
 
 void update() {
     if (_phase == CalibPhase::GOING_UP ||
@@ -231,29 +193,34 @@ void update() {
     } else if (_phase == CalibPhase::DONE) {
         _positionTick();
     } else {
-        _hwStop();
+        _hwOff();
     }
 }
 
-void setADC(uint16_t v) { _adcFiltered = (float)v; }
+void setADC(uint16_t v) {
+    if (_adcFiltered > 0 && abs((int)v - (int)_adcFiltered) > 300) return;
+    _adcFiltered = _adcFiltered * 0.6f  + (float)v * 0.4f;   // rápido
+    _adcControl  = _adcControl  * 0.92f + (float)v * 0.08f;  // lento — muy suave
+}
+
+void setTarget(uint16_t midiTarget) {   // ← FIX BUG 2: única versión, guarda siempre
+    _lastMidiTarget = midiTarget;
+    if (_phase != CalibPhase::DONE) return;
+    _targetADC = (uint16_t)map((long)midiTarget, 0, 14848, _adcMin, _adcMax);
+    log_d("[TARGET] midi=%d → adc=%d (min=%d max=%d)",
+          midiTarget, _targetADC, _adcMin, _adcMax);
+}
 
 void stop() {
     if (_phase == CalibPhase::GOING_UP ||
         _phase == CalibPhase::GOING_DOWN) return;
-    _hwStop();
+    _hwOff();
 }
 
-void setTarget(uint16_t midiTarget) {
-    if (_phase != CalibPhase::DONE) return;
-    _targetADC = (uint16_t)map((long)midiTarget, 0, 14848, _adcMin, _adcMax);
-    Serial.printf("[TARGET] midi=%d → adc=%d (min=%d max=%d)\n", 
-                  midiTarget, _targetADC, _adcMin, _adcMax);
-}
-
-Motor::CalibState getCalibState() {
+CalibState getCalibState() {
     switch (_phase) {
-        case CalibPhase::GOING_UP:   return CalibState::CALIB_DOWN;
-        case CalibPhase::GOING_DOWN: return CalibState::CALIB_UP;
+        case CalibPhase::GOING_UP:   return CalibState::CALIB_UP;
+        case CalibPhase::GOING_DOWN: return CalibState::CALIB_DOWN;
         case CalibPhase::DONE:       return CalibState::DONE;
         case CalibPhase::ERROR:      return CalibState::ERROR;
         default:                     return CalibState::IDLE;
@@ -269,8 +236,8 @@ float    getPosition()  {
     return constrain((_adcFiltered - _adcMin) / (float)_adcSpan, 0.0f, 1.0f);
 }
 void driveRaw(int pwm) {
-    if (pwm == 0) { _hwStop(); return; }
-    if (pwm > 0) _hwUp((uint8_t)constrain( pwm, 0, 255));
+    if (pwm == 0) { _hwOff(); return; }
+    if (pwm > 0) _hwUp((uint8_t)constrain(pwm, 0, 255));
     else         _hwDown((uint8_t)constrain(-pwm, 0, 255));
 }
 

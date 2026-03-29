@@ -15,27 +15,27 @@
 
 // Base de datos por canal (acceso thread-safe desde Core 0)
 struct ChannelData {
-    // Master → Slave (escrito desde Core 0 via MIDI)
+    // Master → Slave
     char      trackName[8]  = {};
     uint8_t   flags         = 0;
     uint16_t  faderTarget   = 8192;
     uint8_t   vuLevel       = 0;
-    uint8_t  vpotValue  = 0;   // ← NUEVO
+    uint8_t   vpotValue     = 0;
     bool      dirty         = true;
-    bool      calibrate     = false;   // one-shot: FLAG_CALIB → se limpia tras enviar
-    AutoMode  autoMode      = AUTO_OFF; // bits 5-7 de flags
+    bool      calibrate     = false;
+    bool      calibrating   = false;   // ← AÑADIR
+    AutoMode  autoMode      = AUTO_OFF;
 
-    // Slave → Master (leído desde Core 0 para enviar a Logic)
-    uint16_t faderPos      = 0;
-    uint8_t  touchState    = 0;
-    uint8_t  buttons       = 0;
-    uint8_t  prevButtons   = 0;
-    int8_t   encoderDelta  = 0;
-    uint8_t  encoderButton = 0;
-    uint8_t prevEncoderButton = 0;
-    bool calibrated = false;
-    
-    bool     responded     = false;
+    // Slave → Master
+    uint16_t faderPos         = 0;
+    uint8_t  touchState       = 0;
+    uint8_t  buttons          = 0;
+    uint8_t  prevButtons      = 0;
+    int8_t   encoderDelta     = 0;
+    uint8_t  encoderButton    = 0;
+    uint8_t  prevEncoderButton = 0;
+    bool     calibrated       = false;
+    bool     responded        = false;
 };
 
 class RS485Master {

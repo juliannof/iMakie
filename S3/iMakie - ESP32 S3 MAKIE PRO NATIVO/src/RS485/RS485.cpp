@@ -167,30 +167,45 @@ void RS485Master::_handleResponse() {
     if (resp->id != _currentId) return;
 
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(2)) == pdTRUE) {
-        _ch[_currentId].faderPos      = resp->faderPos;
-        _ch[_currentId].touchState    = resp->touchState;
-        _ch[_currentId].prevButtons   = _ch[_currentId].buttons;
-        _ch[_currentId].buttons       = resp->buttons & 0x0F;  // ← solo bits 0-3
-        _ch[_currentId].encoderDelta  = resp->encoderDelta;
+        _ch[_currentId].faderPos          = resp->faderPos;
+        _ch[_currentId].touchState        = resp->touchState;
+        _ch[_currentId].prevButtons       = _ch[_currentId].buttons;
+        _ch[_currentId].buttons           = resp->buttons & 0x0F;
+        _ch[_currentId].encoderDelta      = resp->encoderDelta;
         _ch[_currentId].prevEncoderButton = _ch[_currentId].encoderButton;
-        _ch[_currentId].encoderButton = resp->encoderButton;
-        _ch[_currentId].responded     = true;
+        _ch[_currentId].encoderButton     = resp->encoderButton;
+        _ch[_currentId].responded         = true;
 
-        // Estado de calibración
         bool calibDone  = resp->buttons & SLAVE_FLAG_CALIB_DONE;
         bool calibError = resp->buttons & SLAVE_FLAG_CALIB_ERROR;
-        if (calibDone && !_ch[_currentId].calibrated) {
-            _ch[_currentId].calibrated = true;
-            log_i("[RS485] Slave %d calibrado OK", _currentId);
+
+        if (calibDone) {
+            _ch[_currentId].calibrating = false;
+            if (!_ch[_currentId].calibrated) {
+                _ch[_currentId].calibrated = true;
+                _ch[_currentId].dirty      = true;  // fuerza reenvío faderTarget
+                log_i("[RS485] Slave %d calibrado OK", _currentId);
+            }
         }
         if (calibError) {
+            _ch[_currentId].calibrating = false;
             log_w("[RS485] Slave %d ERROR calibracion", _currentId);
+        }
+
+        // Solo disparar si no calibrado y no hay calibración en curso
+        if (!_ch[_currentId].calibrated && !_ch[_currentId].calibrating) {
+            _ch[_currentId].calibrate   = true;
+            _ch[_currentId].dirty       = true;
+            _ch[_currentId].calibrating = true;
+            log_i("[RS485] Slave %d sin calibrar — disparando", _currentId);
         }
 
         xSemaphoreGive(_mutex);
     }
     _rxCount++;
 }
+
+
 
 void RS485Master::_nextSlave() {
     _currentId++;

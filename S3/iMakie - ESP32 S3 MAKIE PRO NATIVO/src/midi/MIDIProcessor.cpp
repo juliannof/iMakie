@@ -686,24 +686,30 @@ void processPitchBend(byte channel, int bendValue) {
     }
 
     // --- Transición HANDSHAKE_COMPLETE → CONNECTED ---
-    if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) {
-        logicConnectionState = ConnectionState::CONNECTED;
-        g_logicConnected     = 1;
-        connectedSinceTime   = millis();
-        needsTOTALRedraw     = true;
-        fadersAtMinMask      = 0;
+    // --- Transición HANDSHAKE_COMPLETE → CONNECTED ---
+if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) {
+    logicConnectionState = ConnectionState::CONNECTED;
+    g_logicConnected     = 1;
+    connectedSinceTime   = millis();
+    needsTOTALRedraw     = true;
+    fadersAtMinMask      = 0;
 
-        // Limpiar todos los SELECT al conectar
-        for (uint8_t i = 0; i < 8; i++) {
-            if (selectStates[i]) {
-                byte offMsg[3] = { 0x80, (uint8_t)(24 + i), 0x00 };
-                sendMIDIBytes(offMsg, 3);
-                selectStates[i] = false;
-            }
+    // Limpiar todos los SELECT al conectar
+    for (uint8_t i = 0; i < 8; i++) {
+        if (selectStates[i]) {
+            byte offMsg[3] = { 0x80, (uint8_t)(24 + i), 0x00 };
+            sendMIDIBytes(offMsg, 3);
+            selectStates[i] = false;
         }
-
-        log_d("DAW conectado: Primer PitchBend Track %d -> CONNECTED.", channel + 1);
     }
+
+    // ── Calibración escalonada ────────────────────────────
+    _calibPendingFrom = 1;
+    _calibNextTime    = millis();   // primera inmediata
+    log_i("[CALIB] Secuencia iniciada para %d slaves", NUM_SLAVES);
+
+    log_d("DAW conectado: Primer PitchBend Track %d -> CONNECTED.", channel + 1);
+}
 
     // --- Actualizar posición fader ---
     if (channel < 9) {
