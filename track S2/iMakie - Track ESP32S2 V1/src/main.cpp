@@ -110,18 +110,12 @@ static void _satLedsTest(int idx, uint8_t r, uint8_t g, uint8_t b) {
 void setup() {
     Serial.begin(115200);
     Serial.setDebugOutput(true);
+    Motor::init(); 
     delay(1500);
 
     otaManager.begin();    // apaga WiFi — sin status aún
     log_i("=== iMakie PTxx BOOT ===");
 
-    pinMode(MOTOR_IN1, OUTPUT);
-    pinMode(MOTOR_IN2, OUTPUT);
-    pinMode(MOTOR_EN,  OUTPUT);
-    digitalWrite(MOTOR_IN1, LOW);
-    digitalWrite(MOTOR_IN2, LOW);
-    digitalWrite(MOTOR_EN,  LOW);
-    log_i("Motor pins init OK");
 
     dac_oneshot_handle_t _dacHandle;
     dac_oneshot_config_t _dacCfg = { .chan_id = DAC_CHAN_0 };
@@ -173,6 +167,7 @@ void setup() {
     // — deben estar listos si el SAT se abre inmediatamente
     ButtonManager::begin(&tft, satMenu);
     log_i("ButtonManager OK");
+    
 
     Motor::begin();
     log_i("Motor OK");

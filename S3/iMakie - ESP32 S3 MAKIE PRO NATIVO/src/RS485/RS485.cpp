@@ -188,17 +188,22 @@ void RS485Master::_handleResponse() {
             }
         }
         if (calibError) {
-            _ch[_currentId].calibrating = false;
-            log_w("[RS485] Slave %d ERROR calibracion", _currentId);
-        }
+    _ch[_currentId].calibrating = false;
+    _ch[_currentId].calibRetries++;
+    log_w("[RS485] Slave %d ERROR calibracion (intento %d)", 
+          _currentId, _ch[_currentId].calibRetries);
+}
 
-        // Solo disparar si no calibrado y no hay calibración en curso
-        if (!_ch[_currentId].calibrated && !_ch[_currentId].calibrating) {
-            _ch[_currentId].calibrate   = true;
-            _ch[_currentId].dirty       = true;
-            _ch[_currentId].calibrating = true;
-            log_i("[RS485] Slave %d sin calibrar — disparando", _currentId);
-        }
+// Solo re-disparar si no calibrado, no en curso, y menos de 3 intentos
+if (!_ch[_currentId].calibrated && 
+    !_ch[_currentId].calibrating &&
+    _ch[_currentId].calibRetries < 3) {
+    _ch[_currentId].calibrate   = true;
+    _ch[_currentId].dirty       = true;
+    _ch[_currentId].calibrating = true;
+    log_i("[RS485] Slave %d sin calibrar — disparando (intento %d)", 
+          _currentId, _ch[_currentId].calibRetries + 1);
+}
 
         xSemaphoreGive(_mutex);
     }

@@ -25,6 +25,8 @@ struct ChannelData {
     bool      calibrate     = false;
     bool      calibrating   = false;   // ← AÑADIR
     AutoMode  autoMode      = AUTO_OFF;
+    uint8_t calibRetries = 0;
+
 
     // Slave → Master
     uint16_t faderPos         = 0;
@@ -36,6 +38,7 @@ struct ChannelData {
     uint8_t  prevEncoderButton = 0;
     bool     calibrated       = false;
     bool     responded        = false;
+    
 };
 
 class RS485Master {

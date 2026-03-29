@@ -154,12 +154,15 @@ static void _positionTick() {
 // ─── API pública ─────────────────────────────────────────────
 namespace Motor {
 
-void init() {
+void init() {   // ← quitar Motor:: — estás dentro del namespace
     pinMode(MOTOR_IN1, OUTPUT);
     pinMode(MOTOR_IN2, OUTPUT);
     pinMode(MOTOR_EN,  OUTPUT);
     analogWriteFrequency(MOTOR_IN1, 20000);
     analogWriteFrequency(MOTOR_IN2, 20000);
+    analogWriteResolution(MOTOR_IN1, 8);   // ← requiere pin en IDF5
+    analogWriteResolution(MOTOR_IN2, 8);
+    log_i("[MOTOR] PWM analogWrite @ 20kHz res=8 IN1=%d IN2=%d", MOTOR_IN1, MOTOR_IN2);
     _hwStop();
 }
 
