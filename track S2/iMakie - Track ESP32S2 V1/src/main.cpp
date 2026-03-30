@@ -116,8 +116,18 @@ void setup() {
     otaManager.begin();
     log_i("=== iMakie PTxx BOOT ===");
 
+    // ── OTA pending: conectar WiFi ANTES de inicializar I2S ──
+    // enableForUpload() desde SAT guarda este flag y reinicia.
+    // En el siguiente boot, I2S0 aún no está inicializado.
+    if (otaManager.isOtaPending()) {
+        log_i("OTA pending — arrancando modo OTA (early boot)");
+        otaManager.clearOtaPending();
+        otaManager.beginOtaFromBoot();
+        // Si conecta: _otaActive=true, loop() maneja el OTA
+        // Si falla:   beginOtaFromBoot() hace restart interno
+    }
+
     // ── First-boot: portal ANTES de inicializar display/I2S ──
-    // Si no hay credenciales, nada compite con el WiFi.
     // launchPortal() no retorna — hace ESP.restart() interno.
     if (!otaManager.hasCredentials()) {
         log_w("Sin credenciales — lanzando portal (early boot)");

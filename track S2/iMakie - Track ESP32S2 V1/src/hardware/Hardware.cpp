@@ -1,7 +1,6 @@
 // src/hardware/Hardware.cpp
 #include "Hardware.h"
 #include "../config.h"
-#include "Neopixels/Neopixel.h"
 
 // Hardware.cpp no gestiona estados de botones ni LEDs.
 // Solo detecta pulsaciones y notifica via callbacks.
