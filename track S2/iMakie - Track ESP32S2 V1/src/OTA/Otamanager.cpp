@@ -2,9 +2,7 @@
 //  OtaManager.cpp  —  iMakie PTxx Track S2
 // ============================================================
 #include "OtaManager.h"
-#include <driver/i2s.h>
-
-
+#include <esp_wifi.h>
 #include <WiFi.h>
 #include <WiFiManager.h>
 #include <ArduinoOTA.h>
@@ -50,7 +48,6 @@ void OtaManager::launchPortal() {
     snprintf(defaultId, sizeof(defaultId), "%u", currentId);
 
     WiFiManager wm;
-    wm.resetSettings();
     wm.setConfigPortalTimeout(PORTAL_TIMEOUT);
     wm.setConnectTimeout(15);
     wm.setBreakAfterConfig(true);
@@ -102,21 +99,13 @@ void OtaManager::enableForUpload() {
         return;
     }
 
-    // ── I2S0 (NeoPixelBus IDF5) no se puede desinstalar con la API
-    //    legacy. Solución: flag NVS + restart. El siguiente boot
-    //    conecta WiFi antes de inicializar I2S0. ─────────────────
-    Preferences prefs;
-    prefs.begin(NVS_NS, false);
-    prefs.putBool("otaPending", true);
-    prefs.end();
-
-    _status("Reiniciando para OTA...");
-    delay(500);
-    ESP.restart();
-}
-
-void OtaManager::_startOta(const char* ssid, const char* pass, const char* otaPass) {
     _status("Conectando WiFi...");
+
+    esp_wifi_stop();
+    esp_wifi_deinit();
+    delay(200);
+    WiFi.mode(WIFI_STA);
+    delay(200);
     WiFi.begin(ssid, pass);
 
     uint32_t t0 = millis();
@@ -126,8 +115,7 @@ void OtaManager::_startOta(const char* ssid, const char* pass, const char* otaPa
 
     if (WiFi.status() != WL_CONNECTED) {
         _status("WiFi: no conectado.");
-        delay(500);
-        ESP.restart();
+        // NO llamar WiFi.mode(WIFI_OFF) — bug GDMA
         return;
     }
 
@@ -163,8 +151,7 @@ void OtaManager::_startOta(const char* ssid, const char* pass, const char* otaPa
         static char buf[32];
         snprintf(buf, sizeof(buf), "OTA error: %u", err);
         _status(buf);
-        delay(500);
-        ESP.restart();
+        _otaActive = false;
     });
 
     ArduinoOTA.begin();
@@ -173,33 +160,6 @@ void OtaManager::_startOta(const char* ssid, const char* pass, const char* otaPa
     static char buf[48];
     snprintf(buf, sizeof(buf), "OTA listo  IP:%s", WiFi.localIP().toString().c_str());
     _status(buf);
-}
-
-bool OtaManager::isOtaPending() {
-    Preferences prefs;
-    prefs.begin(NVS_NS, true);
-    bool v = prefs.getBool("otaPending", false);
-    prefs.end();
-    return v;
-}
-
-void OtaManager::clearOtaPending() {
-    Preferences prefs;
-    prefs.begin(NVS_NS, false);
-    prefs.remove("otaPending");
-    prefs.end();
-}
-
-// OtaManager.cpp
-void OtaManager::beginOtaFromBoot() {
-    char ssid[64]={}, pass[64]={}, otaPass[33]={};
-    if (!_loadCredentials(ssid, pass, otaPass)) {
-        log_w("[OTA] Sin credenciales en boot OTA");
-        return;
-    }
-    log_i("[OTA] SSID guardado: '%s'", ssid);  // ← temporal
-    log_i("[OTA] Pass guardado: '%s'", pass);  // ← temporal
-    _startOta(ssid, pass, otaPass);
 }
 
 // ─────────────────────────────────────────────────────────────
