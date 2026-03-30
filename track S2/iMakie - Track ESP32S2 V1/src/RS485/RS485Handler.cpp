@@ -74,7 +74,7 @@ void onMasterData(const MasterPacket& pkt) {
         handleButtonLedState(ButtonId::REC);
         handleButtonLedState(ButtonId::SOLO);
         handleButtonLedState(ButtonId::MUTE);
-        showNeopixels();
+        //showNeopixels();
         needsHeaderRedraw = true;
     }
 

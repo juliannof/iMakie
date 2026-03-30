@@ -163,8 +163,17 @@ void RS485Master::_handleResponse() {
     const SlavePacket* resp = reinterpret_cast<const SlavePacket*>(_rxBuf);
 
     uint8_t crc = rs485_crc8(_rxBuf, sizeof(SlavePacket) - 1);
-    if (crc != resp->crc) { _crcErrors++; return; }
-    if (resp->id != _currentId) return;
+    if (crc != resp->crc) {
+        _crcErrors++;
+        log_e("[RS485] slave=%u CRC ERROR calc=0x%02X recv=0x%02X",
+              _currentId, crc, resp->crc);
+        return;
+    }
+    if (resp->id != _currentId) {
+        log_e("[RS485] ID MISMATCH esperado=%u recibido=%u",
+              _currentId, resp->id);
+        return;
+    }
 
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(2)) == pdTRUE) {
         _ch[_currentId].faderPos          = resp->faderPos;
@@ -183,30 +192,36 @@ void RS485Master::_handleResponse() {
             _ch[_currentId].calibrating = false;
             if (!_ch[_currentId].calibrated) {
                 _ch[_currentId].calibrated = true;
-                _ch[_currentId].dirty      = true;  // fuerza reenvío faderTarget
+                _ch[_currentId].dirty      = true;
                 log_i("[RS485] Slave %d calibrado OK", _currentId);
             }
         }
-        if (calibError) {
-    _ch[_currentId].calibrating = false;
-    _ch[_currentId].calibRetries++;
-    log_w("[RS485] Slave %d ERROR calibracion (intento %d)", 
-          _currentId, _ch[_currentId].calibRetries);
-}
 
-// Solo re-disparar si no calibrado, no en curso, y menos de 3 intentos
-if (!_ch[_currentId].calibrated && 
-    !_ch[_currentId].calibrating &&
-    _ch[_currentId].calibRetries < 3) {
-    _ch[_currentId].calibrate   = true;
-    _ch[_currentId].dirty       = true;
-    _ch[_currentId].calibrating = true;
-    log_i("[RS485] Slave %d sin calibrar — disparando (intento %d)", 
-          _currentId, _ch[_currentId].calibRetries + 1);
-}
+        if (calibError) {
+            _ch[_currentId].calibrating = false;
+            _ch[_currentId].calibRetries++;
+            log_w("[RS485] Slave %d ERROR calibracion (intento %d)",
+                  _currentId, _ch[_currentId].calibRetries);
+        }
+
+        if (!_ch[_currentId].calibrated &&
+            !_ch[_currentId].calibrating &&
+            _ch[_currentId].calibRetries < 3) {
+            _ch[_currentId].calibrate   = true;
+            _ch[_currentId].dirty       = true;
+            _ch[_currentId].calibrating = true;
+            log_i("[RS485] Slave %d sin calibrar — disparando (intento %d)",
+                  _currentId, _ch[_currentId].calibRetries + 1);
+        }
 
         xSemaphoreGive(_mutex);
     }
+
+    //log_e("[RS485] slave=%u buttons=0x%02X prev=0x%02X",
+    //      _currentId,
+    //      _ch[_currentId].buttons,
+    //      _ch[_currentId].prevButtons);
+
     _rxCount++;
 }
 
