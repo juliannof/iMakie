@@ -2,7 +2,7 @@
 //  OtaManager.cpp  —  iMakie PTxx Track S2
 // ============================================================
 #include "OtaManager.h"
-#include <esp_wifi.h>
+
 #include <WiFi.h>
 #include <WiFiManager.h>
 #include <ArduinoOTA.h>
@@ -101,11 +101,7 @@ void OtaManager::enableForUpload() {
 
     _status("Conectando WiFi...");
 
-    esp_wifi_stop();
-    esp_wifi_deinit();
-    delay(200);
-    WiFi.mode(WIFI_STA);
-    delay(200);
+    // NO llamar WiFi.mode(WIFI_STA) — WiFi.begin() lo gestiona
     WiFi.begin(ssid, pass);
 
     uint32_t t0 = millis();

@@ -17,7 +17,7 @@
 #include "protocol.h"
 #include "hardware/button/ButtonManager.h"
 #include "SAT/SatMenu.h"
-#include "display/SpriteUtils.h"   // en main.cpp
+#include "display/SpriteUtils.h"
 #include <driver/dac_oneshot.h>
 
 // ─── Objetos globales ─────────────────────────────────────────
@@ -38,12 +38,11 @@ float vuLevels        = 0.0f;
 unsigned long vuLastUpdateTime     = 0;
 unsigned long vuPeakLastUpdateTime = 0;
 
-static bool    _suspended = false;
-static SatMenu* satMenu   = nullptr;
+static bool     _suspended = false;
+static SatMenu* satMenu    = nullptr;
 
 // ─────────────────────────────────────────────────────────────
-//  Callbacks SAT — funciones estáticas nombradas
-//  (evitan el ICE del compilador xtensa con demasiadas lambdas)
+//  Callbacks SAT
 // ─────────────────────────────────────────────────────────────
 static void _satMotorOff()  { Motor::stop();   _suspended = true;  }
 static void _satMotorOn()   { Motor::begin();  _suspended = false; }
@@ -51,10 +50,9 @@ static void _satBrightness(uint8_t b) { setScreenBrightness(b); }
 static void _satRS485Off()  { _suspended = true;  }
 static void _satRS485On()   { _suspended = false; needsTOTALRedraw = true; }
 static void _satReboot()    { ESP.restart(); }
-static void _satMotorDrive(int pwm)   { Motor::driveRaw(pwm); }
+static void _satMotorDrive(int pwm) { Motor::driveRaw(pwm); }
 static void _satConfigSaved(const SatConfig& cfg) { rs485.begin(cfg.trackId); }
-static void _satWiFiConfig() { otaManager.launchPortal();    }
-static void _satWiFiOta() { otaManager.enableForUpload(); }
+static void _satWiFiOta()   { otaManager.enableForUpload(); }
 static void _satLedsOff() {
     neopixels.ClearTo(RgbColor(0));
     neopixels.Show();
@@ -66,22 +64,21 @@ static void _satSuspendSprites() {
     vPotSprite.deleteSprite();
     log_i("Sprites suspendidos | PSRAM libre: %d", ESP.getFreePsram());
 }
-
 static void _satRestoreSprites() {
     mainArea.setColorDepth(16);
-    mainArea.setPsram(true);          // ← añadir
+    mainArea.setPsram(true);
     mainArea.createSprite(MAINAREA_WIDTH, MAINAREA_HEIGHT);
 
     header.setColorDepth(16);
-    header.setPsram(true);            // ← añadir
+    header.setPsram(true);
     header.createSprite(TFT_WIDTH, HEADER_HEIGHT);
 
     vuSprite.setColorDepth(16);
-    vuSprite.setPsram(true);          // ← añadir
+    vuSprite.setPsram(true);
     vuSprite.createSprite(TFT_WIDTH - MAINAREA_WIDTH, MAINAREA_HEIGHT);
 
     vPotSprite.setColorDepth(16);
-    vPotSprite.setPsram(true);        // ← añadir
+    vPotSprite.setPsram(true);
     vPotSprite.createSprite(TFT_WIDTH, VPOT_HEIGHT);
 
     _logSpriteAlloc("header",    header);
@@ -90,19 +87,14 @@ static void _satRestoreSprites() {
     _logSpriteAlloc("vPotSprite",vPotSprite);
     needsTOTALRedraw = true;
 }
-
 static void _otaStatus(const char* msg) {
     if (satMenu && satMenu->isOpen())
         satMenu->showStatus(msg);
 }
-
 static void _satLedsTest(int idx, uint8_t r, uint8_t g, uint8_t b) {
     setNeopixelState(idx, r, g, b);
     showNeopixels();
 }
- 
-
-
 
 // =============================================================
 //  setup
@@ -115,15 +107,6 @@ void setup() {
 
     otaManager.begin();
     log_i("=== iMakie PTxx BOOT ===");
-
-    // ── First-boot: portal ANTES de inicializar display/I2S ──
-    // Si no hay credenciales, nada compite con el WiFi.
-    // launchPortal() no retorna — hace ESP.restart() interno.
-    if (!otaManager.hasCredentials()) {
-        log_w("Sin credenciales — lanzando portal (early boot)");
-        otaManager.launchPortal();
-    }
-    // ─────────────────────────────────────────────────────────
 
     dac_oneshot_handle_t _dacHandle;
     dac_oneshot_config_t _dacCfg = { .chan_id = DAC_CHAN_0 };
@@ -160,7 +143,6 @@ void setup() {
     satMenu->onRS485On       (_satRS485On);
     satMenu->onReboot        (_satReboot);
     satMenu->onConfigSaved   (_satConfigSaved);
-    satMenu->onWiFiConfig    (_satWiFiConfig);
     satMenu->onWiFiOta       (_satWiFiOta);
     satMenu->onLedsTest      (_satLedsTest);
     satMenu->onLedsOff       (_satLedsOff);
@@ -197,20 +179,16 @@ void setup() {
 void loop() {
     otaManager.tick();
 
-    // OTA activo: prioridad máxima
     if (otaManager.isOtaActive()) return;
 
-    // SAT abierto
     if (satMenu && satMenu->isOpen()) {
         satMenu->update();
         return;
     }
 
-    // Long-press REC → puede abrir SAT
     ButtonManager::update();
     if (satMenu && satMenu->isOpen()) return;
 
-    // ── RS485 ─────────────────────────────────────────────────
     if (!_suspended) {
         rs485.update();
         static unsigned long lastRxTime = 0;
@@ -230,19 +208,17 @@ void loop() {
         RS485Handler::checkTimeout(lastRxTime);
     }
 
-    // ── Fader + Touch + Motor ──────────────────────────────────
     faderADC.update();
-    FaderTouch::update();               // ← primero actualizar
+    FaderTouch::update();
 
     Motor::setADC(faderADC.getFaderPos());
 
-    if (FaderTouch::isTouched()) {      // ← luego leer
+    if (FaderTouch::isTouched()) {
         Motor::stop();
     } else {
         Motor::update();
     }
 
-    // ── Encoder ───────────────────────────────────────────────
     Encoder::update();
     if (Encoder::hasChanged()) {
         int newLevel = constrain((int)(Encoder::getCount() / 4), -7, 7);
@@ -252,12 +228,7 @@ void loop() {
         }
     }
 
-    // ── Hardware ──────────────────────────────────────────────
     updateButtons();
-
-    // ── Display ───────────────────────────────────────────────
     updateDisplay();
-
-    // ── NeoPixels ─────────────────────────────────────────────
     updateAllNeopixels();
 }

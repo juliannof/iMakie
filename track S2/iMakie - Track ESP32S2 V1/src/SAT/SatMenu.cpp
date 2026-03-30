@@ -1,7 +1,5 @@
 // ============================================================
 //  SatMenu.cpp  –  iMakie PTxx Track S2
-//  Sprite único 240×280. Todo dibujo va a _spr.
-//  Al final de cada frame: _push() → pushSprite(0,0).
 // ============================================================
 #include "SatMenu.h"
 
@@ -9,13 +7,12 @@
 //  Tablas de menú
 // ─────────────────────────────────────────────────────────────
 const SatMenu::Item SatMenu::_mainItems[] = {
-    {"ID","Identidad",   Scr::IDENTIDAD   },
-    {"OT","Activar OTA", Scr::OTA         },
-    {"MT","Motor",       Scr::MOTOR       },
-    {"TC","Touch",       Scr::TOUCH       },
-    {"DG","Diagnostico", Scr::DIAG        },
-    {"WF","Config WiFi", Scr::CONFIG_WIFI },
-    {"RB","Reiniciar",   Scr::REINICIAR   },
+    {"ID","Identidad",   Scr::IDENTIDAD },
+    {"OT","Activar OTA", Scr::OTA       },
+    {"MT","Motor",       Scr::MOTOR     },
+    {"TC","Touch",       Scr::TOUCH     },
+    {"DG","Diagnostico", Scr::DIAG      },
+    {"RB","Reiniciar",   Scr::REINICIAR },
 };
 const SatMenu::Item SatMenu::_identItems[] = {
     {"ID","Track ID (1-8)",   Scr::EDIT_TRACKID},
@@ -35,16 +32,11 @@ const SatMenu::Item SatMenu::_diagItems[] = {
     {"FD","Test Fader",    Scr::TEST_FADER    },
     {"NP","Test Botones",  Scr::TEST_NEOPIXEL },
 };
-const SatMenu::Item SatMenu::_wifiItems[] = {
-    {"CF","Configurar red", Scr::WIFI},
-    {"OT","Activar OTA",    Scr::WIFI},
-};
-const int SatMenu::_mainN  = 7;
+const int SatMenu::_mainN  = 6;
 const int SatMenu::_identN = 2;
 const int SatMenu::_motorN = 2;
 const int SatMenu::_touchN = 2;
 const int SatMenu::_diagN  = 4;
-const int SatMenu::_wifiN  = 2;
 
 // ─────────────────────────────────────────────────────────────
 //  Constructor
@@ -80,7 +72,6 @@ void SatMenu::open() {
     if (_cbRS485Off)   _cbRS485Off();
     if (_cbLedsOff)    _cbLedsOff();
     if (_cbBrightness) _cbBrightness(255);
-
     if (_cbSuspend)    _cbSuspend();
 
     _spr.setColorDepth(16);
@@ -98,11 +89,11 @@ void SatMenu::close() {
     _open = false;
 
     _motorStop();
-    _spr.deleteSprite();             // liberar PSRAM
+    _spr.deleteSprite();
 
-    if (_cbMotorOn)    _cbMotorOn();
-    if (_cbRS485On)    _cbRS485On();
-    if (_cbRestore)    _cbRestore();  // recrear sprites normales
+    if (_cbMotorOn)  _cbMotorOn();
+    if (_cbRS485On)  _cbRS485On();
+    if (_cbRestore)  _cbRestore();
     _tft->fillScreen(C_BLACK);
 }
 
@@ -119,7 +110,6 @@ void SatMenu::update() {
 
     Btn b = _readBtn();
 
-    // Toast: auto-dismiss
     if (_scr == Scr::TOAST) {
         if (millis() - _toastT > 1300 || b != Btn::NONE) _goto(_toastRet);
         else { _render(); }
@@ -135,7 +125,6 @@ void SatMenu::update() {
         case Scr::MOTOR:         _hMotor(b);           break;
         case Scr::TOUCH:         _hTouch(b);           break;
         case Scr::DIAG:          _hDiag(b);            break;
-        case Scr::WIFI:          _hWifi(b);            break;
         case Scr::EDIT_TRACKID:
         case Scr::EDIT_PWMMIN:
         case Scr::EDIT_PWMMAX:
@@ -170,7 +159,6 @@ SatMenu::Btn SatMenu::_readBtn() {
 //  Render dispatcher
 // ─────────────────────────────────────────────────────────────
 void SatMenu::_render() {
-    // Los tests live se renderizan solos y hacen _push() al final
     switch (_scr) {
         case Scr::TEST_DISPLAY:  _tickTestDisplay(Btn::NONE);  return;
         case Scr::TEST_ENCODER:  _tickTestEncoder(Btn::NONE);  return;
@@ -179,7 +167,6 @@ void SatMenu::_render() {
         default: break;
     }
 
-    // Pantallas estáticas: limpiar sprite y redibujar
     _spr.fillScreen(C_BG);
 
     switch (_scr) {
@@ -237,11 +224,6 @@ void SatMenu::_render() {
         case Scr::DIAG:
             _drawHdr("Diagnostico");
             _drawList(_diagItems, _diagN);
-            _drawHints("","","Atras","Entrar");
-            break;
-        case Scr::WIFI:
-            _drawHdr("Config WiFi");
-            _drawList(_wifiItems, _wifiN);
             _drawHints("","","Atras","Entrar");
             break;
         case Scr::EDIT_TRACKID:
@@ -486,13 +468,11 @@ void SatMenu::_tickTestFader(Btn b) {
     if (tchBase==0&&_tchRaw>100) tchBase=_tchRaw;
     _tchOn=(tchBase>0)&&(_tchRaw<(int)(tchBase*0.80f));
 
-    // ── Componer frame en sprite ──────────────────────────
     _spr.fillScreen(C_BG);
     _drawHdr("TEST FADER");
     int y=SAT_HDR_H+6;
     char buf[32];
 
-    // FADER
     _spr.setTextColor(C_CYAN,C_BG); _spr.setTextSize(1);
     _spr.setTextDatum(textdatum_t::top_left);
     _spr.drawString("FADER",4,y);
@@ -505,7 +485,6 @@ void SatMenu::_tickTestFader(Btn b) {
     _spr.setTextColor(C_YELLOW,C_BG); _spr.setTextDatum(textdatum_t::top_center);
     _spr.drawString("0dB",ugX,y); y+=12;
 
-    // TOUCH
     _drawDivider(y+2); y+=8;
     _spr.setTextColor(C_YELLOW,C_BG); _spr.setTextDatum(textdatum_t::top_left);
     _spr.drawString("TOUCH",4,y);
@@ -518,7 +497,6 @@ void SatMenu::_tickTestFader(Btn b) {
     }
     y+=16;
 
-    // MOTOR
     _drawDivider(y+2); y+=8;
     _spr.setTextColor(C_ORANGE,C_BG); _spr.setTextDatum(textdatum_t::top_left);
     _spr.drawString("MOTOR",4,y);
@@ -529,17 +507,16 @@ void SatMenu::_tickTestFader(Btn b) {
     if (barEnd>=center) _spr.fillRect(center,y,barEnd-center,14,_motPWM>0?C_GREEN:C_DARK);
     else                _spr.fillRect(barEnd,y,center-barEnd,14,C_ACCENT);
     _spr.drawFastVLine(center,y,14,C_WHITE);
-    snprintf(buf,32,"PWM:%+d",_motPWM);                          // ← texto sobre la barra
+    snprintf(buf,32,"PWM:%+d",_motPWM);
     _spr.setTextColor(C_TEXT,C_BG);
     _spr.setTextDatum(textdatum_t::top_center);
-    _spr.drawString(buf,bx+bw/2,y);                              // ← centrado en la barra
+    _spr.drawString(buf,bx+bw/2,y);
     _spr.setTextDatum(textdatum_t::top_left);
     y+=18;
     snprintf(buf,32,"IN1=%s  IN2=%s  EN=%s",
         _motPWM>0?"PWM":"0",_motPWM<0?"PWM":"0",abs(_motPWM)>0?"HIGH":"LOW");
     _spr.setTextColor(C_GRAY,C_BG); _spr.drawString(buf,44,y); y+=16;
 
-    // HISTORIAL
     _drawDivider(y); y+=4;
     int gH=H-SAT_HINT_H-y-4; if (gH<20) gH=20;
     int gW=W-8;
@@ -552,7 +529,6 @@ void SatMenu::_tickTestFader(Btn b) {
         _spr.fillRect(4+i*(gW/FAD_HIST),y+gH-fh,pxW,fh+1,C_CYAN);
     }
 
-    // HINTS
     _spr.fillRect(0,H-SAT_HINT_H,W,SAT_HINT_H,C_BG);
     _spr.drawFastHLine(0,H-SAT_HINT_H,W,C_DARK);
     _spr.setTextSize(1); _spr.setTextColor(C_GRAY,C_BG);
@@ -570,31 +546,16 @@ void SatMenu::_hMain(Btn b) {
     if (b == Btn::BACK) { close(); return; }
     if (b == Btn::ENTER) {
         switch (_mainItems[_cur].target) {
-            case Scr::IDENTIDAD:   _goto(Scr::IDENTIDAD); break;
+            case Scr::IDENTIDAD: _goto(Scr::IDENTIDAD); break;
             case Scr::OTA:
                 if (_cbWiFiOta) _cbWiFiOta();
                 _toast("Activando OTA...", Scr::MAIN);
-            break;
-            case Scr::MOTOR:       _goto(Scr::MOTOR);     break;
-            case Scr::TOUCH:       _goto(Scr::TOUCH);     break;
-            case Scr::DIAG:        _goto(Scr::DIAG);      break;
-            case Scr::CONFIG_WIFI: _goto(Scr::WIFI);      break;
-            case Scr::REINICIAR:   _confirm("Reiniciar el dispositivo?", Scr::REINICIAR); break;
+                break;
+            case Scr::MOTOR:     _goto(Scr::MOTOR);     break;
+            case Scr::TOUCH:     _goto(Scr::TOUCH);     break;
+            case Scr::DIAG:      _goto(Scr::DIAG);      break;
+            case Scr::REINICIAR: _confirm("Reiniciar el dispositivo?", Scr::REINICIAR); break;
             default: break;
-        }
-    }
-}
-void SatMenu::_hWifi(Btn b) {
-    if (b == Btn::UP)   { if (_cur>0)        { _cur--; _dirty=true; } }
-    if (b == Btn::DOWN) { if (_cur<_wifiN-1) { _cur++; _dirty=true; } }
-    if (b == Btn::BACK) { _goto(Scr::MAIN); return; }
-    if (b == Btn::ENTER) {
-        if (_cur==0) {
-            if (_cbWiFiConfig) _cbWiFiConfig();
-            _toast("Lanzando portal WiFi...", Scr::MAIN);
-        } else {
-            if (_cbWiFiOta) _cbWiFiOta();
-            _toast("Activando OTA...", Scr::MAIN);
         }
     }
 }
@@ -698,7 +659,7 @@ void SatMenu::_hToast(Btn b) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  Primitivas de dibujo — todas sobre _spr
+//  Primitivas de dibujo
 // ─────────────────────────────────────────────────────────────
 void SatMenu::_drawHdr(const char* t) {
     int W=_spr.width();
@@ -706,7 +667,7 @@ void SatMenu::_drawHdr(const char* t) {
     _spr.setTextColor(C_TEXT,C_BG); _spr.setTextSize(1);
     _spr.setTextDatum(textdatum_t::middle_center);
     _spr.drawString(t,W/2,SAT_HDR_H/2);
-    _spr.fillRect(0,SAT_HDR_H-2,W,2,C_ACCENT);   // línea roja bajo header
+    _spr.fillRect(0,SAT_HDR_H-2,W,2,C_ACCENT);
 }
 void SatMenu::_drawHints(const char* u,const char* d,const char* b,const char* e) {
     int W=_spr.width(),H=_spr.height(),y=H-SAT_HINT_H;
@@ -734,7 +695,6 @@ void SatMenu::_drawList(const Item* items,int n) {
         int idx=i+_scrl; if (idx>=n) break;
         int y=SAT_HDR_H+i*SAT_ROW_H;
         bool sel=(idx==_cur);
-        // Fila seleccionada: rojo. Resto: negro con separador blanco
         uint16_t bg=sel?C_ACCENT:C_BG;
         _spr.fillRect(0,y,W,SAT_ROW_H,bg);
         _drawBadge(6,y+(SAT_ROW_H-SAT_BADGE_H)/2,items[idx].badge,
@@ -798,7 +758,6 @@ void SatMenu::_drawConfirm(const char* msg) {
     _spr.setTextColor(C_TEXT, C_DARK);   _spr.drawString("NO (MUT)",cx+41,cy+22);
 }
 void SatMenu::_drawToast(const char* msg) {
-    // Toast: overlay sobre el frame actual — no limpiar pantalla
     int W=_spr.width(),H=_spr.height();
     int tw=W-40,th=40,tx=20,ty=H/2-20;
     _spr.fillRoundRect(tx,ty,tw,th,8,C_BG);
@@ -875,17 +834,12 @@ void SatMenu::_confirm(const char* msg,Scr yes) {
     _scr=Scr::CONFIRM; _dirty=true;
 }
 
-
 // ─────────────────────────────────────────────────────────────
 //  TEST NEOPIXEL + BOTONES
-//  Cada botón enciende su NeoPixel mientras está pulsado.
-//  REC→0 rojo, SOLO→1 amarillo, MUTE→2 verde, SELECT→3 blanco
-//  Salir: MUTE largo (vuelve a DIAG) — o los 4 pulsados a la vez
 // ─────────────────────────────────────────────────────────────
 void SatMenu::_tickTestNeopixel(Btn b) {
     int W = _spr.width(), H = _spr.height();
 
-    // Leer pines directamente — sin debounce para ver respuesta inmediata
     bool p[4] = {
         digitalRead(BUTTON_PIN_REC)    == LOW,
         digitalRead(BUTTON_PIN_SOLO)   == LOW,
@@ -893,7 +847,6 @@ void SatMenu::_tickTestNeopixel(Btn b) {
         digitalRead(BUTTON_PIN_SELECT) == LOW
     };
 
-    // Long-press MUTE para salir (1 segundo)
     if (p[2]) {
         if (_neoMuteHoldT == 0) _neoMuteHoldT = millis();
         if (millis() - _neoMuteHoldT >= 1000) {
@@ -906,16 +859,14 @@ void SatMenu::_tickTestNeopixel(Btn b) {
         _neoMuteHoldT = 0;
     }
 
-    // Colores por botón
     static const uint8_t COLORS[4][3] = {
-        {255,   0,   0},   // REC    → rojo
-        {255, 200,   0},   // SOLO   → amarillo
-        {  0, 255,   0},   // MUTE   → verde
-        {200, 200, 200},   // SELECT → blanco
+        {255,   0,   0},
+        {255, 200,   0},
+        {  0, 255,   0},
+        {200, 200, 200},
     };
     static const char* NAMES[4] = {"REC", "SOLO", "MUTE", "SEL"};
 
-    // Actualizar LEDs via callback
     if (_cbLedsTest) {
         for (int i = 0; i < 4; i++) {
             if (p[i]) _cbLedsTest(i, COLORS[i][0], COLORS[i][1], COLORS[i][2]);
@@ -923,7 +874,6 @@ void SatMenu::_tickTestNeopixel(Btn b) {
         }
     }
 
-    // Dibujar pantalla
     _spr.fillScreen(C_BG);
     _drawHdr("TEST BOTONES + LEDS");
 

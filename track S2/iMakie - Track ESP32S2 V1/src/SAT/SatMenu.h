@@ -53,7 +53,6 @@ public:
     void onRS485On        (CbVoid     cb) { _cbRS485On    = cb; }
     void onLedsOff        (CbVoid     cb) { _cbLedsOff    = cb; }
     void onReboot         (CbVoid     cb) { _cbReboot     = cb; }
-    void onWiFiConfig     (CbVoid     cb) { _cbWiFiConfig = cb; }
     void onWiFiOta        (CbVoid     cb) { _cbWiFiOta    = cb; }
     void onConfigSaved    (CbConfig   cb) { _cbSaved      = cb; }
     void onSuspendSprites (CbVoid     cb) { _cbSuspend    = cb; }
@@ -71,7 +70,7 @@ public:
 private:
     enum class Scr {
         MAIN, IDENTIDAD, MOTOR, TOUCH, DIAG,
-        CONFIG_WIFI, WIFI, OTA, REINICIAR,
+        OTA, REINICIAR,
         EDIT_TRACKID, EDIT_LABEL,
         EDIT_PWMMIN, EDIT_PWMMAX, EDIT_TOUCHTHR,
         CONFIRM, TOAST,
@@ -104,17 +103,15 @@ private:
     Preferences   _prefs;
 
     CbVoid     _cbMotorOff, _cbMotorOn, _cbRS485Off, _cbRS485On, _cbReboot, _cbLedsOff;
-    CbVoid     _cbWiFiConfig, _cbWiFiOta, _cbSuspend, _cbRestore;
+    CbVoid     _cbWiFiOta, _cbSuspend, _cbRestore;
     CbMotor    _cbMotorDrv;
     CbConfig   _cbSaved;
     CbLedsTest _cbLedsTest;
     std::function<void(uint8_t)> _cbBrightness;
 
-    // Test Display
     int           _dPat   = 0;
     unsigned long _dAutoT = 0;
 
-    // Test Encoder
     long          _encCnt     = 0;
     int           _encLastA   = HIGH;
     int           _encLastB   = HIGH;
@@ -124,7 +121,6 @@ private:
     int8_t        _encHist[ENC_HIST] = {};
     int           _encHistIdx = 0;
 
-    // Test Fader
     int           _fadRaw    = 0;
     float         _fadPct    = 0.0f;
     int           _tchRaw    = 0;
@@ -138,7 +134,6 @@ private:
     int           _fadHistIdx = 0;
     unsigned long _fadHistT   = 0;
 
-    // Test NeoPixel — estado de pines leído directamente
     bool _neoPressed[4] = {};
 
     enum class Btn { NONE, UP, DOWN, BACK, ENTER };
@@ -163,7 +158,6 @@ private:
     void _hMotor(Btn b);
     void _hTouch(Btn b);
     void _hDiag(Btn b);
-    void _hWifi(Btn b);
     void _hEditVal(Btn b);
     void _hEditLbl(Btn b);
     void _hConfirm(Btn b);
@@ -189,7 +183,6 @@ private:
     static const Item _motorItems[];
     static const Item _touchItems[];
     static const Item _diagItems[];
-    static const Item _wifiItems[];
-    static const int  _mainN, _identN, _motorN, _touchN, _diagN, _wifiN;
-    unsigned long _neoMuteHoldT   = 0;   // ← tiempo de inicio pulsación MUTE
+    static const int  _mainN, _identN, _motorN, _touchN, _diagN;
+    unsigned long _neoMuteHoldT = 0;
 };
