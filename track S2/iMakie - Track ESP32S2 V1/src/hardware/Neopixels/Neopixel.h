@@ -42,6 +42,4 @@ extern bool neoWaitingHandshake;  // true = mantener azul, ignorar updateAllNeop
 
 void handleButtonLedState(ButtonId id);
 void updateAllNeopixels();
-void setNeopixelState(int index, uint8_t r, uint8_t g, uint8_t b);
-void showNeopixels();
-void setNeopixelGlobalBrightness(uint8_t brightness);
+

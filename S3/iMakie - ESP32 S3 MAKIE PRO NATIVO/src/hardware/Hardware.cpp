@@ -44,7 +44,7 @@ void initHardware() {
   // Manual way (R, G, B)
   //uint32_t colorAzulClaro = (50 << 16) | (180 << 8) | 255;
   
-  uint32_t colorAzulClaro = seesaw_NeoPixel::Color(0, 0, 200);
+  uint32_t colorAzulClaro = seesaw_NeoPixel::Color(0, 0, 5);
   
   for (int i = 0; i < X_DIM * Y_DIM; i++) {
     trellis.setPixelColor(i, colorAzulClaro);
@@ -81,18 +81,10 @@ void updateLeds() {
     // --- STANDBY: todos los LEDs apagados excepto indicador de página ---
     if (!isLogicConnected()) {
         for (int i = 0; i < 32; i++) {
-            trellis.setPixelColor(i, 0x000000); // apagado
-        }
-        // Solo botón de página activo, tenue, para orientar al usuario
-        if (31 < 32) {
-            uint32_t pageColor;
-            if      (currentPage == 1) pageColor = applyBrightness(C_BLUE);
-            else if (currentPage == 2) pageColor = applyBrightness(C_GREEN);
-            else                       pageColor = applyBrightness(C_RED);
-            trellis.setPixelColor(31, pageColor);
+            trellis.setPixelColor(i, seesaw_NeoPixel::Color(0, 0, 5));
         }
         trellis.show();
-        return; // ← salir sin procesar estados
+        return;
     }
     const byte* colorIndexMap;
     if      (currentPage == 1) colorIndexMap = LED_COLORS_PG1;

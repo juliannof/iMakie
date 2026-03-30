@@ -62,7 +62,7 @@ static constexpr uint32_t CALIB_STABLE_TIME       = 150;   // ms
 
 // ─── Parámetros finales optimizados ────────────────────────
 static constexpr uint8_t PWM_MIN     = 65;      // Mínimo para mover (antes 40)
-static constexpr uint8_t PWM_MAX     = 160;     // Máximo para mover
+static constexpr uint8_t PWM_MAX     = 120;     // Máximo para mover
 static constexpr uint8_t PWM_SLEW    = 4;       // Cambio máximo por ciclo
 
 static constexpr uint8_t HOLD_MIN    = 35;      // Holding mínimo

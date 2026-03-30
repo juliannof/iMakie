@@ -27,10 +27,6 @@ void initNeopixels() {
     // Test visual: todos blanco → apagar
     neopixels.ClearTo(RgbColor(0, 0, NEOPIXEL_DIM_BRIGHTNESS));  // azul tenue — esperando handshake
     neopixels.Show();
-    delay(400);
-
-    neopixels.ClearTo(RgbColor(0));
-    neopixels.Show();
 
     neoNeedsUpdate = false;
 
@@ -92,10 +88,12 @@ void showNeopixels() {
 
 
 void updateAllNeopixels() {
+    if (neoWaitingHandshake) return;
     static bool lastRec    = false;
     static bool lastSolo   = false;
     static bool lastMute   = false;
     static bool lastSelect = false;
+    
 
     if (recStates    == lastRec    &&
         soloStates   == lastSolo   &&

@@ -145,6 +145,13 @@ void checkTimeout(unsigned long lastRxTime) {
     }
     if (logicConnectionState != ConnectionState::DISCONNECTED) {
         logicConnectionState = ConnectionState::DISCONNECTED;
+        Motor::off();
+        Motor::setTarget(Motor::getRawADC());
+        recStates = soloStates = muteStates = selectStates = false;
+        setScreenBrightness(0);
+        neoWaitingHandshake = true;
+        neopixels.ClearTo(RgbColor(0, 0, 5));
+        neopixels.Show();
         needsTOTALRedraw = true;
     }
 }

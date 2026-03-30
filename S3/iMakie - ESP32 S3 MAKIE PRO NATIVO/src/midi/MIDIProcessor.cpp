@@ -415,6 +415,7 @@ void processChannelPressure(byte channel, byte value) {
 // ****************************************************************************
 // processMackieSysEx — ← RS485: enviar trackName al slave
 // ****************************************************************************
+
 void processMackieSysEx(byte* payload, int len) {
     if (len < 5) return;
 
@@ -458,13 +459,23 @@ void processMackieSysEx(byte* payload, int len) {
             byte r2 = 0x7F & ((l3 >> 4) ^ (l1 + l4));
             byte r3 = 0x7F & (l4 - (l3 << 2) ^ (l1 | l2));
             byte r4 = 0x7F & (l2 - l3 + (0xF0 ^ (l4 << 4)));
-            (void)r1; (void)r2; (void)r3; (void)r4;  // verificación opcional
+            (void)r1; (void)r2; (void)r3; (void)r4;
 
             byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x02, 0xF7};
             sendMIDIBytes(online_msg, sizeof(online_msg));
             handshakeState       = HandshakeState::IDLE;
             logicConnectionState = ConnectionState::MIDI_HANDSHAKE_COMPLETE;
             needsTOTALRedraw     = true;
+            break;
+        }
+
+        case 0x0F: {  // GoOffline
+            logicConnectionState = ConnectionState::DISCONNECTED;
+            g_logicConnected     = 0;
+            needsTOTALRedraw     = true;
+            fadersAtMinMask      = 0;
+            firstFaderMinTime    = 0;
+            log_i("[MCU] GoOffline recibido");
             break;
         }
 
@@ -479,51 +490,43 @@ void processMackieSysEx(byte* payload, int len) {
             break;
         }
 
-        // ← RS485 NUEVO: enviar trackName al slave
         case 0x12: {
-    if (len < 6) break;
-    byte startOffset = payload[5];
-    int  text_len    = len - 6;
-    if (text_len <= 0) break;
+            if (len < 6) break;
+            byte startOffset = payload[5];
+            int  text_len    = len - 6;
+            if (text_len <= 0) break;
 
-    // Buffers temporales inicializados con los nombres actuales
-    char nameBufs[8][8] = {};
-    bool nameChanged[8] = {};
-    for (int t = 0; t < 8; t++) {
-        strncpy(nameBufs[t], trackNames[t].c_str(), 7);
-        nameBufs[t][7] = '\0';
-    }
+            char nameBufs[8][8] = {};
+            bool nameChanged[8] = {};
+            for (int t = 0; t < 8; t++) {
+                strncpy(nameBufs[t], trackNames[t].c_str(), 7);
+                nameBufs[t][7] = '\0';
+            }
 
-    for (int i = 0; i < text_len; i++) {
-        byte currentOffset = startOffset + i;
-        if (currentOffset >= 56) break;          // 8 pistas × 7 chars = 56
+            for (int i = 0; i < text_len; i++) {
+                byte currentOffset = startOffset + i;
+                if (currentOffset >= 56) break;
+                int track_idx = currentOffset / 7;
+                int char_pos  = currentOffset % 7;
+                if (track_idx >= 8) break;
+                nameBufs[track_idx][char_pos] = (char)payload[6 + i];
+                nameChanged[track_idx] = true;
+            }
 
-        int track_idx = currentOffset / 7;       // qué pista
-        int char_pos  = currentOffset % 7;       // qué carácter dentro del nombre
-
-        if (track_idx >= 8) break;
-
-        nameBufs[track_idx][char_pos] = (char)payload[6 + i];
-        nameChanged[track_idx] = true;
-    }
-
-    for (int t = 0; t < 8; t++) {
-        if (!nameChanged[t]) continue;
-
-        // Trim espacios finales
-        for (int j = 6; j >= 0; j--) {
-            if (nameBufs[t][j] == ' ' || nameBufs[t][j] == '\0') nameBufs[t][j] = '\0';
-            else break;
+            for (int t = 0; t < 8; t++) {
+                if (!nameChanged[t]) continue;
+                for (int j = 6; j >= 0; j--) {
+                    if (nameBufs[t][j] == ' ' || nameBufs[t][j] == '\0') nameBufs[t][j] = '\0';
+                    else break;
+                }
+                if (trackNames[t] != nameBufs[t]) {
+                    trackNames[t] = String(nameBufs[t]);
+                    needsMainAreaRedraw = true;
+                }
+                rs485.setTrackName(t + 1, nameBufs[t]);
+            }
+            break;
         }
-
-        if (trackNames[t] != nameBufs[t]) {
-            trackNames[t] = String(nameBufs[t]);
-            needsMainAreaRedraw = true;
-        }
-        rs485.setTrackName(t + 1, nameBufs[t]);
-    }
-    break;
-}
 
         case 0x11: {
             if (len < 7) break;
@@ -535,6 +538,12 @@ void processMackieSysEx(byte* payload, int len) {
                 assignmentString = String(assign_buf);
                 needsHeaderRedraw = true;
             }
+            break;
+        }
+
+        case 0x61: {  // AllFaderstoMinimum — Logic cerrando
+            g_logicConnected = 0;
+            log_i("[MCU] AllFaderstoMinimum — bloqueando fader targets");
             break;
         }
 
@@ -553,7 +562,6 @@ void processMackieSysEx(byte* payload, int len) {
                         vuClipState[channel] = clip;
                         needsVUMetersRedraw  = true;
                     }
-                    // ← RS485 NUEVO
                     rs485.setVuLevel(channel + 1, (uint8_t)(normalized * 127.0f));
                 }
             }
@@ -568,6 +576,7 @@ void processMackieSysEx(byte* payload, int len) {
             break;
     }
 }
+
 
 
 // ****************************************************************************
@@ -673,6 +682,9 @@ void processPitchBend(byte channel, int bendValue) {
                 needsTOTALRedraw = true;
                 fadersAtMinMask = 0;
                 firstFaderMinTime = 0;
+                for (uint8_t i = 1; i <= NUM_SLAVES; i++) {
+                    rs485.setFaderTarget(i, rs485.getChannel(i).faderPos);
+            }
                 log_d("[DISCONNECT] %d faders en 0 en %lums.", bitsSet, elapsed);
                 return;
             }

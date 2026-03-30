@@ -3,7 +3,6 @@
 #include "Display.h"
 #include "hardware/encoder/Encoder.h"
 #include "../hardware/Hardware.h"
-#include "../hardware/Neopixels/Neopixel.h"
 #include "SpriteUtils.h"           // en Display.cpp                                                          
 #include "../config.h"
 
@@ -261,7 +260,7 @@ void drawMainArea() {
     mainArea.print(faderDbStr);
 
     mainArea.pushSprite(0, HEADER_HEIGHT);
-    updateAllNeopixels();
+    
     
 }
 

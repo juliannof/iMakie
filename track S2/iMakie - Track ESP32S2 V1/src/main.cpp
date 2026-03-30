@@ -30,7 +30,7 @@ String trackName        = "Track  ";
 bool  recStates    = false;
 bool  soloStates   = false;
 bool  muteStates   = false;
-bool  selectStates = true;
+bool  selectStates = false;
 bool  vuClipState  = false;
 float vuPeakLevels    = 0.0f;
 float faderPositions  = 0.0f;
@@ -191,7 +191,7 @@ void loop() {
 
     if (!_suspended) {
         rs485.update();
-        static unsigned long lastRxTime = 0;
+        static unsigned long lastRxTime = millis();
 
         if (rs485.hasNewData()) {
             lastRxTime = millis();
