@@ -1,26 +1,21 @@
+// FaderADC.cpp
 #include "FaderADC.h"
-
-
+#include "../../config.h"
 
 void FaderADC::begin() {
     analogReadResolution(12);
-    analogSetPinAttenuation(FADER_POT_PIN, ADC_0db);
-    delay(30);                 // estabilizar antes del seed
-    _emaValue = (float)analogRead(FADER_POT_PIN);  // seed correcto
+    analogRead(FADER_POT_PIN);                              // primer read fuerza config del pin
+    analogSetPinAttenuation(FADER_POT_PIN, ADC_0db);        // volver al original
+    delay(50);
+    _rawLast  = analogRead(FADER_POT_PIN);
+    _emaValue = (float)_rawLast;
+    log_i("[ADC] seed=%d", _rawLast);
 }
 
 void FaderADC::update() {
-    int raw = analogRead(FADER_POT_PIN);
-    _emaValue += FADER_EMA_ALPHA * (raw - _emaValue);
-    int filtered = (int)_emaValue;
+    _rawLast   = analogRead(FADER_POT_PIN);
+    _emaValue += FADER_EMA_ALPHA * ((float)_rawLast - _emaValue);
 
-    // Clamp al rango físico real y normalizar a 13-bit (0–8191)
-    filtered = constrain(filtered, FADER_ADC_MIN, FADER_ADC_MAX);
-    _faderPos = map(filtered, FADER_ADC_MIN, FADER_ADC_MAX, 0, 8191);
-
-    static uint32_t _lastPrint = 0;
-    if (millis() - _lastPrint >= 100) {
-        _lastPrint = millis();
-        //Serial.printf("[FADER] raw=%5d  ema=%5d  pos=%5d\n", raw, filtered, _faderPos);
-    }
+    int filtered = constrain((int)_emaValue, FADER_ADC_MIN, FADER_ADC_MAX);
+    _faderPos    = (uint16_t)map(filtered, FADER_ADC_MIN, FADER_ADC_MAX, 0, 8191);
 }

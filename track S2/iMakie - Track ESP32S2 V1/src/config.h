@@ -52,34 +52,6 @@ enum class ConnectionState {
 #define MOTOR_IN2    16
 #define MOTOR_EN     14
 
-// ─── Parámetros de calibración ───────────────────────────────
-static constexpr uint8_t  CALIB_PWM      = 140;  // PWM de crucero durante calibración
-static constexpr uint8_t  CALIB_KICK_PWM  = 145;
-static constexpr uint32_t CALIB_KICK_MS   = 150;
-static constexpr uint32_t CALIB_TIMEOUT           = 5000;  // ms — timeout global
-static constexpr int      ADC_STABILITY_THRESHOLD = 700;    // counts
-static constexpr uint32_t CALIB_STABLE_TIME       = 150;   // ms
-
-// ─── Parámetros finales optimizados ────────────────────────
-static constexpr uint8_t PWM_MIN     = 65;      // Mínimo para mover (antes 40)
-static constexpr uint8_t PWM_MAX     = 120;     // Máximo para mover
-static constexpr uint8_t PWM_SLEW    = 4;       // Cambio máximo por ciclo
-
-static constexpr uint8_t HOLD_MIN    = 35;      // Holding mínimo
-static constexpr uint8_t HOLD_MAX    = 50;      // Holding máximo
-static constexpr float HOLD_GAIN     = 0.35;    // Ganancia para holding
-
-static constexpr uint8_t  PWM_BURST     = 90;   // PWM fijo para correcciones pequeñas
-static constexpr int      BURST_ZONE    = 300;  // distancia donde usar burst
-static constexpr uint32_t MOTOR_COOLDOWN_MS = 400; // más tiempo de parada
-static constexpr uint8_t HOLD_PWM  = 20;   // justo por encima del umbral de movimiento
-static constexpr int     DEAD_ZONE = 100;
-static constexpr int     HOLD_ZONE = 150;  // zona donde aplicar holding
-
-
-static constexpr float   CURVE_GAMMA = 0.6f;
-
-
 
 // Calibración — estado interno (igual que CalibrationManager)
 static uint32_t _tiempoInicioCalibracion = 0;
@@ -93,6 +65,35 @@ static uint16_t _posicionMaximaADC       = 0;
 // Calibración (valores aproximados — ajustar con autocalibración)
 #define FADER_ADC_MIN       768  // leer real en 0%
 #define FADER_ADC_MAX      4090   // leer real en 100%
+
+// ─── FaderADC ─────────────────────────────────────────────────
+static constexpr float    FADER_EMA_ALPHA          = 0.20f;   // único filtro — subir = más vivo, bajar = más suave para motor
+
+// ─── Motor — calibración ──────────────────────────────────────
+static constexpr uint8_t  CALIB_PWM                = 140;
+static constexpr uint8_t  CALIB_KICK_PWM           = 145;
+static constexpr uint32_t CALIB_KICK_MS            = 150;     // duración del kick inicial
+static constexpr uint32_t CALIB_SETTLE_MS          = 100;     // espera tras parar motor antes de leer ADC
+static constexpr uint32_t CALIB_TIMEOUT            = 6000;
+static constexpr int      ADC_STABILITY_THRESHOLD  = 700;     // counts — movimiento = cambio > este valor
+static constexpr uint32_t CALIB_STABLE_TIME        = 150;     // ms sin movimiento → tope detectado
+static constexpr uint32_t CALIB_MIN_TRAVEL_MS      = 800;     // mínimo de viaje antes de empezar a buscar tope
+
+// ─── Motor — control de posición ──────────────────────────────
+static constexpr uint8_t  PWM_MIN                  = 65;
+static constexpr uint8_t  PWM_MAX                  = 120;
+static constexpr uint8_t  PWM_SLEW                 = 4;
+static constexpr int      DEAD_ZONE                = 100;
+static constexpr int      ADC_SPIKE_GUARD          = 500;     // salto máximo aceptado en setADC()
+static constexpr uint16_t MIDI_PB_MAX              = 16383;   // pitch bend 14-bit estándar
+
+// ─── FaderTouch — detección por varianza ──────────────────────
+static constexpr uint32_t TOUCH_VAR_THRESHOLD      = 150;     // ajustar con plástico puesto
+static constexpr int32_t  TOUCH_DELTA_THRESHOLD    = 40;      // shift de nivel sobre baseline
+static constexpr uint8_t  TOUCH_WIN_SIZE           = 8;       // ventana circular de muestras
+static constexpr uint32_t TOUCH_POLL_MS            = 10;      // intervalo de muestreo
+static constexpr uint8_t  TOUCH_BASELINE_SAMPS     = 16;      // muestras para baseline inicial
+
 // --- LED INTEGRADO ---
 #define LED_BUILTIN_PIN 15 // Pin del LED integrado en la Lolin D1 ESP32 S2 (GPIO15)
                           // Verifica el diagrama de pines de tu placa si tienes dudas.

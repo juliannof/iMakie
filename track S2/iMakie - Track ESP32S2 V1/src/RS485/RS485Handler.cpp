@@ -124,10 +124,10 @@ SlavePacket buildResponse(FaderADC& faderADC, SatMenu& satMenu) {
     resp.encoderDelta  = (int8_t)constrain(Encoder::getCount(), -127, 127);
     resp.encoderButton = ButtonManager::getEncoderButton();
 
-    // Estado de calibración en bits 4-5
     Motor::CalibState cs = Motor::getCalibState();
     if (cs == Motor::CalibState::DONE)  resp.buttons |= SLAVE_FLAG_CALIB_DONE;
     if (cs == Motor::CalibState::ERROR) resp.buttons |= SLAVE_FLAG_CALIB_ERROR;
+    if (!Motor::isCalibrated())         resp.buttons |= SLAVE_FLAG_NOT_CALIBRATED;  // ← añadir
 
     return resp;
 }

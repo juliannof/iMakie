@@ -20,6 +20,7 @@
 // bits 0-3: botones (FLAG_REC, SOLO, MUTE, SELECT ya definidos)
 #define SLAVE_FLAG_CALIB_DONE  (1 << 4)   // calibración OK
 #define SLAVE_FLAG_CALIB_ERROR (1 << 5)   // calibración fallida
+#define SLAVE_FLAG_NOT_CALIBRATED (1 << 6)   // ← añadir
 // bits 5-7: modo de automatización (3 bits = 8 valores)
 #define AUTOMODE_SHIFT  5
 #define AUTOMODE_MASK   (0x07 << AUTOMODE_SHIFT)

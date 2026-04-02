@@ -2,7 +2,7 @@
 //  OtaManager.cpp  —  iMakie PTxx Track S2
 // ============================================================
 #include "OtaManager.h"
-
+#include "../config.h"
 #include <WiFi.h>
 #include <WiFiManager.h>
 #include <ArduinoOTA.h>
@@ -35,6 +35,8 @@ void OtaManager::tick() {
 // ─────────────────────────────────────────────────────────────
 void OtaManager::launchPortal() {
     // NO llamar WiFi.mode() — WiFiManager gestiona el modo internamente
+    log_i("[OTA] launchPortal() — inicio");
+    log_i("[OTA] Heap: %d  PSRAM: %d", ESP.getFreeHeap(), ESP.getFreePsram());   
     _status("AP: iMakie-PTxx");
     delay(50);
     _status("Conecta y abre 192.168.4.1");
@@ -94,44 +96,71 @@ void OtaManager::enableForUpload() {
     char pass[64]    = {};
     char otaPass[33] = {};
 
+    log_i("[OTA] enableForUpload() — inicio");
+    log_i("[OTA] Heap libre: %d  PSRAM: %d", ESP.getFreeHeap(), ESP.getFreePsram());
+
     if (!_loadCredentials(ssid, pass, otaPass)) {
+        log_e("[OTA] Sin credenciales en NVS");
         _status("Sin credenciales. Config WiFi primero.");
         return;
     }
 
+    log_i("[OTA] Credenciales OK  ssid='%s'  otaPass='%s'",
+          ssid, strlen(otaPass) > 0 ? "****" : "(vacío)");
+
     _status("Conectando WiFi...");
 
-    // NO llamar WiFi.mode(WIFI_STA) — WiFi.begin() lo gestiona
+    log_i("[OTA] WiFi.begin()...");
+    // antes de WiFi.begin()
+    Serial1.end();                                    // liberar el UART
+    pinMode(RS485_TX_PIN, OUTPUT);
+    digitalWrite(RS485_TX_PIN, LOW);                  // cortar el back-feed
+    digitalWrite(RS485_ENABLE_PIN, HIGH);             // deshabilitar transceiver
+    log_i("[OTA] RS485 deshabilitado antes de WiFi");
+
     WiFi.begin(ssid, pass);
+    log_i("[OTA] WiFi.begin() retornó  status=%d", WiFi.status());
 
     uint32_t t0 = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - t0 < 10000) {
         delay(250);
+        log_i("[OTA] WiFi status=%d  elapsed=%lums  heap=%d",
+              WiFi.status(), millis() - t0, ESP.getFreeHeap());
     }
 
+    log_i("[OTA] Bucle WiFi terminado  status=%d  elapsed=%lums",
+          WiFi.status(), millis() - t0);
+
     if (WiFi.status() != WL_CONNECTED) {
+        log_e("[OTA] No conectado");
         _status("WiFi: no conectado.");
-        // NO llamar WiFi.mode(WIFI_OFF) — bug GDMA
+        // ── Restaurar RS485 ──
+        digitalWrite(RS485_ENABLE_PIN, LOW);
+        Serial1.begin(RS485_BAUD, SERIAL_8N1, RS485_RX_PIN, RS485_TX_PIN);
+        log_i("[OTA] RS485 restaurado");
         return;
     }
+
+    log_i("[OTA] Conectado  IP=%s  RSSI=%d",
+          WiFi.localIP().toString().c_str(), WiFi.RSSI());
 
     ArduinoOTA.setPort(OTA_PORT);
     ArduinoOTA.setHostname(PORTAL_SSID);
     ArduinoOTA.setRebootOnSuccess(true);
+    log_i("[OTA] ArduinoOTA configurado  port=%d  host=%s", OTA_PORT, PORTAL_SSID);
 
     if (strlen(otaPass) > 0) {
         ArduinoOTA.setPassword(otaPass);
+        log_i("[OTA] OTA password establecida");
     }
 
     ArduinoOTA.onStart([this]() {
         Serial.end();
         _status("OTA: iniciando...");
     });
-
     ArduinoOTA.onEnd([this]() {
         _status("OTA: completado. Reiniciando...");
     });
-
     ArduinoOTA.onProgress([this](unsigned int prog, unsigned int total) {
         static uint8_t lastPct = 255;
         uint8_t pct = (prog * 100) / total;
@@ -142,19 +171,23 @@ void OtaManager::enableForUpload() {
             _status(buf);
         }
     });
-
     ArduinoOTA.onError([this](ota_error_t err) {
+        log_e("[OTA] Error: %u", err);
         static char buf[32];
         snprintf(buf, sizeof(buf), "OTA error: %u", err);
         _status(buf);
         _otaActive = false;
     });
 
+    log_i("[OTA] ArduinoOTA.begin()...");
     ArduinoOTA.begin();
+    log_i("[OTA] ArduinoOTA.begin() OK");
+
     _otaActive = true;
 
     static char buf[48];
     snprintf(buf, sizeof(buf), "OTA listo  IP:%s", WiFi.localIP().toString().c_str());
+    log_i("[OTA] %s", buf);
     _status(buf);
 }
 

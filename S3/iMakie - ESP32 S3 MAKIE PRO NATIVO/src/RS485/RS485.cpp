@@ -159,6 +159,10 @@ bool RS485Master::_readResponse() {
     return false;
 }
 
+//***************************************************************************************************
+// Procesa la respuesta del esclavo: valida CRC, actualiza estado del canal, maneja calibración, etc.
+//***************************************************************************************************
+
 void RS485Master::_handleResponse() {
     const SlavePacket* resp = reinterpret_cast<const SlavePacket*>(_rxBuf);
 
@@ -185,8 +189,9 @@ void RS485Master::_handleResponse() {
         _ch[_currentId].encoderButton     = resp->encoderButton;
         _ch[_currentId].responded         = true;
 
-        bool calibDone  = resp->buttons & SLAVE_FLAG_CALIB_DONE;
-        bool calibError = resp->buttons & SLAVE_FLAG_CALIB_ERROR;
+        bool calibDone     = resp->buttons & SLAVE_FLAG_CALIB_DONE;
+        bool calibError    = resp->buttons & SLAVE_FLAG_CALIB_ERROR;
+        bool notCalibrated = resp->buttons & SLAVE_FLAG_NOT_CALIBRATED;
 
         if (calibDone) {
             _ch[_currentId].calibrating = false;
@@ -198,10 +203,15 @@ void RS485Master::_handleResponse() {
         }
 
         if (calibError) {
-            _ch[_currentId].calibrating = false;
+            _ch[_currentId].calibrating  = false;
             _ch[_currentId].calibRetries++;
             log_w("[RS485] Slave %d ERROR calibracion (intento %d)",
                   _currentId, _ch[_currentId].calibRetries);
+        }
+
+        if (notCalibrated && !_ch[_currentId].calibrating) {
+            _ch[_currentId].calibrated   = false;
+            _ch[_currentId].calibRetries = 0;
         }
 
         if (!_ch[_currentId].calibrated &&
@@ -217,13 +227,9 @@ void RS485Master::_handleResponse() {
         xSemaphoreGive(_mutex);
     }
 
-    //log_e("[RS485] slave=%u buttons=0x%02X prev=0x%02X",
-    //      _currentId,
-    //      _ch[_currentId].buttons,
-    //      _ch[_currentId].prevButtons);
-
     _rxCount++;
 }
+
 
 
 
