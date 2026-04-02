@@ -24,6 +24,7 @@ void handleVUMeterDecay();
 void setVPotLevel(int8_t level);
 void setVPotRaw  (uint8_t raw);
 void setAutoMode(uint8_t mode);
+void setTrackId(uint8_t id);
 void drawSplashScreen();
 
 

@@ -3,6 +3,7 @@
 #include "Display.h"
 #include "hardware/encoder/Encoder.h"
 #include "../hardware/Hardware.h"
+#include <Preferences.h>
 #include "../version.h"
 #include "SpriteUtils.h"           // en Display.cpp                                                          
 #include "../config.h"
@@ -12,6 +13,8 @@ extern LGFX_Sprite header;
 extern LGFX_Sprite mainArea;
 extern LGFX_Sprite vuSprite;
 extern LGFX_Sprite vPotSprite;
+
+static uint8_t _trackId = 0;
 
 namespace {
     uint8_t screenBrightness = 255;
@@ -25,6 +28,8 @@ void drawInitializingScreen();
 void drawVPotDisplay();
 void drawButton(LGFX_Sprite &sprite, uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char* label, bool active, uint16_t activeColor);
 void drawMeter(LGFX_Sprite &sprite, uint16_t x, uint16_t y, uint16_t w, uint16_t h, float level, float peakLevel, bool isClipping);
+void setTrackId(uint8_t id) { _trackId = id; }
+
 
 bool needsTOTALRedraw    = true;
 bool needsMainAreaRedraw = false;
@@ -105,21 +110,28 @@ void setScreenBrightness(uint8_t brightness) {
 // ════════════════════════════════════════════════════════════
 
 void drawSplashScreen() {
+    Preferences prefs;
+    prefs.begin("ptxx", true);
+    uint8_t trackId = prefs.getUChar("trackId", 0);
+    prefs.end();
     tft.fillScreen(TFT_BLACK);
     tft.setTextDatum(MC_DATUM);
 
     tft.setFont(&fonts::FreeSans24pt7b);
     tft.setTextColor(TFT_WHITE);
-    tft.drawString("PTxx", TFT_WIDTH / 2, 80);
+    tft.drawString("iMakie", TFT_WIDTH / 2, 80);
 
     tft.setFont(&fonts::FreeSans12pt7b);
     tft.setTextColor(TFT_MCU_GRAY);
-    tft.drawString("iMakie Track", TFT_WIDTH / 2, 120);
+    char buf[16];
+    snprintf(buf, sizeof(buf), "iMakie Track %d", trackId);  // ← trackId, no _trackId
+    tft.drawString(buf, TFT_WIDTH / 2, 120);
 
     tft.setFont(&fonts::FreeSans9pt7b);
-    tft.setTextColor(TFT_MCU_DARKGRAY);
+    tft.setTextColor(TFT_WHITE);
     tft.drawString("FW " FW_VERSION "  " FW_BUILD_DATE, TFT_WIDTH / 2, 170);
-    tft.drawString(FW_HARDWARE, TFT_WIDTH / 2, 195);
+    tft.drawString(FW_BUILD_TIME, TFT_WIDTH / 2, 195);
+    tft.drawString(FW_HARDWARE, TFT_WIDTH / 2, 215);
 }
 
 
