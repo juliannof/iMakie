@@ -3,6 +3,7 @@
 #include "Display.h"
 #include "hardware/encoder/Encoder.h"
 #include "../hardware/Hardware.h"
+#include "../version.h"
 #include "SpriteUtils.h"           // en Display.cpp                                                          
 #include "../config.h"
 
@@ -99,6 +100,28 @@ void setScreenBrightness(uint8_t brightness) {
     tft.setBrightness(brightness);
 }
 
+// ════════════════════════════════════════════════════════════
+//  drawSplashScreen
+// ════════════════════════════════════════════════════════════
+
+void drawSplashScreen() {
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextDatum(MC_DATUM);
+
+    tft.setFont(&fonts::FreeSans24pt7b);
+    tft.setTextColor(TFT_WHITE);
+    tft.drawString("PTxx", TFT_WIDTH / 2, 80);
+
+    tft.setFont(&fonts::FreeSans12pt7b);
+    tft.setTextColor(TFT_MCU_GRAY);
+    tft.drawString("iMakie Track", TFT_WIDTH / 2, 120);
+
+    tft.setFont(&fonts::FreeSans9pt7b);
+    tft.setTextColor(TFT_MCU_DARKGRAY);
+    tft.drawString("FW " FW_VERSION "  " FW_BUILD_DATE, TFT_WIDTH / 2, 170);
+    tft.drawString(FW_HARDWARE, TFT_WIDTH / 2, 195);
+}
+
 
 
 // ════════════════════════════════════════════════════════════
@@ -156,7 +179,12 @@ void updateDisplay() {
 //  Pantallas de estado
 // ════════════════════════════════════════════════════════════
 void drawOfflineScreen() {
-    tft.setBrightness(0);
+    static bool splashDrawn = false;
+    if (!splashDrawn) {
+        tft.setBrightness(100);
+        drawSplashScreen();  // necesita el trackId
+        splashDrawn = true;
+    }
 }
 
 void drawInitializingScreen() {

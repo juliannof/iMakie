@@ -24,7 +24,7 @@ void handleVUMeterDecay();
 void setVPotLevel(int8_t level);
 void setVPotRaw  (uint8_t raw);
 void setAutoMode(uint8_t mode);
-
+void drawSplashScreen();
 
 
 void drawButton(LGFX_Sprite &sprite,                  // ← LGFX_Sprite

@@ -19,6 +19,7 @@
 #include "SAT/SatMenu.h"
 #include "display/SpriteUtils.h"
 #include <driver/dac_oneshot.h>
+#include "version.h"
 
 // ─── Objetos globales ─────────────────────────────────────────
 LGFX        tft;
@@ -106,7 +107,8 @@ void setup() {
     delay(1500);
 
     otaManager.begin();
-    log_i("=== iMakie PTxx BOOT ===");
+    log_i("=== iMakie PTxx BOOT === FW:%s HW:%s (%s %s)",
+      FW_VERSION, FW_HARDWARE, FW_BUILD_DATE, FW_BUILD_TIME);
 
     dac_oneshot_handle_t _dacHandle;
     dac_oneshot_config_t _dacCfg = { .chan_id = DAC_CHAN_0 };
@@ -117,6 +119,8 @@ void setup() {
     log_i("Fader ADC OK");
 
     initDisplay();
+    drawSplashScreen();
+    //delay(2000);          // 2 segundos visible
     log_i("Display OK");
 
     initNeopixels();
@@ -165,7 +169,8 @@ void setup() {
         log_e("ERROR: PSRAM no detectada");
     }
 
-    uint8_t slaveId = satMenu->getConfig().trackId;
+    uint8_t slaveId = satMenu->getConfig().trackId;  // ← mover aquí arriba
+
     log_i("Track ID: %d", slaveId);
     rs485.begin(slaveId);
 
