@@ -252,6 +252,8 @@ void setup() {
     xTaskCreatePinnedToCore(taskCore0, "MIDI", 4096, NULL, 2, &taskCore0Handle, 0);
     xTaskCreatePinnedToCore(taskCore1, "UI",   8192, NULL, 1, &taskCore1Handle, 1);
 
+    rs485.startTask();   // ← ÚLTIMO: todo listo, ahora sí arranca el polling
+
     log_e("--- V0.2 * Dual core + RS485 activo. ---");
 }
 

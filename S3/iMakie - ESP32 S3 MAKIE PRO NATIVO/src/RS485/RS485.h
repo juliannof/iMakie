@@ -44,7 +44,8 @@ struct ChannelData {
 class RS485Master {
 public:
     void begin(uint8_t numSlaves = NUM_SLAVES);
-
+    void startTask(); 
+    
     // FreeRTOS task (Core 1)
     static void taskEntry(void* param);
     void        runTask();

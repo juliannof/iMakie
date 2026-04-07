@@ -11,8 +11,8 @@ void RS485Master::begin(uint8_t numSlaves) {
     pinMode(RS485_ENABLE_PIN, OUTPUT);
     digitalWrite(RS485_ENABLE_PIN, LOW);
 
+    Serial1.setRxBufferSize(256);   // ← ANTES del begin (fix bug anterior)
     Serial1.begin(RS485_BAUD, SERIAL_8N1, RS485_RX_PIN, RS485_TX_PIN);
-    Serial1.setRxBufferSize(256);
 
     _mutex = xSemaphoreCreateMutex();
     configASSERT(_mutex);
@@ -25,12 +25,16 @@ void RS485Master::begin(uint8_t numSlaves) {
 
     _cycleStart = millis();
 
+    log_i("[RS485] Master init | slaves:%u baud:%u", _numSlaves, RS485_BAUD);
+    // ← task ya NO se crea aquí
+}
+
+void RS485Master::startTask() {
     xTaskCreatePinnedToCore(
         RS485Master::taskEntry, "RS485",
-        4096, this, 5, nullptr, 1   // Core 1, prioridad 5
+        4096, this, 5, nullptr, 1
     );
-
-    log_i("[RS485] Master init | slaves:%u baud:%u", _numSlaves, RS485_BAUD);
+    log_i("[RS485] Task iniciado.");
 }
 
 void RS485Master::setCalibrate(uint8_t id) {
