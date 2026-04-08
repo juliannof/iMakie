@@ -11,17 +11,17 @@
 
 // Franjas — ancho en portrait = alto para nosotros
 #define VU_X         0
-#define VU_W         180
+#define VU_W         220
 #define TRACKNAME_X  (VU_X + VU_W)          // 110
-#define TRACKNAME_W  40
+#define TRACKNAME_W  35
 #define SELECT_X     (TRACKNAME_X + TRACKNAME_W)  // 150
-#define SELECT_W     60
+#define SELECT_W     50
 #define MUTE_X       (SELECT_X + SELECT_W)   // 210
-#define MUTE_W       60
+#define MUTE_W       50
 #define PANORAMA_X   (MUTE_X + MUTE_W)       // 270
-#define PANORAMA_W   50
+#define PANORAMA_W   55
 #define HEADER_X     (PANORAMA_X + PANORAMA_W) // 370
-#define HEADER_W     (P4_W - SLIDER_W - HEADER_X)  // 450 - 320 = 130
+#define HEADER_W     70
 
 
 
@@ -34,7 +34,7 @@
 #define COLOR_MUTE_ON   lv_color_hex(0xFF0000)
 #define COLOR_MUTE_OFF  lv_color_hex(0x400000)
 #define COLOR_SEL_ON    lv_color_hex(0x0000FF)
-#define COLOR_SEL_OFF   lv_color_hex(0x000040)
+#define COLOR_SEL_OFF   lv_color_hex(0x333333)
 
 // ── Widgets ───────────────────────────────────────────────
 static lv_obj_t* s_screen        = NULL;
@@ -62,25 +62,9 @@ static void set_rotated(lv_obj_t* obj) {
     lv_obj_set_style_transform_pivot_y(obj, LV_PCT(50), 0);
 }
 
-// ── Gesture callback ──────────────────────────────────────
-static void gesture_cb(lv_event_t* e) {
-    lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
-    if (dir == LV_DIR_LEFT) {
-        s_slider_visible = !s_slider_visible;
-        if (s_slider_visible)
-            lv_obj_remove_flag(s_slider_panel, LV_OBJ_FLAG_HIDDEN);
-        else
-            lv_obj_add_flag(s_slider_panel, LV_OBJ_FLAG_HIDDEN);
-    }
-}
+static lv_obj_t* s_arc_lbl[NUM_CH] = {};
 
-void uiToggleSlider() {
-    s_slider_visible = !s_slider_visible;
-    if (s_slider_visible)
-        lv_obj_remove_flag(s_slider_panel, LV_OBJ_FLAG_HIDDEN);
-    else
-        lv_obj_add_flag(s_slider_panel, LV_OBJ_FLAG_HIDDEN);
-}
+LV_FONT_DECLARE(lv_font_dseg7_44);
 
 
 void uiPage3Create() {
@@ -100,12 +84,15 @@ void uiPage3Create() {
     lv_obj_clear_flag(header, LV_OBJ_FLAG_SCROLLABLE);
 
     s_timecode = lv_label_create(s_screen);
-lv_label_set_text(s_timecode, "00:00:00:00");
-lv_obj_set_style_text_color(s_timecode, lv_color_hex(0x00FFFF), 0);
-lv_obj_set_style_text_font(s_timecode, &lv_font_montserrat_32, 0);
-lv_obj_set_pos(s_timecode, HEADER_X + HEADER_W / 2, P4_H / 2);
-lv_obj_set_style_text_align(s_timecode, LV_TEXT_ALIGN_CENTER, 0);
-set_rotated(s_timecode);
+    lv_label_set_text(s_timecode, "00:00:00:00");
+    lv_obj_set_style_text_color(s_timecode, lv_color_hex(0x00FFFF), 0);
+    //lv_obj_set_style_text_font(s_timecode, &lv_font_dseg7_44, 0);
+    lv_obj_set_style_text_font(s_timecode, &lv_font_montserrat_44, 0);
+    lv_obj_set_style_text_color(s_timecode, lv_color_hex(0x00FFFF), 0);
+    //lv_obj_set_pos(s_timecode, HEADER_X + HEADER_W / 2-50, P4_H / 2);
+    lv_obj_set_pos(s_timecode, 380, P4_H / 2);
+    lv_obj_set_style_text_align(s_timecode, LV_TEXT_ALIGN_CENTER, 0);
+    set_rotated(s_timecode);
 
     // ── 8 CANALES ─────────────────────────────────────────
     for (int i = 0; i < NUM_CH; i++) {
@@ -119,9 +106,9 @@ set_rotated(s_timecode);
     lv_obj_set_size(s_arc[i], 40, 40);
     lv_arc_set_range(s_arc[i], -100, 100);
     lv_arc_set_value(s_arc[i], 0);
-    lv_arc_set_bg_angles(s_arc[i], 135, 45);
+    lv_arc_set_bg_angles(s_arc[i], 135, 405);  // 405 = 45+360 para cubrir el lado derecho
     lv_arc_set_mode(s_arc[i], LV_ARC_MODE_SYMMETRICAL);
-    lv_obj_set_style_arc_color(s_arc[i], lv_color_hex(0x00FFFF), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(s_arc[i], lv_color_hex(0x00FF00), LV_PART_INDICATOR);
     lv_obj_set_style_arc_color(s_arc[i], lv_color_hex(0x333333), LV_PART_MAIN);
     lv_obj_set_style_arc_width(s_arc[i], 4, LV_PART_MAIN);
     lv_obj_set_style_arc_width(s_arc[i], 4, LV_PART_INDICATOR);
@@ -129,109 +116,96 @@ set_rotated(s_timecode);
     lv_obj_remove_flag(s_arc[i], LV_OBJ_FLAG_CLICKABLE);
     set_rotated(s_arc[i]);
 
-        // MUTE
-s_mute[i] = lv_obj_create(s_screen);
-lv_obj_set_pos(s_mute[i], MUTE_X + 4, y + 4);
-lv_obj_set_size(s_mute[i], MUTE_W - 8, CH_H - 8);
-lv_obj_set_style_bg_color(s_mute[i], COLOR_MUTE_OFF, 0);
-lv_obj_set_style_border_width(s_mute[i], 0, 0);
-lv_obj_set_style_radius(s_mute[i], 6, 0);
-lv_obj_clear_flag(s_mute[i], LV_OBJ_FLAG_SCROLLABLE);
-lv_obj_add_flag(s_mute[i], LV_OBJ_FLAG_CLICKABLE);
-lv_obj_t* mute_lbl = lv_label_create(s_mute[i]);
-lv_label_set_text(mute_lbl, "M");
-lv_obj_set_style_text_color(mute_lbl, lv_color_hex(0xFFFFFF), 0);
-lv_obj_center(mute_lbl);
-set_rotated(mute_lbl);
-lv_obj_add_event_cb(s_mute[i], [](lv_event_t* e) {
+    // Label valor dentro del arco
+
+    s_arc_lbl[i] = lv_label_create(s_arc[i]);
+    lv_label_set_text(s_arc_lbl[i], "C");  // C = center
+    lv_obj_set_style_text_color(s_arc_lbl[i], lv_color_hex(0x00FF00), 0);
+    lv_obj_set_style_text_font(s_arc_lbl[i], &lv_font_montserrat_12, 0);
+    lv_obj_center(s_arc_lbl[i]);
+    lv_obj_set_style_text_color(s_arc_lbl[i], lv_color_hex(0xFFFFFF), 0);
+
+
+    // MUTE
+    s_mute[i] = lv_obj_create(s_screen);
+    lv_obj_set_pos(s_mute[i], MUTE_X + 4, y + 4);
+    lv_obj_set_size(s_mute[i], MUTE_W - 8, CH_H - 8);
+    lv_obj_set_style_bg_color(s_mute[i], COLOR_MUTE_OFF, 0);
+    lv_obj_set_style_border_width(s_mute[i], 0, 0);
+    lv_obj_set_style_radius(s_mute[i], 6, 0);
+    lv_obj_clear_flag(s_mute[i], LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(s_mute[i], LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_t* mute_lbl = lv_label_create(s_mute[i]);
+    lv_label_set_text(mute_lbl, "M");
+    lv_obj_set_style_text_color(mute_lbl, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_center(mute_lbl);
+    set_rotated(mute_lbl);
+    lv_obj_add_event_cb(s_mute[i], [](lv_event_t* e) {
     int ch = (int)(intptr_t)lv_event_get_user_data(e);
     uint8_t note = 0x10 + ch;
     bool isOn = !muteStates[ch];
     byte msg[3] = { (byte)(isOn ? 0x90 : 0x80), note, (byte)(isOn ? 127 : 0) };
     sendMIDIBytes(msg, 3);
-}, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+    }, LV_EVENT_CLICKED, (void*)(intptr_t)i);
 
-// SELECT
-s_select[i] = lv_obj_create(s_screen);
-lv_obj_set_pos(s_select[i], SELECT_X + 4, y + 4);
-lv_obj_set_size(s_select[i], SELECT_W - 8, CH_H - 8);
-lv_obj_set_style_bg_color(s_select[i], COLOR_SEL_OFF, 0);
-lv_obj_set_style_border_width(s_select[i], 0, 0);
-lv_obj_set_style_radius(s_select[i], 6, 0);
-lv_obj_clear_flag(s_select[i], LV_OBJ_FLAG_SCROLLABLE);
-lv_obj_add_flag(s_select[i], LV_OBJ_FLAG_CLICKABLE);
-lv_obj_t* sel_lbl = lv_label_create(s_select[i]);
-lv_label_set_text(sel_lbl, "S");
-lv_obj_set_style_text_color(sel_lbl, lv_color_hex(0xFFFFFF), 0);
-lv_obj_center(sel_lbl);
-set_rotated(sel_lbl);
-lv_obj_add_event_cb(s_select[i], [](lv_event_t* e) {
-    int ch = (int)(intptr_t)lv_event_get_user_data(e);
-    uint8_t note = 0x18 + ch;
-    bool isOn = !selectStates[ch];
-    byte msg[3] = { (byte)(isOn ? 0x90 : 0x80), note, (byte)(isOn ? 127 : 0) };
-    sendMIDIBytes(msg, 3);
-}, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+    // SELECT
+    s_select[i] = lv_obj_create(s_screen);
+    lv_obj_set_pos(s_select[i], SELECT_X + 4, y + 4);
+    lv_obj_set_size(s_select[i], SELECT_W - 8, CH_H - 8);
+    lv_obj_set_style_bg_color(s_select[i], COLOR_SEL_OFF, 0);
+    lv_obj_set_style_border_width(s_select[i], 0, 0);
+    lv_obj_set_style_radius(s_select[i], 6, 0);
+    lv_obj_clear_flag(s_select[i], LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(s_select[i], LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_t* sel_lbl = lv_label_create(s_select[i]);
+    lv_label_set_text(sel_lbl, "S");
+    lv_obj_set_style_text_color(sel_lbl, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_center(sel_lbl);
+    set_rotated(sel_lbl);
+    lv_obj_add_event_cb(s_select[i], [](lv_event_t* e) {
+        int ch = (int)(intptr_t)lv_event_get_user_data(e);
+        uint8_t note = 0x18 + ch;
+        bool isOn = !selectStates[ch];
+        byte msg[3] = { (byte)(isOn ? 0x90 : 0x80), note, (byte)(isOn ? 127 : 0) };
+        sendMIDIBytes(msg, 3);
+    }, LV_EVENT_CLICKED, (void*)(intptr_t)i);
 
-       // TRACK NAME
-lv_obj_t* tn_cont = lv_obj_create(s_screen);
-lv_obj_set_pos(tn_cont, TRACKNAME_X, y);
-lv_obj_set_size(tn_cont, TRACKNAME_W, CH_H);
-lv_obj_set_style_bg_opa(tn_cont, LV_OPA_TRANSP, 0);
-lv_obj_set_style_border_width(tn_cont, 0, 0);
-lv_obj_clear_flag(tn_cont, LV_OBJ_FLAG_SCROLLABLE);
+    // TRACK NAME
+    lv_obj_t* tn_cont = lv_obj_create(s_screen);
+    lv_obj_set_pos(tn_cont, TRACKNAME_X, y);
+    lv_obj_set_size(tn_cont, TRACKNAME_W, CH_H);
+    lv_obj_set_style_bg_opa(tn_cont, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(tn_cont, 0, 0);
+    lv_obj_clear_flag(tn_cont, LV_OBJ_FLAG_SCROLLABLE);
 
-s_trackname[i] = lv_label_create(tn_cont);
-lv_label_set_text(s_trackname[i], "---");
-lv_obj_set_style_text_color(s_trackname[i], lv_color_hex(0xFFFFFF), 0);
-lv_obj_set_style_text_font(s_trackname[i], &lv_font_montserrat_12, 0);
-lv_obj_center(s_trackname[i]);
-set_rotated(s_trackname[i]);
+    s_trackname[i] = lv_label_create(tn_cont);
+    lv_label_set_text(s_trackname[i], "---");
+    lv_obj_set_style_text_color(s_trackname[i], lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_text_font(s_trackname[i], &lv_font_montserrat_14, 0);
+    lv_obj_center(s_trackname[i]);
+    set_rotated(s_trackname[i]);
 
-        // VU — 12 segmentos
-int seg_w   = (VU_W - 8 - 11) / 12;  // ancho de cada segmento horizontal
-int seg_pad = 1;
-for (int s = 0; s < 12; s++) {
-    int seg_x = VU_X + 4 + s * (seg_w + seg_pad);
-    s_vu_seg[i][s] = lv_obj_create(s_screen);
-    lv_obj_set_pos(s_vu_seg[i][s], seg_x, y + 4);
-    lv_obj_set_size(s_vu_seg[i][s], seg_w, CH_H - 8);
-    lv_obj_set_style_border_width(s_vu_seg[i][s], 0, 0);
-    lv_obj_set_style_radius(s_vu_seg[i][s], 1, 0);
-    lv_obj_clear_flag(s_vu_seg[i][s], LV_OBJ_FLAG_SCROLLABLE);
-    lv_color_t off_color;
-    if      (s < 8)  off_color = lv_color_hex(0x003300);
-    else if (s < 10) off_color = lv_color_hex(0x333300);
-    else             off_color = lv_color_hex(0x330000);
-    lv_obj_set_style_bg_color(s_vu_seg[i][s], off_color, 0);
-}
+    // VU — 12 segmentos
+    int seg_w   = (VU_W - 8 - 11) / 12;  // ancho de cada segmento horizontal
+    int seg_pad = 1;
+    for (int s = 0; s < 12; s++) {
+        int seg_x = VU_X + 4 + s * (seg_w + seg_pad);
+        s_vu_seg[i][s] = lv_obj_create(s_screen);
+        lv_obj_set_pos(s_vu_seg[i][s], seg_x, y + 4);
+        lv_obj_set_size(s_vu_seg[i][s], seg_w, CH_H - 8);
+        lv_obj_set_style_border_width(s_vu_seg[i][s], 0, 0);
+        lv_obj_set_style_radius(s_vu_seg[i][s], 1, 0);
+        lv_obj_clear_flag(s_vu_seg[i][s], LV_OBJ_FLAG_SCROLLABLE);
+        lv_color_t off_color;
+        if      (s < 8)  off_color = lv_color_hex(0x003300);
+        else if (s < 10) off_color = lv_color_hex(0x333300);
+        else             off_color = lv_color_hex(0x330000);
+        lv_obj_set_style_bg_color(s_vu_seg[i][s], off_color, 0);
+    }
     }
 
-    // ── SLIDER BRILLO — oculto ────────────────────────────
-    s_slider_panel = lv_obj_create(s_screen);
-    lv_obj_set_pos(s_slider_panel, CONTENT_W, 0);
-    lv_obj_set_size(s_slider_panel, SLIDER_W, P4_H);
-    lv_obj_set_style_bg_color(s_slider_panel, lv_color_hex(0x222222), 0);
-    lv_obj_set_style_border_width(s_slider_panel, 0, 0);
-    lv_obj_set_style_radius(s_slider_panel, 0, 0);
-    lv_obj_clear_flag(s_slider_panel, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(s_slider_panel, LV_OBJ_FLAG_HIDDEN);
 
-    s_slider = lv_slider_create(s_slider_panel);
-    lv_obj_set_size(s_slider, 20, P4_H - 40);
-    lv_obj_center(s_slider);
-    lv_slider_set_range(s_slider, 10, 100);
-    lv_slider_set_value(s_slider, 80, LV_ANIM_OFF);
-    lv_obj_add_event_cb(s_slider, [](lv_event_t* e) {
-        lv_obj_t* s = (lv_obj_t*)lv_event_get_target(e);
-        extern void displaySetBrightness(uint8_t);
-        displaySetBrightness((uint8_t)lv_slider_get_value(s));
-    }, LV_EVENT_VALUE_CHANGED, NULL);
-
-    // ── GESTO ─────────────────────────────────────────────
-    lv_obj_add_event_cb(s_screen, gesture_cb, LV_EVENT_GESTURE, NULL);
-    lv_obj_clear_flag(s_screen, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(s_screen, LV_OBJ_FLAG_CLICKABLE);
+    
 
     lv_scr_load(s_screen);
 }
@@ -255,9 +229,16 @@ void uiPage3Update() {
         // TRACK NAME
         lv_label_set_text(s_trackname[i], trackNames[i].c_str());
 
-        // PANORAMA
-        int pan = (int)(vpotValues[i] & 0x0F) - 7;
-        lv_arc_set_value(s_arc[i], pan * 14);
+        // PANORAMA — vpot Mackie: bits 3-0 = pos (0-11), centro = 6
+        int pos  = (int)(vpotValues[i] & 0x0F);
+        int pan  = ((pos - 6) * 100) / 6;
+        lv_arc_set_value(s_arc[i], pan);
+
+        char pan_txt[5];
+        if (pos == 6)      snprintf(pan_txt, sizeof(pan_txt), "C");
+        else if (pos > 6)  snprintf(pan_txt, sizeof(pan_txt), "R%d", pos - 6);
+        else               snprintf(pan_txt, sizeof(pan_txt), "L%d", 6 - pos);
+        lv_label_set_text(s_arc_lbl[i], pan_txt);
 
         // VU — 12 segmentos
         int activeSegments = (int)round(vuLevels[i] * 12.0f);
