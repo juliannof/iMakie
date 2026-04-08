@@ -35,6 +35,7 @@ extern uint8_t g_logicConnected;
 // --- Variables de display ---
 extern String trackNames[9];
 extern bool recStates[8], soloStates[8], muteStates[8], selectStates[8];
+extern uint8_t vpotValues[8];
 extern float vuLevels[9];
 extern bool vuClipState[9];
 extern unsigned long vuLastUpdateTime[9];

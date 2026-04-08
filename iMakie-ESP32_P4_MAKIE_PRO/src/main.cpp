@@ -5,11 +5,14 @@
 #include "RS485/RS485.h"
 #include "midi/MIDIProcessor.h"
 #include "display/Display.h"
+#include "display/UIPage3.h"
+
 
 USBMIDI MIDI;
 
 volatile ConnectionState logicConnectionState = ConnectionState::DISCONNECTED;
 uint8_t g_logicConnected = 0;
+uint8_t vpotValues[8] = {};
 
 String trackNames[9];
 bool recStates[8]    = {}, soloStates[8] = {};
@@ -33,6 +36,9 @@ DisplayMode currentTimecodeMode = MODE_BEATS;
 
 TaskHandle_t taskCore0Handle = NULL;
 TaskHandle_t taskCore1Handle = NULL;
+
+extern void handleVUMeterDecay();
+
 
 void updateLeds() {}
 
@@ -95,9 +101,11 @@ void taskCore0(void* pvParameters) {
 
 void taskCore1(void* pvParameters) {
     for (;;) {
+        handleVUMeterDecay();  // ← añadir
+        uiPage3Update();
         lv_tick_inc(10);
         lv_task_handler();
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
 
@@ -115,17 +123,14 @@ void setup() {
 
     initDisplay();
     log_e("initDisplay() OK");
-    // Test LVGL
-    lv_obj_t* label = lv_label_create(lv_scr_act());
-    lv_label_set_text(label, "iMakie P4");
-    lv_obj_center(label);
+    uiPage3Create();
 
     rs485.begin(NUM_SLAVES);
     log_e("RS485 OK — slaves: %d TX:%d RX:%d EN:%d",
           NUM_SLAVES, RS485_TX_PIN, RS485_RX_PIN, RS485_ENABLE_PIN);
 
     xTaskCreatePinnedToCore(taskCore0, "MIDI", 4096, NULL, 2, &taskCore0Handle, 0);
-    xTaskCreatePinnedToCore(taskCore1, "UI",   4096, NULL, 1, &taskCore1Handle, 1);
+    xTaskCreatePinnedToCore(taskCore1, "UI", 16384, NULL, 1, &taskCore1Handle, 1);
 
     log_e("iMakie P4 listo.");
 }

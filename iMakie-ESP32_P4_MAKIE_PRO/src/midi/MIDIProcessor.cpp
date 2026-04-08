@@ -280,11 +280,12 @@ void processControlChange(byte channel, byte controller, byte value) {
     if (controller >= 48 && controller <= 55) {
         uint8_t strip = controller - 48;
         rs485.setVPotValue(strip + 1, value);
+        vpotValues[strip] = value;  // ← añadir
         log_v("[VPot] strip=%u raw=0x%02X mode=%u pos=%u center=%u",
-              strip, value,
-              (value >> 4) & 0x03,
-              value & 0x0F,
-              (value >> 6) & 0x01);
+            strip, value,
+            (value >> 4) & 0x03,
+            value & 0x0F,
+            (value >> 6) & 0x01);
         return;
     }
 

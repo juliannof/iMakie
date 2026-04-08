@@ -8,6 +8,7 @@
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_mipi_dsi.h"
 #include "lcd/esp_lcd_st7701.h"
+#include "touch/esp_lcd_touch_gt911.h"
 #include "lvgl.h"
 
 #define LCD_H_RES           480
@@ -104,6 +105,34 @@ void initDisplay() {
     esp_lcd_panel_reset(s_panel);
     esp_lcd_panel_init(s_panel);
 
+    // I2C para GT911
+    i2c_master_bus_handle_t i2c_bus = NULL;
+    i2c_master_bus_config_t i2c_cfg = {
+        .i2c_port          = I2C_NUM_1,
+        .sda_io_num        = GPIO_NUM_7,
+        .scl_io_num        = GPIO_NUM_8,
+        .clk_source        = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7,
+    };
+    i2c_new_master_bus(&i2c_cfg, &i2c_bus);
+
+    // GT911
+    esp_lcd_panel_io_handle_t tp_io = NULL;
+    esp_lcd_panel_io_i2c_config_t tp_io_cfg = ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG();
+    tp_io_cfg.scl_speed_hz = 400000;
+    esp_lcd_new_panel_io_i2c(i2c_bus, &tp_io_cfg, &tp_io);
+
+    esp_lcd_touch_config_t tp_cfg = {
+        .x_max        = LCD_H_RES,
+        .y_max        = LCD_V_RES,
+        .rst_gpio_num = GPIO_NUM_NC,
+        .int_gpio_num = GPIO_NUM_NC,
+        .levels       = {.reset = 0, .interrupt = 0},
+        .flags        = {.swap_xy = 0, .mirror_x = 0, .mirror_y = 0},
+    };
+    static esp_lcd_touch_handle_t s_tp = NULL;
+    esp_lcd_touch_new_i2c_gt911(tp_io, &tp_cfg, &s_tp);
+
     // LVGL init
     lv_init();
 
@@ -125,6 +154,25 @@ void initDisplay() {
         lv_display_flush_ready(disp);
     });
 
+   // LVGL input device touch
+lv_indev_t* indev = lv_indev_create();
+lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
+lv_indev_set_read_cb(indev, [](lv_indev_t* drv, lv_indev_data_t* data) {
+    esp_lcd_touch_handle_t tp = (esp_lcd_touch_handle_t)lv_indev_get_user_data(drv);
+    uint16_t x, y, strength;
+    uint8_t count = 0;
+    esp_lcd_touch_read_data(tp);
+    if (esp_lcd_touch_get_coordinates(tp, &x, &y, &strength, &count, 1) && count > 0) {
+        data->point.x = x;
+        data->point.y = y;
+        data->state = LV_INDEV_STATE_PRESSED;
+    } else {
+        data->state = LV_INDEV_STATE_RELEASED;
+    }
+});
+lv_indev_set_user_data(indev, s_tp);
+   
+    
     displaySetBrightness(80);
     log_i("[Display] Init OK");
 }
