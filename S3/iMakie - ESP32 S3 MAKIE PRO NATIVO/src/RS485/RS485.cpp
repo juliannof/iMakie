@@ -73,30 +73,34 @@ void RS485Master::runTask() {
                 break;
 
             case BusState::WAIT_RESP:
-                if (_readResponse()) {
-                    _handleResponse();
-                    _busState   = BusState::GAP;
-                    _stateTimer = micros();
-                } else if (micros() - _stateTimer > RS485_RESP_TIMEOUT_US) {
-                    _timeouts++;
-                    log_v("[RS485] TIMEOUT slave %d (rx bytes=%d)", _currentId, Serial1.available());  // ← añade esto
-                    if (xSemaphoreTake(_mutex, 0) == pdTRUE) {
-                        _ch[_currentId].responded = false;
-                        xSemaphoreGive(_mutex);
-                    }
-                    _busState   = BusState::GAP;
-                    _stateTimer = micros();
-                }
-                break;
-
-            case BusState::GAP:
-                if (micros() - _stateTimer >= RS485_GAP_US) {
-                    _nextSlave();
-                    _busState = BusState::SEND;
-                }
-                break;
+    if (_readResponse()) {
+        _handleResponse();
+        _busState   = BusState::GAP;
+        _stateTimer = micros();
+    } else if (micros() - _stateTimer > RS485_RESP_TIMEOUT_US) {
+        _timeouts++;
+        log_v("[RS485] TIMEOUT slave %d", _currentId);
+        if (xSemaphoreTake(_mutex, 0) == pdTRUE) {
+            _ch[_currentId].responded = false;
+            xSemaphoreGive(_mutex);
         }
-        taskYIELD();
+        _busState   = BusState::GAP;
+        _stateTimer = micros();
+    } else {
+        vTaskDelay(1);  // ← cede Core 1
+    }
+    break;
+
+case BusState::GAP:
+    if (micros() - _stateTimer >= RS485_GAP_US) {
+        _nextSlave();
+        _busState = BusState::SEND;
+    } else {
+        vTaskDelay(1);  // ← cede Core 1
+    }
+    break;
+        }
+        //taskYIELD();
     }
 }
 
