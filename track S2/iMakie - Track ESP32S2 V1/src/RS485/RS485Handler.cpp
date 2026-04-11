@@ -43,7 +43,7 @@ void onMasterData(const MasterPacket& pkt) {
         Motor::setTarget(Motor::getRawADC()); 
         recStates = soloStates = muteStates = selectStates = false;
         vuLevels = vuPeakLevels = 0.0f;
-        setScreenBrightness(0); 
+        //setScreenBrightness(0); 
         neoWaitingHandshake = true;
         updateAllNeopixels();
     }

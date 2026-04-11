@@ -4,7 +4,6 @@
 #include "hardware/encoder/Encoder.h"
 #include "../hardware/Hardware.h"
 #include <Preferences.h>
-#include "../version.h"
 #include "SpriteUtils.h"           // en Display.cpp                                                          
 #include "../config.h"
 
@@ -127,11 +126,14 @@ void drawSplashScreen() {
     snprintf(buf, sizeof(buf), "iMakie Track %d", trackId);  // ← trackId, no _trackId
     tft.drawString(buf, TFT_WIDTH / 2, 120);
 
-    tft.setFont(&fonts::FreeSans9pt7b);
+    
     tft.setTextColor(TFT_WHITE);
-    tft.drawString("FW " FW_VERSION "  " FW_BUILD_DATE, TFT_WIDTH / 2, 170);
-    tft.drawString(FW_BUILD_TIME, TFT_WIDTH / 2, 195);
-    tft.drawString(FW_HARDWARE, TFT_WIDTH / 2, 215);
+    char verBuf[40];
+    snprintf(verBuf, sizeof(verBuf), "FW %s", FW_VERSION);
+    tft.setFont(&fonts::FreeSans12pt7b);
+    tft.drawString(verBuf, TFT_WIDTH / 2, 170);
+    tft.setFont(&fonts::FreeSans9pt7b);
+    tft.drawString(FW_BUILD_ID, TFT_WIDTH / 2, 200);
 }
 
 

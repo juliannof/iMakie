@@ -19,7 +19,7 @@
 #include "SAT/SatMenu.h"
 #include "display/SpriteUtils.h"
 #include <driver/dac_oneshot.h>
-#include "version.h"
+
 
 // ─── Objetos globales ─────────────────────────────────────────
 LGFX        tft;
@@ -104,27 +104,24 @@ void setup() {
     Serial.begin(115200);
     Serial.setDebugOutput(true);
     Motor::init();
-    delay(1500);
-
-    otaManager.begin();
-    log_i("=== iMakie PTxx BOOT === FW:%s HW:%s (%s %s)",
-      FW_VERSION, FW_HARDWARE, FW_BUILD_DATE, FW_BUILD_TIME);
-
-    dac_oneshot_handle_t _dacHandle;
-    dac_oneshot_config_t _dacCfg = { .chan_id = DAC_CHAN_0 };
-    dac_oneshot_new_channel(&_dacCfg, &_dacHandle);
-    dac_oneshot_output_voltage(_dacHandle, 77);
-    delay(30);
-    faderADC.begin();
-    log_i("Fader ADC OK");
-
+    initNeopixels();
+    log_i("NeoPixels OK");
     initDisplay();
     drawSplashScreen();
     //delay(2000);          // 2 segundos visible
     log_i("Display OK");
+    
+    otaManager.begin();
+    
+    dac_oneshot_handle_t _dacHandle;
+    dac_oneshot_config_t _dacCfg = { .chan_id = DAC_CHAN_0 };
+    dac_oneshot_new_channel(&_dacCfg, &_dacHandle);
+    dac_oneshot_output_voltage(_dacHandle, 50);
+    delay(100);
+    faderADC.begin();
+    log_i("Mueve el fader de punta a punta...");
+    
 
-    initNeopixels();
-    log_i("NeoPixels OK");
 
     initHardware();
     log_i("Hardware OK");

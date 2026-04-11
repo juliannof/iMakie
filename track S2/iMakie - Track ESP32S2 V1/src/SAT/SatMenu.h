@@ -126,8 +126,6 @@ private:
     int           _tchRaw    = 0;
     bool          _tchOn     = false;
     int           _motPWM    = 0;
-    int           _fadCalMin = 4095;
-    int           _fadCalMax = 0;
     unsigned long _fadT      = 0;
     static const int FAD_HIST = 80;
     uint8_t       _fadHist[FAD_HIST] = {};
@@ -177,6 +175,12 @@ private:
     void _back()      { _goto(_prev); }
     void _toast(const char* msg, Scr ret);
     void _confirm(const char* msg, Scr yes);
+
+    int           _fadCalMin  = 8191;
+    int           _fadCalMax  = 0;
+    int           _lastRaw    = 0;
+    unsigned long _stopT      = 0;
+    bool          _reported   = false;
 
     static const Item _mainItems[];
     static const Item _identItems[];

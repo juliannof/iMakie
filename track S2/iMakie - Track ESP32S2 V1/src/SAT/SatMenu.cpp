@@ -2,6 +2,9 @@
 //  SatMenu.cpp  –  iMakie PTxx Track S2
 // ============================================================
 #include "SatMenu.h"
+#include "../hardware/fader/FaderADC.h"   // ← añadir
+
+extern FaderADC faderADC;                  // ← añadir
 
 // ─────────────────────────────────────────────────────────────
 //  Tablas de menú
@@ -445,24 +448,40 @@ void SatMenu::_tickTestFader(Btn b) {
     if (b == Btn::BACK)  { _motorStop(); _goto(Scr::DIAG); return; }
     if (b == Btn::UP)    { _motPWM=constrain(_motPWM+20,-255,255); _motorDrive(_motPWM); }
     if (b == Btn::DOWN)  { _motPWM=constrain(_motPWM-20,-255,255); _motorDrive(_motPWM); }
-    if (b == Btn::ENTER) { _motPWM=0; _motorStop(); _fadCalMin=4095; _fadCalMax=0; }
+    if (b == Btn::ENTER) {
+        _motPWM=0;
+        _motorStop();
+        _fadCalMin=8191; _fadCalMax=0;
+        _reported=false; _stopT=0;
+        faderADC.measureRange();
+    }
 
     unsigned long now=millis();
     if (now-_fadT>25) {
         _fadT=now;
-        int sum=0; for (int i=0;i<8;i++) sum+=analogRead(FADER_POT_PIN);
-        _fadRaw=sum/8;
-        if (_fadRaw<_fadCalMin) _fadCalMin=_fadRaw;
-        if (_fadRaw>_fadCalMax) _fadCalMax=_fadRaw;
-        int range=_fadCalMax-_fadCalMin;
-        _fadPct=range>50?(float)(_fadRaw-_fadCalMin)/range:(float)_fadRaw/4095.0f;
-        _fadPct=constrain(_fadPct,0.0f,1.0f);
+        faderADC.update();
+        _fadRaw = faderADC.getRawLast();
+        if (_fadRaw < _fadCalMin) { _fadCalMin = _fadRaw; _reported = false; }
+        if (_fadRaw > _fadCalMax) { _fadCalMax = _fadRaw; _reported = false; }
+        _fadPct = (_fadCalMax > _fadCalMin) ?
+                  constrain((float)(_fadRaw - _fadCalMin) / (_fadCalMax - _fadCalMin), 0.0f, 1.0f) :
+                  constrain((float)faderADC.getFaderPos() / 8191.0f, 0.0f, 1.0f);
+
+        if (abs(_fadRaw - _lastRaw) > 10) {
+            _stopT   = now;
+            _lastRaw = _fadRaw;
+        } else if (!_reported && now - _stopT > 500 && _fadCalMax > _fadCalMin) {
+            log_i("[ADC] RANGE  min=%d  max=%d  span=%d", _fadCalMin, _fadCalMax, _fadCalMax - _fadCalMin);
+            _reported = true;
+        }
+
         if (now-_fadHistT>50) {
             _fadHistT=now;
             _fadHist[_fadHistIdx]=(uint8_t)(_fadPct*255);
             _fadHistIdx=(_fadHistIdx+1)%FAD_HIST;
         }
     }
+
     _tchRaw=_touchRead();
     static int tchBase=0;
     if (tchBase==0&&_tchRaw>100) tchBase=_tchRaw;
@@ -476,7 +495,7 @@ void SatMenu::_tickTestFader(Btn b) {
     _spr.setTextColor(C_CYAN,C_BG); _spr.setTextSize(1);
     _spr.setTextDatum(textdatum_t::top_left);
     _spr.drawString("FADER",4,y);
-    snprintf(buf,32,"raw=%4d  %.1f%%  [%d-%d]",_fadRaw,_fadPct*100.f,_fadCalMin,_fadCalMax);
+    snprintf(buf,32,"raw=%4d  [%d-%d]", _fadRaw, _fadCalMin, _fadCalMax);
     _spr.setTextColor(C_TEXT,C_BG); _spr.drawString(buf,44,y); y+=14;
     _drawHBar(4,y,W-8,14,_fadPct,C_CYAN);
     int ugX=4+(int)((W-8)*0.75f);
@@ -533,7 +552,7 @@ void SatMenu::_tickTestFader(Btn b) {
     _spr.drawFastHLine(0,H-SAT_HINT_H,W,C_DARK);
     _spr.setTextSize(1); _spr.setTextColor(C_GRAY,C_BG);
     _spr.setTextDatum(textdatum_t::middle_left);
-    _spr.drawString("REC=mot+  SOL=mot-  SEL=stop/cal  MUT=salir",4,H-SAT_HINT_H/2);
+    _spr.drawString("REC=mot+  SOL=mot-  SEL=medir  MUT=salir",4,H-SAT_HINT_H/2);
     _push();
 }
 
@@ -601,7 +620,7 @@ void SatMenu::_hDiag(Btn b) {
         switch (_cur) {
             case 0: _dPat=0; _goto(Scr::TEST_DISPLAY); break;
             case 1: _encCnt=0; memset(_encHist,0,ENC_HIST); _goto(Scr::TEST_ENCODER); break;
-            case 2: _motPWM=0; _fadCalMin=4095; _fadCalMax=0;
+            case 2: _motPWM=0;
                     _fadHistIdx=0; memset(_fadHist,0,FAD_HIST);
                     _goto(Scr::TEST_FADER); break;
             case 3: memset(_neoPressed,0,sizeof(_neoPressed));
@@ -909,9 +928,10 @@ void SatMenu::_tickTestNeopixel(Btn b) {
 void SatMenu::showStatus(const char* msg) {
     if (!_open || !_spr.width()) return;
     _spr.fillRect(0, 120, _spr.width(), 40, C_BG);
-    _spr.setTextColor(C_TEXT, C_BG);
+    _spr.setFont(&fonts::FreeSans9pt7b);
     _spr.setTextSize(1);
     _spr.setTextDatum(textdatum_t::middle_center);
+    _spr.setTextColor(C_TEXT, C_BG);   // ← añadir antes de drawString
     _spr.drawString(msg, _spr.width()/2, 140);
     _push();
 }
