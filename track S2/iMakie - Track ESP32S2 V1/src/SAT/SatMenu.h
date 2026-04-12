@@ -166,6 +166,8 @@ private:
     void _tickTestFader(Btn b);
     void _tickTestNeopixel(Btn b);
 
+    
+
     void _motorStop();
     void _motorDrive(int pwm);
     void _load();
@@ -178,6 +180,8 @@ private:
 
     int           _fadCalMin  = 8191;
     int           _fadCalMax  = 0;
+    uint16_t _noiseMin = 8191;
+    uint16_t _noiseMax = 0;
     int           _lastRaw    = 0;
     unsigned long _stopT      = 0;
     bool          _reported   = false;

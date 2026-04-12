@@ -443,6 +443,10 @@ void SatMenu::_tickTestEncoder(Btn b) {
 static int _touchRead() { return (int)touchRead(FADER_TOUCH_PIN); }
 
 void SatMenu::_tickTestFader(Btn b) {
+    // Asegurar motor apagado al entrar en el test
+    static bool _firstEntry = true;
+    if (_firstEntry) { _firstEntry = false; _motorStop(); }
+    
     int W = _spr.width(), H = _spr.height();
 
     if (b == Btn::BACK)  { _motorStop(); _goto(Scr::DIAG); return; }
@@ -452,35 +456,55 @@ void SatMenu::_tickTestFader(Btn b) {
         _motPWM=0;
         _motorStop();
         _fadCalMin=8191; _fadCalMax=0;
+        _noiseMin=8191;  _noiseMax=0;   // ← añadido
         _reported=false; _stopT=0;
         faderADC.measureRange();
     }
 
     unsigned long now=millis();
-    if (now-_fadT>25) {
-        _fadT=now;
-        faderADC.update();
-        _fadRaw = faderADC.getRawLast();
-        if (_fadRaw < _fadCalMin) { _fadCalMin = _fadRaw; _reported = false; }
-        if (_fadRaw > _fadCalMax) { _fadCalMax = _fadRaw; _reported = false; }
-        _fadPct = (_fadCalMax > _fadCalMin) ?
-                  constrain((float)(_fadRaw - _fadCalMin) / (_fadCalMax - _fadCalMin), 0.0f, 1.0f) :
-                  constrain((float)faderADC.getFaderPos() / 8191.0f, 0.0f, 1.0f);
+if (now-_fadT>25) {
+    _fadT=now;
+    faderADC.update();
+    _fadRaw = faderADC.getRawLast();
+    uint16_t fadEma = faderADC.getFaderPos();
 
-        if (abs(_fadRaw - _lastRaw) > 10) {
-            _stopT   = now;
-            _lastRaw = _fadRaw;
-        } else if (!_reported && now - _stopT > 500 && _fadCalMax > _fadCalMin) {
-            log_i("[ADC] RANGE  min=%d  max=%d  span=%d", _fadCalMin, _fadCalMax, _fadCalMax - _fadCalMin);
+    // ── Rango de recorrido total (para Motor) ─────────────
+    if ((int)fadEma < _fadCalMin) { _fadCalMin = fadEma; _reported = false; }
+    if ((int)fadEma > _fadCalMax) { _fadCalMax = fadEma; _reported = false; }
+
+    // ── Ventana deslizante de ruido local ─────────────────
+    // Solo mide el span de las últimas N muestras en reposo
+    if (abs((int)fadEma - (int)_lastRaw) > 15) {
+        // Fader en movimiento: resetea ventana local
+        _stopT       = now;
+        _lastRaw     = (int)fadEma;
+        _noiseMin    = fadEma;
+        _noiseMax    = fadEma;
+        _reported    = false;
+    } else {
+        // Fader quieto: acumula ventana local
+        if (fadEma < _noiseMin) _noiseMin = fadEma;
+        if (fadEma > _noiseMax) _noiseMax = fadEma;
+
+        if (!_reported && now - _stopT > 500 && _fadCalMax > _fadCalMin) {
+            log_i("[ADC] NOISE  min=%d  max=%d  span=%d  |  RANGE  min=%d  max=%d  span=%d",
+                  _noiseMin, _noiseMax, _noiseMax - _noiseMin,
+                  _fadCalMin, _fadCalMax, _fadCalMax - _fadCalMin);
             _reported = true;
         }
-
-        if (now-_fadHistT>50) {
-            _fadHistT=now;
-            _fadHist[_fadHistIdx]=(uint8_t)(_fadPct*255);
-            _fadHistIdx=(_fadHistIdx+1)%FAD_HIST;
-        }
     }
+
+    // ── _fadPct sobre rango acumulado ─────────────────────
+    _fadPct = (_fadCalMax > _fadCalMin) ?
+              constrain((float)((int)fadEma - _fadCalMin) / (_fadCalMax - _fadCalMin), 0.0f, 1.0f) :
+              constrain((float)fadEma / 8191.0f, 0.0f, 1.0f);
+
+    if (now-_fadHistT>50) {
+        _fadHistT=now;
+        _fadHist[_fadHistIdx]=(uint8_t)(_fadPct*255);
+        _fadHistIdx=(_fadHistIdx+1)%FAD_HIST;
+    }
+}
 
     _tchRaw=_touchRead();
     static int tchBase=0;

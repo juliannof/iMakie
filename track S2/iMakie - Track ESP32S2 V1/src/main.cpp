@@ -101,14 +101,22 @@ static void _satLedsTest(int idx, uint8_t r, uint8_t g, uint8_t b) {
 //  setup
 // =============================================================
 void setup() {
+    // Motor: latchear antes de cambiar dirección
+    digitalWrite(MOTOR_EN,  LOW);
+    digitalWrite(MOTOR_IN1, LOW);
+    digitalWrite(MOTOR_IN2, LOW);
+    pinMode(MOTOR_EN,  OUTPUT);
+    pinMode(MOTOR_IN1, OUTPUT);
+    pinMode(MOTOR_IN2, OUTPUT);*
     Serial.begin(115200);
     Serial.setDebugOutput(true);
+    delay(500);          // 2 segundos visible
+
     Motor::init();
     initNeopixels();
     log_i("NeoPixels OK");
     initDisplay();
     drawSplashScreen();
-    //delay(2000);          // 2 segundos visible
     log_i("Display OK");
     
     otaManager.begin();
@@ -119,7 +127,7 @@ void setup() {
     dac_oneshot_output_voltage(_dacHandle, 50);
     delay(100);
     faderADC.begin();
-    log_i("Mueve el fader de punta a punta...");
+    log_i("Fader iniciado.");
     
 
 
@@ -167,6 +175,7 @@ void setup() {
     }
 
     uint8_t slaveId = satMenu->getConfig().trackId;  // ← mover aquí arriba
+    Motor::off();   // ← asegurar motor apagado antes de arrancar RS485
 
     log_i("Track ID: %d", slaveId);
     rs485.begin(slaveId);

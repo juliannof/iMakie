@@ -1,11 +1,9 @@
 #include "FaderADC.h"
 #include "../../config.h"
 
-// GPIO10 = ADC1_CH9 en ESP32-S2
 #define FADER_ADC_UNIT    ADC_UNIT_1
-#define FADER_ADC_CHANNEL ADC_CHANNEL_9
+#define FADER_ADC_CHANNEL ADC_CHANNEL_9   // GPIO10 en ESP32-S2
 #define FADER_ADC_ATTEN   ADC_ATTEN_DB_11
-
 
 void FaderADC::begin() {
     adc_oneshot_unit_init_cfg_t unitCfg = {
@@ -20,9 +18,8 @@ void FaderADC::begin() {
         .bitwidth = ADC_BITWIDTH_13,
     };
     ESP_ERROR_CHECK(adc_oneshot_config_channel(_adcHandle, FADER_ADC_CHANNEL, &chanCfg));
-   
 
-    // Sin calibración — raw directo
+    // Seed inicial — raw directo, sin EMA aún
     int raw = 0;
     adc_oneshot_read(_adcHandle, FADER_ADC_CHANNEL, &raw);
     _rawLast  = raw;
@@ -35,20 +32,24 @@ void FaderADC::update() {
     adc_oneshot_read(_adcHandle, FADER_ADC_CHANNEL, &raw);
     _rawLast   = raw;
     _emaValue += FADER_EMA_ALPHA * ((float)raw - _emaValue);
-    int filtered = constrain((int)_emaValue, FADER_ADC_MIN, FADER_ADC_MAX);
-    _faderPos    = (uint16_t)map(filtered, FADER_ADC_MIN, FADER_ADC_MAX, 0, 8191);
+    _faderPos  = (uint16_t)_emaValue;   // raw EMA, sin map ni constrain
 }
 
+// Mide ruido y span en escala raw real.
+// Llamar con el fader quieto en una posición conocida.
 void FaderADC::measureRange() {
     int minVal = 8191, maxVal = 0;
+    float ema  = (float)_rawLast;       // parte del estado EMA actual
+
     for (int i = 0; i < 100; i++) {
         int raw = 0;
         adc_oneshot_read(_adcHandle, FADER_ADC_CHANNEL, &raw);
-        int filtered = constrain(raw, FADER_ADC_MIN, FADER_ADC_MAX);
-        int pos = (int)map(filtered, FADER_ADC_MIN, FADER_ADC_MAX, 0, 8191);
+        ema += FADER_EMA_ALPHA * ((float)raw - ema);
+        int pos = (int)ema;
         if (pos < minVal) minVal = pos;
         if (pos > maxVal) maxVal = pos;
         delay(10);
     }
-    log_i("[ADC] RANGE  min=%d  max=%d  span=%d", minVal, maxVal, maxVal - minVal);
+    log_i("[ADC] RANGE  min=%d  max=%d  span=%d  (raw EMA, 13-bit)",
+          minVal, maxVal, maxVal - minVal);
 }

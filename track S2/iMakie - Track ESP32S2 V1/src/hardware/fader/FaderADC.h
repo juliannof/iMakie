@@ -6,9 +6,9 @@ class FaderADC {
 public:
     void     begin();
     void     update();
-    void     measureRange();
-    uint16_t getFaderPos() const { return _faderPos; }
-    int      getRawLast()  const { return _rawLast;  }  // raw ADC
+    void     measureRange();                              // diagnóstico de ruido en raw
+    uint16_t getFaderPos() const { return _faderPos; }  // raw EMA (≈1200–6700)
+    int      getRawLast()  const { return _rawLast;  }  // raw ADC sin filtrar
 private:
     adc_oneshot_unit_handle_t _adcHandle = nullptr;
     float    _emaValue = 0.0f;

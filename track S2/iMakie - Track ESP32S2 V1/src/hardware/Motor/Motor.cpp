@@ -24,18 +24,6 @@ static void _hwDown(uint8_t pwm) {
 }
 
 // ─── Máquina de calibración ───────────────────────────────────
-//
-//  Flujo:
-//    KICK_UP → GOING_UP → SETTLE_UP
-//    → KICK_DOWN → GOING_DOWN → SETTLE_DOWN → DONE
-//
-//  Los estados KICK_* esperan CALIB_KICK_MS con PWM alto
-//  sin bloquear el loop — reemplazan el delay(CALIB_KICK_MS).
-//
-//  Los estados SETTLE_* esperan CALIB_SETTLE_MS con motor parado
-//  mientras setADC() sigue recibiendo valores frescos de FaderADC
-//  — reemplazan el delay(80) + faderADC.update() del código anterior.
-//
 enum class CalibPhase {
     IDLE,
     KICK_UP, GOING_UP, SETTLE_UP,
@@ -44,19 +32,24 @@ enum class CalibPhase {
 };
 
 static CalibPhase _phase          = CalibPhase::IDLE;
-static uint32_t   _phaseStart     = 0;   // timestamp de entrada a la fase actual
-static uint32_t   _calibStart     = 0;   // timestamp inicio calibración (timeout global)
-static uint32_t   _calibMinDetect = 0;   // no buscar tope antes de este instante
-static uint32_t   _stableStart    = 0;   // inicio del período estable actual
-static int        _stableRef      = 0;   // referencia para detectar movimiento
+static uint32_t   _phaseStart     = 0;
+static uint32_t   _calibStart     = 0;
+static uint32_t   _calibMinDetect = 0;
+static uint32_t   _stableStart    = 0;
+static int        _stableRef      = 0;
 
 static uint16_t   _adcTop         = 0;
 static uint16_t   _adcMin         = 0;
 static uint16_t   _adcMax         = 8191;
 static uint16_t   _adcSpan        = 8191;
-static uint16_t   _adcPos         = 0;   // valor actual — recibido vía setADC()
+static uint16_t   _adcPos         = 0;
 static uint16_t   _targetADC      = 0;
 static uint16_t   _lastMidiTarget = 0;
+
+// ─── Noise measurement durante SETTLE ─────────────────────────
+static uint16_t   _settleMin      = 8191;
+static uint16_t   _settleMax      = 0;
+static uint16_t   _noiseTopSpan   = 0;
 
 static bool       _motorActive    = false;
 static int        _currentPWM     = 0;
@@ -99,6 +92,8 @@ static void _calibUpdate() {
             _stableStart = now;
         } else if (now - _stableStart >= CALIB_STABLE_TIME) {
             _hwOff();
+            _settleMin  = 8191;
+            _settleMax  = 0;
             _phaseStart = now;
             _phase      = CalibPhase::SETTLE_UP;
             log_d("[CALIB] SETTLE_UP  pos=%d", pos);
@@ -106,15 +101,23 @@ static void _calibUpdate() {
         break;
 
     case CalibPhase::SETTLE_UP:
+        // Acumular noise durante el periodo de asentamiento
+        if (_adcPos < _settleMin) _settleMin = _adcPos;
+        if (_adcPos > _settleMax) _settleMax = _adcPos;
+
         if (now - _phaseStart >= CALIB_SETTLE_MS) {
-            _adcTop         = _adcPos;
+            _adcTop       = _adcPos;
+            _noiseTopSpan = _settleMax - _settleMin;
+            log_i("[CALIB] Tope superior: %d  noise_span=%d", _adcTop, _noiseTopSpan);
+
             _calibMinDetect = now + CALIB_MIN_TRAVEL_MS;
             _stableRef      = (int)_adcTop;
             _stableStart    = now;
+            _settleMin      = 8191;   // reset para SETTLE_DOWN
+            _settleMax      = 0;
             _hwDown(CALIB_KICK_PWM);
             _phaseStart     = now;
             _phase          = CalibPhase::KICK_DOWN;
-            log_i("[CALIB] Tope superior: %d", _adcTop);
         }
         break;
 
@@ -135,6 +138,8 @@ static void _calibUpdate() {
             _stableStart = now;
         } else if (now - _stableStart >= CALIB_STABLE_TIME) {
             _hwOff();
+            _settleMin  = 8191;
+            _settleMax  = 0;
             _phaseStart = now;
             _phase      = CalibPhase::SETTLE_DOWN;
             log_d("[CALIB] SETTLE_DOWN  pos=%d", pos);
@@ -142,12 +147,25 @@ static void _calibUpdate() {
         break;
 
     case CalibPhase::SETTLE_DOWN: {
+        // Acumular noise durante el periodo de asentamiento
+        if (_adcPos < _settleMin) _settleMin = _adcPos;
+        if (_adcPos > _settleMax) _settleMax = _adcPos;
+
         if (now - _phaseStart < CALIB_SETTLE_MS) break;
-        uint16_t adcBot = _adcPos;
-        log_i("[CALIB] Tope inferior: %d", adcBot);
+
+        uint16_t adcBot       = _adcPos;
+        uint16_t noiseSpanBot = _settleMax - _settleMin;
+
+        // Margen = 2× noise span medido en cada tope, mínimo 20 raw
+        uint16_t marginBot = max((uint16_t)(noiseSpanBot * 2), (uint16_t)20);
+        uint16_t marginTop = max((uint16_t)(_noiseTopSpan * 2), (uint16_t)20);
+
+        log_i("[CALIB] Tope inferior: %d  noise_span=%d  margin=%d", adcBot, noiseSpanBot, marginBot);
+        log_i("[CALIB] Tope superior: noise_span=%d  margin=%d", _noiseTopSpan, marginTop);
+
         if (_adcTop > adcBot + 200) {
-            _adcMin    = adcBot + 20;
-            _adcMax    = _adcTop - 20;
+            _adcMin    = adcBot + marginBot;
+            _adcMax    = _adcTop - marginTop;
             _adcSpan   = _adcMax - _adcMin;
             _targetADC = (uint16_t)map((long)_lastMidiTarget,
                                         0, MIDI_PB_MAX, _adcMin, _adcMax);
@@ -172,7 +190,6 @@ static void _positionTick() {
     int absErr = abs(err);
 
     log_i("[POS] pos=%d target=%d err=%d active=%d", pos, _targetADC, err, _motorActive);  // ← temporal
-
 
     if (absErr < DEAD_ZONE) {
         if (_motorActive) {
@@ -205,14 +222,21 @@ static void _positionTick() {
 namespace Motor {
 
 void init() {
+    // Registro de salida primero — al cambiar a OUTPUT ya va LOW sin glitch
+    digitalWrite(MOTOR_EN,  LOW);
+    digitalWrite(MOTOR_IN1, LOW);
+    digitalWrite(MOTOR_IN2, LOW);
+
     pinMode(MOTOR_IN1, OUTPUT);
     pinMode(MOTOR_IN2, OUTPUT);
     pinMode(MOTOR_EN,  OUTPUT);
+
     analogWriteFrequency(MOTOR_IN1, 20000);
     analogWriteFrequency(MOTOR_IN2, 20000);
     analogWriteResolution(MOTOR_IN1, 8);
     analogWriteResolution(MOTOR_IN2, 8);
-    _hwBrake();
+
+    _hwOff();
     log_i("[MOTOR] init OK  IN1=%d IN2=%d EN=%d", MOTOR_IN1, MOTOR_IN2, MOTOR_EN);
 }
 
@@ -226,6 +250,9 @@ void startCalib() {
     if (_isCalibrating()) return;
     _motorActive    = false;
     _currentPWM     = 0;
+    _settleMin      = 8191;
+    _settleMax      = 0;
+    _noiseTopSpan   = 0;
     _calibStart     = millis();
     _calibMinDetect = millis() + CALIB_MIN_TRAVEL_MS;
     _stableRef      = (int)_adcPos;
@@ -247,8 +274,6 @@ void update() {
 }
 
 void setADC(uint16_t v) {
-    // Spike guard: descarta saltos imposibles fuera de calibración
-    // (durante calib el fader se mueve rápido — cualquier delta es válido)
     if (!_isCalibrating() &&
         _adcPos > 0 &&
         abs((int)v - (int)_adcPos) > ADC_SPIKE_GUARD) return;
@@ -262,7 +287,6 @@ void setTarget(uint16_t midiPB) {
     log_d("[TARGET] midi=%d → adc=%d", midiPB, _targetADC);
 }
 
-// Freno activo — usar cuando el usuario toca el fader
 void stop() {
     if (_isCalibrating()) return;
     _hwBrake();
@@ -270,7 +294,6 @@ void stop() {
     _currentPWM  = 0;
 }
 
-// Corte total — usar en desconexión o apagado de emergencia
 void off() {
     _hwOff();
     _motorActive = false;
