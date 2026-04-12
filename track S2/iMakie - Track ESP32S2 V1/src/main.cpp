@@ -101,18 +101,12 @@ static void _satLedsTest(int idx, uint8_t r, uint8_t g, uint8_t b) {
 //  setup
 // =============================================================
 void setup() {
-    // Motor: latchear antes de cambiar dirección
-    digitalWrite(MOTOR_EN,  LOW);
-    digitalWrite(MOTOR_IN1, LOW);
-    digitalWrite(MOTOR_IN2, LOW);
-    pinMode(MOTOR_EN,  OUTPUT);
-    pinMode(MOTOR_IN1, OUTPUT);
-    pinMode(MOTOR_IN2, OUTPUT);*
+    Motor::init();
     Serial.begin(115200);
     Serial.setDebugOutput(true);
     delay(500);          // 2 segundos visible
 
-    Motor::init();
+    
     initNeopixels();
     log_i("NeoPixels OK");
     initDisplay();

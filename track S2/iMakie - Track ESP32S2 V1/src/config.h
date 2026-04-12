@@ -80,6 +80,7 @@ static constexpr uint32_t CALIB_STABLE_TIME        = 150;     // ms sin movimien
 static constexpr uint32_t CALIB_MIN_TRAVEL_MS      = 800;     // mínimo de viaje antes de empezar a buscar tope
 
 // ─── Motor — control de posición ──────────────────────────────
+static constexpr uint8_t  PWM_START                  = 0;
 static constexpr uint8_t  PWM_MIN                  = 65;
 static constexpr uint8_t  PWM_MAX                  = 120;
 static constexpr uint8_t  PWM_SLEW                 = 4;

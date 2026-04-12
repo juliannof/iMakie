@@ -417,6 +417,11 @@ void processChannelPressure(byte channel, byte value) {
 // ****************************************************************************
 
 void processMackieSysEx(byte* payload, int len) {
+
+    log_i("[SysEx] cmd=0x%02X len=%d family=0x%02X state=%d",
+      len > 4 ? payload[4] : 0xFF, len,
+      len > 3 ? payload[3] : 0xFF,
+      (int)logicConnectionState);
     if (len < 5) return;
 
     byte device_family = payload[3];
@@ -491,6 +496,9 @@ void processMackieSysEx(byte* payload, int len) {
         }
 
         case 0x12: {
+            log_i("[0x12] len=%d offset=%d text_len=%d state=%d",
+          len, len >= 6 ? payload[5] : -1, len - 6,
+          (int)logicConnectionState);
             if (len < 6) break;
             byte startOffset = payload[5];
             int  text_len    = len - 6;

@@ -6,6 +6,8 @@
 #include "midi/MIDIProcessor.h"
 #include "display/Display.h"
 #include "display/UIPage3.h"
+#include "display/UIOffline.h"
+#include <LittleFS.h>
 
 
 USBMIDI MIDI;
@@ -26,8 +28,9 @@ float faderPositions[9]               = {};
 bool needsTOTALRedraw    = false;
 bool needsMainAreaRedraw = false;
 bool needsHeaderRedraw   = false;
-bool needsVUMetersRedraw = false;
-String assignmentString  = "--";
+bool needsTimecodeRedraw = true;
+bool needsButtonsRedraw  = true;
+bool needsVUMetersRedraw = true;String assignmentString  = "--";
 bool btnStatePG1[32] = {}, btnStatePG2[32] = {};
 bool btnFlashPG1[32] = {}, btnFlashPG2[32] = {};
 char timeCodeChars_clean[13] = {};
@@ -38,6 +41,9 @@ TaskHandle_t taskCore0Handle = NULL;
 TaskHandle_t taskCore1Handle = NULL;
 
 extern void handleVUMeterDecay();
+
+volatile bool g_switchToPage3 = false;
+volatile bool g_switchToOffline = false;
 
 
 void updateLeds() {}
@@ -101,17 +107,43 @@ void taskCore0(void* pvParameters) {
 
 void taskCore1(void* pvParameters) {
     for (;;) {
-        handleVUMeterDecay();  // ← añadir
-        uiPage3Update();
+        if (g_switchToPage3) {
+            g_switchToPage3  = false;
+            uiOfflineDestroy();
+            uiPage3Create();
+        } else if (g_switchToOffline) {
+            g_switchToOffline = false;
+            uiPage3Destroy();   // ← necesitamos esta función
+            uiOfflineCreate();
+        } else if (logicConnectionState == ConnectionState::DISCONNECTED) {
+            uiOfflineTick();
+        } else if (logicConnectionState == ConnectionState::CONNECTED) {
+            handleVUMeterDecay();
+            uiPage3Update();
+        }
         lv_tick_inc(10);
         lv_task_handler();
-        vTaskDelay(pdMS_TO_TICKS(5));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
 void setup() {
     Serial.begin(115200);
+    //while (!Serial) delay(10);  // esperar USB CDC
+    //delay(3000);  // esperar USB
     log_e("iMakie P4 arrancando...");
+    
+
+
+    if (!LittleFS.begin(false)) {
+        log_e("[FS] LittleFS no montado");
+    } else {
+        log_i("[FS] LittleFS OK");
+    }
+
+    initDisplay();
+    log_e("initDisplay() OK");
+    uiOfflineCreate();
 
     memset(timeCodeChars_clean, ' ', 12); timeCodeChars_clean[12] = '\0';
     memset(beatsChars_clean,   ' ', 12); beatsChars_clean[12]   = '\0';
@@ -121,10 +153,7 @@ void setup() {
     MIDI.begin();
     delay(2000);
 
-    initDisplay();
-    log_e("initDisplay() OK");
-    uiPage3Create();
-
+    
     rs485.begin(NUM_SLAVES);
     log_e("RS485 OK — slaves: %d TX:%d RX:%d EN:%d",
           NUM_SLAVES, RS485_TX_PIN, RS485_RX_PIN, RS485_ENABLE_PIN);

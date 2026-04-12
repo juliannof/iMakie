@@ -145,7 +145,7 @@ public:
 
 // --- Protocolo ---
 #define RS485_BAUD        500000
-#define NUM_SLAVES             9   // ← actualizar al añadir hardware
+#define NUM_SLAVES             1   // ← actualizar al añadir hardware
 
 // --- Timing (µs) ---
 #define RS485_TX_ENABLE_US     10

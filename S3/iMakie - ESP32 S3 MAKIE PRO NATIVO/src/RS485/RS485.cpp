@@ -72,11 +72,15 @@ void RS485Master::runTask() {
                 _stateTimer = micros();
                 break;
 
-            case BusState::WAIT_RESP:
+    case BusState::WAIT_RESP:
     if (_readResponse()) {
-        _handleResponse();
-        _busState   = BusState::GAP;
-        _stateTimer = micros();
+        if (_handleResponse()) {
+            _busState   = BusState::GAP;
+            _stateTimer = micros();
+        } else {
+            _rxGot    = 0;
+            _rxHeader = false;
+        }
     } else if (micros() - _stateTimer > RS485_RESP_TIMEOUT_US) {
         _timeouts++;
         log_v("[RS485] TIMEOUT slave %d", _currentId);
@@ -86,8 +90,6 @@ void RS485Master::runTask() {
         }
         _busState   = BusState::GAP;
         _stateTimer = micros();
-    } else {
-        vTaskDelay(1);  // ← cede Core 1
     }
     break;
 
@@ -96,7 +98,7 @@ case BusState::GAP:
         _nextSlave();
         _busState = BusState::SEND;
     } else {
-        vTaskDelay(1);  // ← cede Core 1
+        vTaskDelay(1);  // ← este se queda
     }
     break;
         }
@@ -171,7 +173,7 @@ bool RS485Master::_readResponse() {
 // Procesa la respuesta del esclavo: valida CRC, actualiza estado del canal, maneja calibración, etc.
 //***************************************************************************************************
 
-void RS485Master::_handleResponse() {
+bool RS485Master::_handleResponse() {
     const SlavePacket* resp = reinterpret_cast<const SlavePacket*>(_rxBuf);
 
     uint8_t crc = rs485_crc8(_rxBuf, sizeof(SlavePacket) - 1);
@@ -179,12 +181,12 @@ void RS485Master::_handleResponse() {
         _crcErrors++;
         log_e("[RS485] slave=%u CRC ERROR calc=0x%02X recv=0x%02X",
               _currentId, crc, resp->crc);
-        return;
+        return false;   // ← era return;
     }
     if (resp->id != _currentId) {
         log_e("[RS485] ID MISMATCH esperado=%u recibido=%u",
               _currentId, resp->id);
-        return;
+        return false;   // ← era return;
     }
 
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(2)) == pdTRUE) {
@@ -236,6 +238,7 @@ void RS485Master::_handleResponse() {
     }
 
     _rxCount++;
+    return true; 
 }
 
 

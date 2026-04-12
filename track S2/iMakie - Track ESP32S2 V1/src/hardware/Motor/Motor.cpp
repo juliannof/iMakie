@@ -222,20 +222,28 @@ static void _positionTick() {
 namespace Motor {
 
 void init() {
-    // Registro de salida primero — al cambiar a OUTPUT ya va LOW sin glitch
-    digitalWrite(MOTOR_EN,  LOW);
-    digitalWrite(MOTOR_IN1, LOW);
+    // 1. Latch LOW antes de cambiar dirección
+    //digitalWrite(MOTOR_EN,  LOW);
+    //digitalWrite(MOTOR_IN1, LOW);
     digitalWrite(MOTOR_IN2, LOW);
 
+    // 2. Dirección OUTPUT
+    pinMode(MOTOR_EN,  OUTPUT);
     pinMode(MOTOR_IN1, OUTPUT);
     pinMode(MOTOR_IN2, OUTPUT);
-    pinMode(MOTOR_EN,  OUTPUT);
 
+    // 3. Attach LEDC con duty=0 explícito ANTES de configurar frecuencia
+    //    Si analogWriteFrequency va primero, el duty inicial es indeterminado
+    analogWrite(MOTOR_IN1, PWM_START);   // attach + duty=0 garantizado
+    analogWrite(MOTOR_IN2, PWM_START);   // attach + duty=0 garantizado
+
+    // 4. Ahora frecuencia y resolución — el duty ya está en 0, no cambia
     analogWriteFrequency(MOTOR_IN1, 20000);
     analogWriteFrequency(MOTOR_IN2, 20000);
     analogWriteResolution(MOTOR_IN1, 8);
     analogWriteResolution(MOTOR_IN2, 8);
 
+    // 5. Estado final
     _hwOff();
     log_i("[MOTOR] init OK  IN1=%d IN2=%d EN=%d", MOTOR_IN1, MOTOR_IN2, MOTOR_EN);
 }

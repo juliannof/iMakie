@@ -18,6 +18,7 @@
 // --- Slaves ---
 #define NUM_SLAVES  9
 
+
 // --- Enums ---
 enum class ConnectionState {
     DISCONNECTED,
@@ -44,8 +45,10 @@ extern unsigned long vuPeakLastUpdateTime[9];
 extern float faderPositions[9];
 extern bool needsTOTALRedraw;
 extern bool needsMainAreaRedraw;
-extern bool needsHeaderRedraw;
+extern bool needsTimecodeRedraw;
+extern bool needsButtonsRedraw;
 extern bool needsVUMetersRedraw;
+extern bool needsHeaderRedraw;
 extern String assignmentString;
 extern bool btnStatePG1[32];
 extern bool btnStatePG2[32];
@@ -54,6 +57,9 @@ extern bool btnFlashPG2[32];
 extern char timeCodeChars_clean[13];
 extern char beatsChars_clean[13];
 extern DisplayMode currentTimecodeMode;
+
+extern volatile bool g_switchToPage3;
+extern volatile bool g_switchToOffline;
 
 // --- Mackie char map ---
 const char MACKIE_CHAR_MAP[64] = {

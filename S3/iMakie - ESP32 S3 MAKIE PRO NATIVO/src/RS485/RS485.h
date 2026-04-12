@@ -89,7 +89,7 @@ private:
 
     void _sendPacket   (uint8_t id);
     bool _readResponse ();
-    void _handleResponse();
+    bool _handleResponse();
     void _nextSlave    ();
 };
 

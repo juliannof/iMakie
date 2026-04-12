@@ -168,6 +168,8 @@
 #define LV_FONT_UNSCII_16 0
 
 #define LV_FONT_FMT_TXT_LARGE 1
+#define LV_FONT_CUSTOM_DECLARE LV_FONT_DECLARE(lv_font_dseg7_44)
+#define LV_USE_TJPGD 1
 //#define LV_FONT_FMT_TXT_COMPRESSED 0
 
 /**********************
@@ -181,6 +183,10 @@
 #define LV_TXT_COLOR_CMD "#"
 #define LV_USE_BIDI 0
 #define LV_USE_ARABIC_PERSIAN_CHARS 0
+
+
+#define LV_USE_FS_MEMFS 1
+#define LV_FS_MEMFS_LETTER 'M'
 
 /**********************
  * TICK INTERFACE
