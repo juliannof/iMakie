@@ -31,7 +31,7 @@ namespace {
     static const uint16_t ALL_FADERS_MIN_MASK = 0x01FF;
     static unsigned long lastMidiActivityTime = 0;
     
-    static const unsigned long MIDI_TIMEOUT_MS = 28000;
+    static const unsigned long MIDI_TIMEOUT_MS = 0;
     static const int DISCONNECT_THRESHOLD = 9;
     static const unsigned long DISCONNECT_WINDOW_MS = 150;
 

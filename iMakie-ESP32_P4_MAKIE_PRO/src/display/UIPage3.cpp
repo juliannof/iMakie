@@ -1,4 +1,6 @@
 #include "UIPage3.h"
+#include "UIMenu.h"
+
 #include "../config.h"
 #include "Display.h"
 #include "lvgl.h"
@@ -33,8 +35,8 @@
 #define COLOR_HEADER    lv_color_hex(0x000050)
 #define COLOR_MUTE_ON   lv_color_hex(0xFF0000)
 #define COLOR_MUTE_OFF  lv_color_hex(0x400000)
-#define COLOR_SEL_ON    lv_color_hex(0x888888)
- #define COLOR_SEL_OFF   lv_color_hex(0x333333)
+#define COLOR_SOLO_ON   lv_color_hex(0xFFAA00)
+#define COLOR_SOLO_OFF  lv_color_hex(0x333333) 
 
 #define COLOR_TRACK_BG       lv_color_hex(0x0F1218)
 #define COLOR_TRACK_SEL      lv_color_hex(0x2A3040)
@@ -92,6 +94,11 @@ lv_obj_set_style_bg_color(header, COLOR_HEADER, 0);
 lv_obj_set_style_border_width(header, 0, 0);
 lv_obj_set_style_radius(header, 0, 0);
 lv_obj_clear_flag(header, LV_OBJ_FLAG_SCROLLABLE);
+lv_obj_set_style_shadow_width(header, 15, 0);
+lv_obj_set_style_shadow_color(header, lv_color_hex(0x000000), 0);
+lv_obj_set_style_shadow_opa(header, LV_OPA_70, 0);
+lv_obj_set_style_shadow_offset_x(header, -10, 0);
+lv_obj_set_style_shadow_offset_y(header, 0, 0);
 
 
 // ── TIMECODE — ghost primero (detrás) ────────────────────
@@ -197,27 +204,26 @@ lv_obj_set_style_transform_pivot_y(s_timecode, th/2, 0);
         sendMIDIBytes(msg, 3);
     }, LV_EVENT_CLICKED, (void*)(intptr_t)i);
 
-    // SELECT
-    s_select[i] = lv_obj_create(s_screen);
-    lv_obj_set_pos(s_select[i], SELECT_X + 4, y + 4);
-    lv_obj_set_size(s_select[i], SELECT_W - 8, CH_H - 8);
-    lv_obj_set_style_bg_color(s_select[i], COLOR_SEL_OFF, 0);
-    lv_obj_set_style_border_width(s_select[i], 0, 0);
-    lv_obj_set_style_radius(s_select[i], 6, 0);
-    lv_obj_clear_flag(s_select[i], LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(s_select[i], LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_t* sel_lbl = lv_label_create(s_select[i]);
-    lv_label_set_text(sel_lbl, "S");
-    lv_obj_set_style_text_color(sel_lbl, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_center(sel_lbl);
-    set_rotated(sel_lbl);
-    lv_obj_add_event_cb(s_select[i], [](lv_event_t* e) {
-        int ch = (int)(intptr_t)lv_event_get_user_data(e);
-        uint8_t note = 0x18 + ch;
-        bool isOn = !selectStates[ch];
-        byte msg[3] = { (byte)(isOn ? 0x90 : 0x80), note, (byte)(isOn ? 127 : 0) };
-        sendMIDIBytes(msg, 3);
-    }, LV_EVENT_CLICKED, (void*)(intptr_t)i);
+    // SOLO
+s_select[i] = lv_obj_create(s_screen);
+lv_obj_set_pos(s_select[i], SELECT_X + 4, y + 4);
+lv_obj_set_size(s_select[i], SELECT_W - 8, CH_H - 8);
+lv_obj_set_style_bg_color(s_select[i], COLOR_SOLO_OFF, 0);
+lv_obj_set_style_border_width(s_select[i], 0, 0);
+lv_obj_set_style_radius(s_select[i], 6, 0);
+lv_obj_clear_flag(s_select[i], LV_OBJ_FLAG_SCROLLABLE);
+lv_obj_add_flag(s_select[i], LV_OBJ_FLAG_CLICKABLE);
+lv_obj_t* sel_lbl = lv_label_create(s_select[i]);
+lv_label_set_text(sel_lbl, "S");
+lv_obj_set_style_text_color(sel_lbl, lv_color_hex(0xFFFFFF), 0);
+lv_obj_center(sel_lbl);
+set_rotated(sel_lbl);
+lv_obj_add_event_cb(s_select[i], [](lv_event_t* e) {
+    int ch = (int)(intptr_t)lv_event_get_user_data(e);
+    uint8_t note = 0x08 + ch;
+    byte msg[3] = { 0x90, note, 127 };
+    sendMIDIBytes(msg, 3);
+}, LV_EVENT_CLICKED, (void*)(intptr_t)i);
 
     // TRACK NAME
     lv_obj_t* tn_cont = lv_obj_create(s_screen);
@@ -264,6 +270,8 @@ lv_obj_set_style_transform_pivot_y(s_timecode, th/2, 0);
     needsTimecodeRedraw = true;
     needsButtonsRedraw  = true;
 
+    uiMenuInit(s_screen);
+
     s_page3_ready = true;
 
     lv_scr_load(s_screen);
@@ -294,7 +302,7 @@ void uiPage3Update() {
         lv_obj_set_style_bg_color(s_mute[i],
             muteStates[i] ? COLOR_MUTE_ON : COLOR_MUTE_OFF, 0);
         lv_obj_set_style_bg_color(s_select[i],
-            selectStates[i] ? COLOR_SEL_ON : COLOR_SEL_OFF, 0);
+            soloStates[i] ? COLOR_SOLO_ON : COLOR_SOLO_OFF, 0);
         lv_label_set_text(s_trackname[i], trackNames[i].c_str());
         int pos = (int)(vpotValues[i] & 0x0F);
         int pan = ((pos - 6) * 100) / 6;

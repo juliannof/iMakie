@@ -6,8 +6,13 @@
 #include "midi/MIDIProcessor.h"
 #include "display/Display.h"
 #include "display/UIPage3.h"
+#include "display/UIPage3B.h"                                                                                  
 #include "display/UIOffline.h"
 #include <LittleFS.h>
+
+#include <Preferences.h>
+
+
 
 
 USBMIDI MIDI;
@@ -43,7 +48,10 @@ TaskHandle_t taskCore1Handle = NULL;
 extern void handleVUMeterDecay();
 
 volatile bool g_switchToPage3 = false;
+volatile uint8_t g_currentPage   = 0;
+volatile bool g_switchToPage3B   = false;
 volatile bool g_switchToOffline = false;
+volatile bool g_switchToPage3A = false;
 
 
 void updateLeds() {}
@@ -100,7 +108,7 @@ void taskCore0(void* pvParameters) {
         }
 
         tickCalibracion();
-        checkMidiTimeout();
+        // checkMidiTimeout();
         vTaskDelay(1);
     }
 }
@@ -108,25 +116,37 @@ void taskCore0(void* pvParameters) {
 void taskCore1(void* pvParameters) {
     for (;;) {
         if (g_switchToPage3) {
-            g_switchToPage3  = false;
+            g_switchToPage3 = false;
             uiOfflineDestroy();
+            if (g_currentPage == 2) uiPage3BCreate();
+            else                    uiPage3Create();
+        } else if (g_switchToPage3A) {
+            g_switchToPage3A = false;
+            uiPage3BDestroy();
+            g_currentPage = 0;
             uiPage3Create();
+        } else if (g_switchToPage3B) {
+            g_switchToPage3B = false;
+            uiPage3Destroy();
+            g_currentPage = 2;
+            uiPage3BCreate();
         } else if (g_switchToOffline) {
             g_switchToOffline = false;
-            uiPage3Destroy();   // ← necesitamos esta función
+            if (g_currentPage == 2) uiPage3BDestroy();
+            else                    uiPage3Destroy();
             uiOfflineCreate();
         } else if (logicConnectionState == ConnectionState::DISCONNECTED) {
             uiOfflineTick();
         } else if (logicConnectionState == ConnectionState::CONNECTED) {
             handleVUMeterDecay();
-            uiPage3Update();
+            if (g_currentPage == 2) uiPage3BUpdate();
+            else                    uiPage3Update();
         }
         lv_tick_inc(10);
         lv_task_handler();
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
-
 void setup() {
     Serial.begin(115200);
     //while (!Serial) delay(10);  // esperar USB CDC
@@ -143,6 +163,10 @@ void setup() {
 
     initDisplay();
     log_e("initDisplay() OK");
+    Preferences prefs;
+    prefs.begin("uimenu", true);
+    g_currentPage = prefs.getUChar("lastPage", 0);
+    prefs.end();
     uiOfflineCreate();
 
     memset(timeCodeChars_clean, ' ', 12); timeCodeChars_clean[12] = '\0';
