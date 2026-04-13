@@ -492,7 +492,16 @@ void processMackieSysEx(byte* payload, int len) {
             break;
         }
 
-        case 0x0E: break;
+        case 0x0E: {
+    if (len < 7) break;
+    byte channel = payload[5];
+    byte mode    = payload[6];
+    if (channel < 8) {
+        g_channelAutoMode[channel] = mode;
+        needsButtonsRedraw = true;
+    }
+    break;
+}
 
         default:
             log_v("processMackieSysEx: Comando 0x%02X no manejado.", command);

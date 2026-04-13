@@ -57,12 +57,23 @@ static bool s_page3b_ready = false;
 // Automode state per channel — 0=READ 1=TOUCH 2=LATCH 3=WRITE
 static uint8_t s_automode_state[NUM_CH] = {};
 
-static const char* AUTOMODE_LABELS[] = { "R", "T", "L", "W" };
+// Mackie automode values:
+// 0=READ 1=WRITE 2=TRIM 3=TOUCH 4=LATCH 5=OFF
+static const char* AUTOMODE_LABELS[] = { "R", "W", "T", "TCH", "L", "OFF" };
+static const lv_color_t AUTOMODE_COLORS[] = {
+    lv_color_hex(0x006600),  // READ — verde
+    lv_color_hex(0xAA0000),  // WRITE — rojo
+    lv_color_hex(0x006600),  // TRIM — verde claro
+    lv_color_hex(0x0000AA),  // TOUCH — azul
+    lv_color_hex(0xAA6600),  // LATCH — naranja
+    lv_color_hex(0x333333),  // OFF — gris
+};
 static const uint8_t AUTOMODE_NOTES[] = { 0x4A, 0x4D, 0x4E, 0x4B }; // READ TOUCH LATCH WRITE
 
 extern void sendMIDIBytes(const byte* data, size_t len);
 extern String formatBeatString();
 extern String formatTimecodeString();
+extern uint8_t g_channelAutoMode[8];
 
 LV_FONT_DECLARE(lv_font_dseg7_44);
 
@@ -278,29 +289,28 @@ void uiPage3BUpdate() {
     }
 
     if (needsButtonsRedraw) {
-        for (int i = 0; i < NUM_CH; i++) {
-            lv_obj_set_style_bg_color(s_track_bg[i],
-                selectStates[i] ? COLOR_TRACK_SEL : COLOR_TRACK_BG, 0);
-            lv_obj_set_style_bg_color(s_mute[i],
-                muteStates[i] ? COLOR_MUTE_ON : COLOR_MUTE_OFF, 0);
-            lv_obj_set_style_bg_color(s_automode[i],
-                automode_color(s_automode_state[i]), 0);
-            lv_label_set_text(s_automode_lbl[i], AUTOMODE_LABELS[s_automode_state[i]]);
-            lv_label_set_text(s_trackname[i], trackNames[i].c_str());
-            int pos = (int)(vpotValues[i] & 0x0F);
-            int pan = ((pos - 6) * 100) / 6;
-            lv_arc_set_value(s_arc[i], pan);
-            char pan_txt[5];
-            if (pos == 6)      snprintf(pan_txt, sizeof(pan_txt), "C");
-            else if (pos > 6)  snprintf(pan_txt, sizeof(pan_txt), "R%d", pos - 6);
-            else               snprintf(pan_txt, sizeof(pan_txt), "L%d", 6 - pos);
-            lv_label_set_text(s_arc_lbl[i], pan_txt);
-            // Fader desde faderPositions
-            int fval = (int)(faderPositions[i] * 16383.0f);
-            lv_slider_set_value(s_fader[i], fval, LV_ANIM_OFF);
-        }
-        needsButtonsRedraw = false;
+    for (int i = 0; i < NUM_CH; i++) {
+        lv_obj_set_style_bg_color(s_track_bg[i],
+            selectStates[i] ? COLOR_TRACK_SEL : COLOR_TRACK_BG, 0);
+        lv_obj_set_style_bg_color(s_mute[i],
+            muteStates[i] ? COLOR_MUTE_ON : COLOR_MUTE_OFF, 0);
+        uint8_t am = g_channelAutoMode[i];
+        lv_obj_set_style_bg_color(s_automode[i], AUTOMODE_COLORS[am < 6 ? am : 0], 0);
+        lv_label_set_text(s_automode_lbl[i], AUTOMODE_LABELS[am < 6 ? am : 0]);
+        lv_label_set_text(s_trackname[i], trackNames[i].c_str());
+        int pos = (int)(vpotValues[i] & 0x0F);
+        int pan = ((pos - 6) * 100) / 6;
+        lv_arc_set_value(s_arc[i], pan);
+        char pan_txt[5];
+        if (pos == 6)      snprintf(pan_txt, sizeof(pan_txt), "C");
+        else if (pos > 6)  snprintf(pan_txt, sizeof(pan_txt), "R%d", pos - 6);
+        else               snprintf(pan_txt, sizeof(pan_txt), "L%d", 6 - pos);
+        lv_label_set_text(s_arc_lbl[i], pan_txt);
+        int fval = (int)(faderPositions[i] * 16383.0f);
+        lv_slider_set_value(s_fader[i], fval, LV_ANIM_OFF);
     }
+    needsButtonsRedraw = false;
+}
 }
 
 void uiPage3BDestroy() {
