@@ -416,41 +416,44 @@ void processMackieSysEx(byte* payload, int len) {
         }
 
         case 0x12: {
-            if (len < 6) break;
-            byte startOffset = payload[5];
-            int  text_len    = len - 6;
-            if (text_len <= 0) break;
+    if (len < 6) break;
+    byte startOffset = payload[5];
+    int  text_len    = len - 6;
+    if (text_len <= 0) break;
 
-            char nameBufs[8][8] = {};
-            bool nameChanged[8] = {};
-            for (int t = 0; t < 8; t++) {
-                strncpy(nameBufs[t], trackNames[t].c_str(), 7);
-                nameBufs[t][7] = '\0';
-            }
-            for (int i = 0; i < text_len; i++) {
-                byte currentOffset = startOffset + i;
-                if (currentOffset >= 56) break;
-                int track_idx = currentOffset / 7;
-                int char_pos  = currentOffset % 7;
-                if (track_idx >= 8) break;
-                nameBufs[track_idx][char_pos] = (char)payload[6 + i];
-                nameChanged[track_idx] = true;
-            }
-            for (int t = 0; t < 8; t++) {
-                if (!nameChanged[t]) continue;
-                for (int j = 6; j >= 0; j--) {
-                    if (nameBufs[t][j] == ' ' || nameBufs[t][j] == '\0') nameBufs[t][j] = '\0';
-                    else break;
-                }
-                if (trackNames[t] != nameBufs[t]) {
-                    trackNames[t] = String(nameBufs[t]);
-                    needsMainAreaRedraw = true;
-                    needsButtonsRedraw  = true;
-                }
-                rs485.setTrackName(t + 1, nameBufs[t]);
-            }
-            break;
+    auto trimRight = [](char* s) {
+        for (int j = 6; j >= 0; j--) {
+            if (s[j] == ' ' || s[j] == '\0') s[j] = '\0';
+            else break;
         }
+    };
+
+    char nameBufs[8][8] = {};
+    bool nameChanged[8] = {};
+
+    for (int t = 0; t < 8; t++) {
+        strncpy(nameBufs[t], trackNames[t].c_str(), 7);
+        nameBufs[t][7] = '\0';
+    }
+
+    for (int i = 0; i < text_len; i++) {
+        byte offset = startOffset + i;
+        if (offset >= 56) break;             // offset<56 garantiza track<8
+        nameBufs[offset / 7][offset % 7] = (char)payload[6 + i];
+        nameChanged[offset / 7] = true;
+    }
+
+    for (int t = 0; t < 8; t++) {
+        if (!nameChanged[t]) continue;
+        trimRight(nameBufs[t]);
+        if (trackNames[t] == nameBufs[t]) continue;
+        trackNames[t] = String(nameBufs[t]);
+        needsMainAreaRedraw = true;
+        needsButtonsRedraw  = true;
+        rs485.setTrackName(t + 1, nameBufs[t]);
+    }
+    break;
+}
 
         case 0x11: {
             if (len < 7) break;
@@ -587,7 +590,7 @@ void processNote(byte status, byte note, byte velocity) {
 }
 
 void processPitchBend(byte channel, int bendValue) {
-    log_e("PB ch%d raw:%d", channel, bendValue);
+    log_v("PB ch%d raw:%d", channel, bendValue);
     if (channel > 9) return;
 
     if (bendValue == 0) {

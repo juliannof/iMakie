@@ -1,5 +1,6 @@
 // src/display/Display.cpp
 #include "Display.h"
+#include "../config.h"
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 #include "driver/i2c_master.h"
@@ -21,6 +22,13 @@
 
 static esp_lcd_panel_handle_t s_panel = NULL;
 static lv_display_t* s_disp = NULL;
+
+static lv_obj_t* s_root         = NULL;
+static lv_obj_t* s_content_area = NULL;
+
+lv_obj_t* displayGetRoot()        { return s_root; }
+lv_obj_t* displayGetContentArea() { return s_content_area; }
+
 
 static void backlight_init() {
     const ledc_timer_config_t timer_cfg = {
@@ -173,6 +181,33 @@ lv_indev_set_read_cb(indev, [](lv_indev_t* drv, lv_indev_data_t* data) {
 lv_indev_set_user_data(indev, s_tp);
    
     
-    displaySetBrightness(80);
+    // ── Pantalla raíz ────────────────────────────────────────────────
+s_root = lv_obj_create(NULL);
+lv_obj_set_style_bg_color(s_root, lv_color_hex(COL_BG), 0);
+lv_obj_set_style_bg_opa(s_root, LV_OPA_COVER, 0);
+lv_obj_set_style_pad_all(s_root, 0, 0);
+lv_obj_set_style_border_width(s_root, 0, 0);
+lv_obj_clear_flag(s_root, LV_OBJ_FLAG_SCROLLABLE);
+lv_obj_clear_flag(s_root, LV_OBJ_FLAG_SCROLL_ELASTIC);
+lv_obj_clear_flag(s_root, LV_OBJ_FLAG_SCROLL_MOMENTUM);
+    lv_obj_clear_flag(s_root, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);  // ← añadir
+lv_obj_clear_flag(s_root, LV_OBJ_FLAG_SCROLL_CHAIN_VER);  // ← añadir
+
+// ── Content area — padre de todas las páginas ────────────────────
+s_content_area = lv_obj_create(s_root);
+lv_obj_set_pos(s_content_area, 0, 0);
+lv_obj_set_size(s_content_area, HEADER_X, P4_H);
+lv_obj_set_style_pad_all(s_content_area, 0, 0);
+lv_obj_set_style_border_width(s_content_area, 0, 0);
+lv_obj_set_style_bg_color(s_content_area, lv_color_hex(COL_BG), 0);
+lv_obj_set_style_bg_opa(s_content_area, LV_OPA_COVER, 0);
+lv_obj_clear_flag(s_content_area, LV_OBJ_FLAG_SCROLLABLE);
+lv_obj_clear_flag(s_content_area, LV_OBJ_FLAG_SCROLL_ELASTIC);
+lv_obj_clear_flag(s_content_area, LV_OBJ_FLAG_SCROLL_MOMENTUM);
+lv_obj_clear_flag(s_content_area, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);  // ← añadir
+lv_obj_clear_flag(s_content_area, LV_OBJ_FLAG_SCROLL_CHAIN_VER);  // ← añadir
+lv_obj_add_flag(s_content_area, LV_OBJ_FLAG_CLICKABLE);
+
+lv_scr_load(s_root);
     log_i("[Display] Init OK");
 }

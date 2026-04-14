@@ -8,6 +8,7 @@
 #include "display/UIPage3.h"
 #include "display/UIPage3B.h"                                                                                  
 #include "display/UIOffline.h"
+#include "display/UIHeader.h"
 #include <LittleFS.h>
 
 #include <Preferences.h>
@@ -118,35 +119,49 @@ void taskCore1(void* pvParameters) {
         if (g_switchToPage3) {
             g_switchToPage3 = false;
             uiOfflineDestroy();
-            if (g_currentPage == 2) uiPage3BCreate();
-            else                    uiPage3Create();
+            uiHeaderEnsureCreated(displayGetRoot());
+            if (g_currentPage == 2) uiPage3BCreate(displayGetContentArea());
+            else                    uiPage3Create(displayGetContentArea());
+
         } else if (g_switchToPage3A) {
             g_switchToPage3A = false;
             uiPage3BDestroy();
             g_currentPage = 0;
-            uiPage3Create();
+            uiHeaderEnsureCreated(displayGetRoot());
+            uiPage3Create(displayGetContentArea());
+
         } else if (g_switchToPage3B) {
             g_switchToPage3B = false;
             uiPage3Destroy();
             g_currentPage = 2;
-            uiPage3BCreate();
+            uiHeaderEnsureCreated(displayGetRoot());
+            uiPage3BCreate(displayGetContentArea());
+
         } else if (g_switchToOffline) {
             g_switchToOffline = false;
             if (g_currentPage == 2) uiPage3BDestroy();
             else                    uiPage3Destroy();
-            uiOfflineCreate();
+            uiHeaderDestroy();
+            uiOfflineCreate(displayGetContentArea());
+
         } else if (logicConnectionState == ConnectionState::DISCONNECTED) {
             uiOfflineTick();
+
         } else if (logicConnectionState == ConnectionState::CONNECTED) {
             handleVUMeterDecay();
+            uiHeaderUpdate();
             if (g_currentPage == 2) uiPage3BUpdate();
             else                    uiPage3Update();
         }
+
         lv_tick_inc(10);
         lv_task_handler();
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
+
+
+
 void setup() {
     Serial.begin(115200);
     //while (!Serial) delay(10);  // esperar USB CDC
@@ -163,11 +178,14 @@ void setup() {
 
     initDisplay();
     log_e("initDisplay() OK");
+    // uiHeaderCreate eliminado de aquí
+    uiOfflineCreate(displayGetContentArea());
+    
     Preferences prefs;
     prefs.begin("uimenu", true);
     g_currentPage = prefs.getUChar("lastPage", 0);
     prefs.end();
-    uiOfflineCreate();
+    uiOfflineCreate(displayGetContentArea());
 
     memset(timeCodeChars_clean, ' ', 12); timeCodeChars_clean[12] = '\0';
     memset(beatsChars_clean,   ' ', 12); beatsChars_clean[12]   = '\0';

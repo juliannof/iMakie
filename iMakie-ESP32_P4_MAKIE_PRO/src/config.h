@@ -15,6 +15,35 @@
 #define RS485_GAP_US          300
 #define POLL_CYCLE_MS         20
 
+
+// ── Dimensiones display ──────────────────────────────────────────
+#define P4_W    480
+#define P4_H    800
+#define NUM_CH  8
+#define CH_H    (P4_H / NUM_CH)   // 100px
+
+// ── Header strip ─────────────────────────────────────────────────
+#define HEADER_X  410
+#define HEADER_W  (P4_W - HEADER_X)   // 70px
+
+// ── Colores UI — usar con lv_color_hex() en archivos LVGL ────────
+#define COL_BG         0x000000
+#define COL_HEADER     0x000050
+#define COL_MUTE_ON    0xFF0000
+#define COL_MUTE_OFF   0x400000
+#define COL_SOLO_ON    0xFFAA00
+#define COL_SOLO_OFF   0x333333
+#define COL_TRACK_BG   0x0F1218
+#define COL_TRACK_SEL  0x2A3040
+#define COL_TRACK_SEP  0x111111
+
+// -- Automode
+#define COL_AUTO_READ   0x006600
+#define COL_AUTO_TOUCH  0x0000AA
+#define COL_AUTO_LATCH  0xAA6600
+#define COL_AUTO_WRITE  0xAA0000
+#define COL_AUTO_OFF    0x333333
+
 // --- Slaves ---
 #define NUM_SLAVES  9
 
@@ -63,6 +92,8 @@ extern volatile uint8_t g_currentPage;  // 0=P3A 1=P1 2=P3B
 extern volatile bool g_switchToPage3A;
 extern volatile bool g_switchToPage3B;
 extern volatile bool g_switchToOffline;
+extern volatile bool g_sessionActive;
+
 
 // --- Mackie char map ---
 const char MACKIE_CHAR_MAP[64] = {
