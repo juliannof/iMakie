@@ -93,6 +93,7 @@ extern volatile bool g_switchToPage3A;
 extern volatile bool g_switchToPage3B;
 extern volatile bool g_switchToOffline;
 extern volatile bool g_sessionActive;
+extern volatile bool g_switchToPage1;
 
 
 // --- Mackie char map ---

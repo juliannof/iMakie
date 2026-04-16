@@ -5,6 +5,7 @@
 #include "RS485/RS485.h"
 #include "midi/MIDIProcessor.h"
 #include "display/Display.h"
+#include "display/UIPage1.h"
 #include "display/UIPage3.h"
 #include "display/UIPage3B.h"                                                                                  
 #include "display/UIOffline.h"
@@ -53,6 +54,7 @@ volatile uint8_t g_currentPage   = 0;
 volatile bool g_switchToPage3B   = false;
 volatile bool g_switchToOffline = false;
 volatile bool g_switchToPage3A = false;
+volatile bool g_switchToPage1 = false;
 
 
 void updateLeds() {}
@@ -120,27 +122,41 @@ void taskCore1(void* pvParameters) {
             g_switchToPage3 = false;
             uiOfflineDestroy();
             uiHeaderEnsureCreated(displayGetRoot());
-            if (g_currentPage == 2) uiPage3BCreate(displayGetContentArea());
-            else                    uiPage3Create(displayGetContentArea());
+            if      (g_currentPage == 1) uiPage1Create(displayGetContentArea());
+            else if (g_currentPage == 2) uiPage3BCreate(displayGetContentArea());
+            else                         uiPage3Create(displayGetContentArea());
+
+        } else if (g_switchToPage1) {
+            g_switchToPage1 = false;
+            log_e("[Task] switchToPage1 currentPage=%d", g_currentPage);
+
+            if      (g_currentPage == 0) uiPage3Destroy();
+            else if (g_currentPage == 2) uiPage3BDestroy();
+            g_currentPage = 1;
+            uiHeaderEnsureCreated(displayGetRoot());
+            uiPage1Create(displayGetContentArea());
 
         } else if (g_switchToPage3A) {
             g_switchToPage3A = false;
-            uiPage3BDestroy();
+            if      (g_currentPage == 1) uiPage1Destroy();
+            else if (g_currentPage == 2) uiPage3BDestroy();
             g_currentPage = 0;
             uiHeaderEnsureCreated(displayGetRoot());
             uiPage3Create(displayGetContentArea());
 
         } else if (g_switchToPage3B) {
             g_switchToPage3B = false;
-            uiPage3Destroy();
+            if      (g_currentPage == 1) uiPage1Destroy();
+            else if (g_currentPage == 0) uiPage3Destroy();
             g_currentPage = 2;
             uiHeaderEnsureCreated(displayGetRoot());
             uiPage3BCreate(displayGetContentArea());
 
         } else if (g_switchToOffline) {
             g_switchToOffline = false;
-            if (g_currentPage == 2) uiPage3BDestroy();
-            else                    uiPage3Destroy();
+            if      (g_currentPage == 1) uiPage1Destroy();
+            else if (g_currentPage == 2) uiPage3BDestroy();
+            else                         uiPage3Destroy();
             uiHeaderDestroy();
             uiOfflineCreate(displayGetContentArea());
 
@@ -150,8 +166,9 @@ void taskCore1(void* pvParameters) {
         } else if (logicConnectionState == ConnectionState::CONNECTED) {
             handleVUMeterDecay();
             uiHeaderUpdate();
-            if (g_currentPage == 2) uiPage3BUpdate();
-            else                    uiPage3Update();
+            if      (g_currentPage == 1) uiPage1Update();
+            else if (g_currentPage == 2) uiPage3BUpdate();
+            else                         uiPage3Update();
         }
 
         lv_tick_inc(10);
