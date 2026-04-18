@@ -39,7 +39,7 @@ enum class ConnectionState {
 #define RS485_RESP_BYTE       0xBB
 
 // Fader
-#define FADER_POT_PIN           10   // ADC1_CH9 — sin cambio
+#define FADER_POT_PIN    10   // ADC1_CH9 — sin cambio
 #define FADER_VCC_PIN    17   // DAC_CHANNEL_1 — GPIO17, salida ~1.0V (77/255×3.3V)
                               // API: dac_output_enable / dac_output_voltage — NO dacWrite()
 
@@ -59,8 +59,14 @@ static uint32_t _ultimoTiempoEstable     = 0;
 static int      _ultimoValorEstable      = 0;
 static uint16_t _posicionMaximaADC       = 0;
 
-
-
+// ─── ButtonManager — SAT long press ──────────────────────────
+#define SAT_HOLD_MS      1500   // tiempo para abrir SAT
+#define SAT_BAR_SHOW_MS  1000   // tiempo antes de mostrar barra
+#define SAT_BAR_W        180
+#define SAT_BAR_H          8
+#define SAT_BAR_CX       120
+#define SAT_BAR_CY       140
+#define SAT_LABEL_Y      (SAT_BAR_CY - 16)
 
 // Calibración (valores aproximados — ajustar con autocalibración)
 #define FADER_ADC_MIN       768  // leer real en 0%
@@ -70,19 +76,16 @@ static uint16_t _posicionMaximaADC       = 0;
 static constexpr float    FADER_EMA_ALPHA          = 0.20f;   // único filtro — subir = más vivo, bajar = más suave para motor
 
 // ─── Motor — calibración ──────────────────────────────────────
-static constexpr uint8_t  CALIB_PWM                = 140;
-static constexpr uint8_t  CALIB_KICK_PWM           = 145;
 static constexpr uint32_t CALIB_KICK_MS            = 150;     // duración del kick inicial
-static constexpr uint32_t CALIB_SETTLE_MS          = 100;     // espera tras parar motor antes de leer ADC
+static constexpr uint32_t CALIB_SETTLE_MS          = 200;     // espera tras parar motor antes de leer ADC
 static constexpr uint32_t CALIB_TIMEOUT            = 6000;
 static constexpr int      ADC_STABILITY_THRESHOLD  = 700;     // counts — movimiento = cambio > este valor
 static constexpr uint32_t CALIB_STABLE_TIME        = 150;     // ms sin movimiento → tope detectado
 static constexpr uint32_t CALIB_MIN_TRAVEL_MS      = 800;     // mínimo de viaje antes de empezar a buscar tope
 
 // ─── Motor — control de posición ──────────────────────────────
-static constexpr uint8_t  PWM_START                  = 0;
 static constexpr uint8_t  PWM_MIN                  = 65;
-static constexpr uint8_t  PWM_MAX                  = 120;
+static constexpr uint8_t  PWM_MAX                  = 125;
 static constexpr uint8_t  PWM_SLEW                 = 4;
 static constexpr int      DEAD_ZONE                = 100;
 static constexpr int      ADC_SPIKE_GUARD          = 500;     // salto máximo aceptado en setADC()

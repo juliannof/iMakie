@@ -23,19 +23,13 @@ static unsigned long _holdStart = 0;
 static int           _lastBarW  = -1;
 static bool          _fired     = false;
 
-static constexpr unsigned long HOLD_MS     = 1000;
-static constexpr unsigned long BAR_SHOW_MS = 300;    // esperar antes de mostrar barra
-static constexpr uint16_t      COL_ACCENT = 0xF800;   // rojo puro
-static constexpr uint16_t      COL_TRACK  = 0x2104;   // gris oscuro
-static constexpr uint16_t      COL_BG     = 0x0000;
-static constexpr uint16_t      COL_TEXT   = 0xFFFF;
-
-// Barra centrada en pantalla — no interfiere con ningún sprite
-static constexpr int BAR_W  = 180;
-static constexpr int BAR_H  = 8;
-static constexpr int BAR_CX = 120;   // centro 240px
-static constexpr int BAR_CY = 140;   // centro 280px
-static constexpr int LABEL_Y = BAR_CY - 16;
+static constexpr unsigned long HOLD_MS     = SAT_HOLD_MS;
+static constexpr unsigned long BAR_SHOW_MS = SAT_BAR_SHOW_MS;
+static constexpr int BAR_W  = SAT_BAR_W;
+static constexpr int BAR_H  = SAT_BAR_H;
+static constexpr int BAR_CX = SAT_BAR_CX;
+static constexpr int BAR_CY = SAT_BAR_CY;
+static constexpr int LABEL_Y = SAT_LABEL_Y;
 
 // ─────────────────────────────────────────────────────────────
 static void _drawBar(float pct) {
@@ -48,20 +42,20 @@ static void _drawBar(float pct) {
     _lastBarW = fill;
 
     if (pct == 0.0f) {
-        _tft->setTextColor(COL_TEXT, COL_BG);
+        _tft->setTextColor(TFT_WHITE, TFT_BLACK);
         _tft->setTextSize(1);
         _tft->setTextDatum(textdatum_t::middle_center);
         _tft->drawString("Mantener para SAT...", BAR_CX, LABEL_Y);
     }
-    _tft->fillRect(bx, BAR_CY, BAR_W, BAR_H, COL_TRACK);
+    _tft->fillRect(bx, BAR_CY, BAR_W, BAR_H, TFT_MCU_DARKGRAY); 
     if (fill > 0)
-        _tft->fillRect(bx, BAR_CY, fill, BAR_H, COL_ACCENT);
+        _tft->fillRect(bx, BAR_CY, fill, BAR_H, 0xF800);
 }
 
 static void _clearBar() {
     if (!_tft) return;
     _tft->fillRect(BAR_CX - BAR_W/2 - 2, LABEL_Y - 8,
-                   BAR_W + 4, BAR_H + 28, COL_BG);
+                   BAR_W + 4, BAR_H + 28, TFT_BLACK); 
     _lastBarW = -1;
 }
 

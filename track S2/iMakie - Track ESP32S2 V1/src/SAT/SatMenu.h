@@ -35,6 +35,7 @@ struct SatConfig {
     uint8_t pwmMax;
     bool    touchEnabled;
     uint8_t touchThreshold;
+    bool    motorDisabled; 
 };
 
 using CbVoid     = std::function<void()>;
@@ -75,6 +76,8 @@ private:
         EDIT_PWMMIN, EDIT_PWMMAX, EDIT_TOUCHTHR,
         CONFIRM, TOAST,
         TEST_DISPLAY, TEST_ENCODER, TEST_FADER, TEST_NEOPIXEL,
+        MOTOR_CALIB,
+        MOTOR_POS,
     };
 
     struct Item { const char* badge; const char* label; Scr target; };
@@ -178,6 +181,9 @@ private:
     void _toast(const char* msg, Scr ret);
     void _confirm(const char* msg, Scr yes);
 
+    void _tickMotorCalib(Btn b);
+    void _tickMotorPos(Btn b);
+
     int           _fadCalMin  = 8191;
     int           _fadCalMax  = 0;
     uint16_t _noiseMin = 8191;
@@ -193,4 +199,5 @@ private:
     static const Item _diagItems[];
     static const int  _mainN, _identN, _motorN, _touchN, _diagN;
     unsigned long _neoMuteHoldT = 0;
+    uint16_t      _motorTarget = 4096;   // posición manual 0–8191
 };

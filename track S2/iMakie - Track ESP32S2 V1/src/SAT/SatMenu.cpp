@@ -2,7 +2,10 @@
 //  SatMenu.cpp  –  iMakie PTxx Track S2
 // ============================================================
 #include "SatMenu.h"
+#include "../config.h"
+
 #include "../hardware/fader/FaderADC.h"   // ← añadir
+#include "../hardware/Motor/Motor.h"
 
 extern FaderADC faderADC;                  // ← añadir
 
@@ -22,9 +25,13 @@ const SatMenu::Item SatMenu::_identItems[] = {
     {"LB","Etiqueta (6 chr)", Scr::EDIT_LABEL  },
 };
 const SatMenu::Item SatMenu::_motorItems[] = {
-    {"MN","PWM Minimo",  Scr::EDIT_PWMMIN },
-    {"MX","PWM Maximo",  Scr::EDIT_PWMMAX },
+    {"DI","Motor ON/OFF",  Scr::MOTOR     },
+    {"CA","Calibrar",      Scr::MOTOR_CALIB},  // ← añadir
+    {"PO","Posicion",      Scr::MOTOR_POS },   // ← añadir
+    {"MN","PWM Minimo",    Scr::EDIT_PWMMIN},
+    {"MX","PWM Maximo",    Scr::EDIT_PWMMAX},
 };
+
 const SatMenu::Item SatMenu::_touchItems[] = {
     {"EN","Habilitado",  Scr::TOUCH        },
     {"TH","Umbral %",    Scr::EDIT_TOUCHTHR},
@@ -37,7 +44,7 @@ const SatMenu::Item SatMenu::_diagItems[] = {
 };
 const int SatMenu::_mainN  = 6;
 const int SatMenu::_identN = 2;
-const int SatMenu::_motorN = 2;
+const int SatMenu::_motorN = 5;   
 const int SatMenu::_touchN = 2;
 const int SatMenu::_diagN  = 4;
 
@@ -107,9 +114,18 @@ void SatMenu::update() {
     if (!_open) return;
 
     bool live = (_scr == Scr::TEST_DISPLAY   ||
-                 _scr == Scr::TEST_ENCODER   ||
-                 _scr == Scr::TEST_FADER     ||
-                 _scr == Scr::TEST_NEOPIXEL);
+             _scr == Scr::TEST_ENCODER   ||
+             _scr == Scr::TEST_FADER     ||
+             _scr == Scr::TEST_NEOPIXEL  ||
+             _scr == Scr::MOTOR_CALIB    ||  // ← añadir
+             _scr == Scr::MOTOR_POS);         // ← añadir
+
+
+    // ADC + Motor frescos en pantallas de motor
+    if (_scr == Scr::MOTOR_CALIB || _scr == Scr::MOTOR_POS) {
+        faderADC.update();
+        Motor::setADC(faderADC.getFaderPos());
+    }
 
     Btn b = _readBtn();
 
@@ -126,6 +142,8 @@ void SatMenu::update() {
         case Scr::MAIN:          _hMain(b);            break;
         case Scr::IDENTIDAD:     _hIdent(b);           break;
         case Scr::MOTOR:         _hMotor(b);           break;
+        case Scr::MOTOR_CALIB:   _tickMotorCalib(b); break;
+        case Scr::MOTOR_POS:     _tickMotorPos(b);   break;
         case Scr::TOUCH:         _hTouch(b);           break;
         case Scr::DIAG:          _hDiag(b);            break;
         case Scr::EDIT_TRACKID:
@@ -167,6 +185,8 @@ void SatMenu::_render() {
         case Scr::TEST_ENCODER:  _tickTestEncoder(Btn::NONE);  return;
         case Scr::TEST_FADER:    _tickTestFader(Btn::NONE);    return;
         case Scr::TEST_NEOPIXEL: _tickTestNeopixel(Btn::NONE); return;
+        case Scr::MOTOR_CALIB:   _tickMotorCalib(Btn::NONE); return;
+        case Scr::MOTOR_POS:     _tickMotorPos(Btn::NONE);   return;
         default: break;
     }
 
@@ -487,9 +507,9 @@ if (now-_fadT>25) {
         if (fadEma > _noiseMax) _noiseMax = fadEma;
 
         if (!_reported && now - _stopT > 500 && _fadCalMax > _fadCalMin) {
-            log_i("[ADC] NOISE  min=%d  max=%d  span=%d  |  RANGE  min=%d  max=%d  span=%d",
-                  _noiseMin, _noiseMax, _noiseMax - _noiseMin,
-                  _fadCalMin, _fadCalMax, _fadCalMax - _fadCalMin);
+            //log_i("[ADC] NOISE  min=%d  max=%d  span=%d  |  RANGE  min=%d  max=%d  span=%d",
+            //      _noiseMin, _noiseMax, _noiseMax - _noiseMin,
+            //      _fadCalMin, _fadCalMax, _fadCalMax - _fadCalMin);
             _reported = true;
         }
     }
@@ -612,12 +632,30 @@ void SatMenu::_hIdent(Btn b) {
     }
 }
 void SatMenu::_hMotor(Btn b) {
-    if (b == Btn::UP)   { if (_cur>0)         { _cur--; _dirty=true; } }
-    if (b == Btn::DOWN) { if (_cur<_motorN-1) { _cur++; _dirty=true; } }
-    if (b == Btn::BACK) _goto(Scr::MAIN);
+    if (b == Btn::UP)   { if (_cur > 0) { _cur--; _dirty=true; } }
+    if (b == Btn::DOWN) { if (_cur < _motorN-1) { _cur++; _dirty=true; } }
+    if (b == Btn::BACK) { _goto(Scr::MAIN); return; }
     if (b == Btn::ENTER) {
-        if (_cur==0) { _eTitle="PWM Minimo"; _eVal=_tmp.pwmMin; _eMin=0;  _eMax=120; _goto(Scr::EDIT_PWMMIN); }
-        else         { _eTitle="PWM Maximo"; _eVal=_tmp.pwmMax; _eMin=50; _eMax=255; _goto(Scr::EDIT_PWMMAX); }
+        switch (_cur) {
+            case 0:  // toggle motorDisabled
+                _tmp.motorDisabled = !_tmp.motorDisabled;
+                _cfg.motorDisabled  = _tmp.motorDisabled;
+                _save();
+                if (_cbSaved) _cbSaved(_cfg);
+                _dirty = true;
+                _toast(_cfg.motorDisabled ? "Motor DESACTIVADO" : "Motor ACTIVADO", Scr::MOTOR);
+                break;
+            case 1: _goto(Scr::MOTOR_CALIB); break;  // ← añadir
+            case 2: _goto(Scr::MOTOR_POS);   break;  // ← añadir
+            case 3:
+                _eTitle="PWM Minimo"; _eVal=_tmp.pwmMin; _eMin=0; _eMax=120;
+                _goto(Scr::EDIT_PWMMIN);
+                break;
+            case 4:
+                _eTitle="PWM Maximo"; _eVal=_tmp.pwmMax; _eMin=50; _eMax=255;
+                _goto(Scr::EDIT_PWMMAX);
+                break;
+        }
     }
 }
 void SatMenu::_hTouch(Btn b) {
@@ -850,6 +888,7 @@ void SatMenu::_load() {
     _cfg.pwmMax         = _prefs.getUChar("pwmMax", 220);
     _cfg.touchEnabled   = _prefs.getBool ("touchEn",true);
     _cfg.touchThreshold = _prefs.getUChar("touchThr",80);
+    _cfg.motorDisabled = _prefs.getBool("motorDis", false);
     String lbl=_prefs.getString("label","CH-01 ");
     strncpy(_cfg.label,lbl.c_str(),6); _cfg.label[6]='\0';
     _prefs.end();
@@ -862,6 +901,7 @@ void SatMenu::_save() {
     _prefs.putBool ("touchEn", _cfg.touchEnabled);
     _prefs.putUChar("touchThr",_cfg.touchThreshold);
     _prefs.putString("label",  String(_cfg.label).substring(0,6));
+    _prefs.putBool("motorDis", _cfg.motorDisabled);
     _prefs.end();
 }
 
@@ -957,5 +997,106 @@ void SatMenu::showStatus(const char* msg) {
     _spr.setTextDatum(textdatum_t::middle_center);
     _spr.setTextColor(C_TEXT, C_BG);   // ← añadir antes de drawString
     _spr.drawString(msg, _spr.width()/2, 140);
+    _push();
+}
+
+
+// ─────────────────────────────────────────────────────────────
+//  MOTOR CALIB
+// ─────────────────────────────────────────────────────────────
+void SatMenu::_tickMotorCalib(Btn b) {
+    int W = _spr.width(), H = _spr.height();
+
+    if (b == Btn::BACK) { Motor::off(); _goto(Scr::MOTOR); return; }
+    if (b == Btn::UP) {
+        log_i("[MOTOR_CALIB] startCalib() disparado");
+        Motor::startCalib();
+    }
+
+    //faderADC.update();
+    Motor::setADC(faderADC.getFaderPos());
+    Motor::update();
+
+    Motor::CalibState cs = Motor::getCalibState();
+
+    _spr.fillScreen(C_BG);
+    _drawHdr("MOTOR CALIB");
+
+    int y = SAT_HDR_H + 8;
+    char buf[32];
+
+    const char* stateStr = "IDLE";
+    uint16_t stateCol = C_GRAY;
+    switch (cs) {
+        case Motor::CalibState::CALIB_UP:   stateStr="SUBIENDO";   stateCol=C_CYAN;   break;
+        case Motor::CalibState::CALIB_DOWN: stateStr="BAJANDO";    stateCol=C_CYAN;   break;
+        case Motor::CalibState::DONE:       stateStr="DONE";       stateCol=C_GREEN;  break;
+        case Motor::CalibState::ERROR:      stateStr="ERROR";      stateCol=C_ACCENT; break;
+        default: break;
+    }
+    _spr.setTextColor(stateCol, C_BG); _spr.setTextSize(2);
+    _spr.setTextDatum(textdatum_t::middle_center);
+    _spr.drawString(stateStr, W/2, y+10); y+=30;
+
+    uint16_t pos = Motor::getRawADC();
+    float pct = Motor::getPosition();
+    _spr.setTextSize(1); _spr.setTextColor(C_TEXT, C_BG);
+    _spr.setTextDatum(textdatum_t::top_left);
+    snprintf(buf, 32, "pos=%d  (%.1f%%)", pos, pct*100.f);
+    _spr.drawString(buf, 4, y); y+=14;
+    _drawHBar(4, y, W-8, 12, pct, C_CYAN); y+=18;
+
+    snprintf(buf, 32, "min=%d  max=%d", Motor::getADCMin(), Motor::getADCMax());
+    _spr.setTextColor(C_GRAY, C_BG);
+    _spr.drawString(buf, 4, y); y+=14;
+    snprintf(buf, 32, "span=%d", Motor::getADCMax() - Motor::getADCMin());
+    _spr.drawString(buf, 4, y);
+
+    _drawHints("Calibrar","","Atras","");
+    _push();
+}
+
+// ─────────────────────────────────────────────────────────────
+//  MOTOR POSICIÓN
+// ─────────────────────────────────────────────────────────────
+void SatMenu::_tickMotorPos(Btn b) {
+    int W = _spr.width(), H = _spr.height();
+
+    if (b == Btn::BACK)  { Motor::stop(); _goto(Scr::MOTOR); return; }
+    if (b == Btn::UP)    { _motorTarget = (uint16_t)constrain((int)_motorTarget + 100, 0, 8191); Motor::setTarget(_motorTarget); }
+    if (b == Btn::DOWN)  { _motorTarget = (uint16_t)constrain((int)_motorTarget - 100, 0, 8191); Motor::setTarget(_motorTarget); }
+
+    //faderADC.update();
+    Motor::setADC(faderADC.getFaderPos());
+    Motor::update();
+
+    uint16_t pos    = Motor::getRawADC();
+    float    pct    = Motor::getPosition();
+    float    tgtPct = constrain((float)_motorTarget / 8191.f, 0.f, 1.f);
+    int      err    = (int)_motorTarget - (int)pos;
+
+    _spr.fillScreen(C_BG);
+    _drawHdr("MOTOR POSICION");
+
+    int y = SAT_HDR_H + 8;
+    char buf[32];
+
+    _spr.setTextColor(C_CYAN, C_BG); _spr.setTextSize(1);
+    _spr.setTextDatum(textdatum_t::top_left);
+    snprintf(buf, 32, "target=%d", _motorTarget);
+    _spr.drawString(buf, 4, y); y+=14;
+    _drawHBar(4, y, W-8, 12, tgtPct, C_CYAN); y+=18;
+
+    snprintf(buf, 32, "pos=%d  err=%+d", pos, err);
+    _spr.setTextColor(C_TEXT, C_BG);
+    _spr.drawString(buf, 4, y); y+=14;
+    _drawHBar(4, y, W-8, 12, pct, C_GREEN); y+=18;
+
+    if (!Motor::isCalibrated()) {
+        _spr.setTextColor(C_ACCENT, C_BG);
+        _spr.drawString("!! SIN CALIBRAR !!", 4, y);
+    }
+
+    _drawHints("tgt+100","tgt-100","Atras","");
     _push();
 }

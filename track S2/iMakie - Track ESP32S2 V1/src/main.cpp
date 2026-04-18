@@ -109,6 +109,7 @@ void setup() {
     
     initNeopixels();
     log_i("NeoPixels OK");
+    
     initDisplay();
     drawSplashScreen();
     log_i("Display OK");

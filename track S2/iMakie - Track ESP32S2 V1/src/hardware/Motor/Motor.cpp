@@ -77,7 +77,7 @@ static void _calibUpdate() {
 
     case CalibPhase::KICK_UP:
         if (now - _phaseStart >= CALIB_KICK_MS) {
-            _hwUp(CALIB_PWM);
+            _hwUp(PWM_MAX);
             _stableRef   = pos;
             _stableStart = now;
             _phase       = CalibPhase::GOING_UP;
@@ -115,7 +115,7 @@ static void _calibUpdate() {
             _stableStart    = now;
             _settleMin      = 8191;   // reset para SETTLE_DOWN
             _settleMax      = 0;
-            _hwDown(CALIB_KICK_PWM);
+            _hwDown(PWM_MAX);
             _phaseStart     = now;
             _phase          = CalibPhase::KICK_DOWN;
         }
@@ -123,7 +123,7 @@ static void _calibUpdate() {
 
     case CalibPhase::KICK_DOWN:
         if (now - _phaseStart >= CALIB_KICK_MS) {
-            _hwDown(CALIB_PWM);
+            _hwDown(PWM_MAX);
             _stableRef   = pos;
             _stableStart = now;
             _phase       = CalibPhase::GOING_DOWN;
@@ -222,22 +222,18 @@ static void _positionTick() {
 namespace Motor {
 
 void init() {
-    // 1. Latch LOW antes de cambiar dirección
-    //digitalWrite(MOTOR_EN,  LOW);
-    //digitalWrite(MOTOR_IN1, LOW);
-    digitalWrite(MOTOR_IN2, LOW);
-
-    // 2. Dirección OUTPUT
+    // Dirección OUTPUT
     pinMode(MOTOR_EN,  OUTPUT);
     pinMode(MOTOR_IN1, OUTPUT);
     pinMode(MOTOR_IN2, OUTPUT);
 
-    // 3. Attach LEDC con duty=0 explícito ANTES de configurar frecuencia
+    // Attach LEDC con duty=0 explícito ANTES de configurar frecuencia
     //    Si analogWriteFrequency va primero, el duty inicial es indeterminado
-    analogWrite(MOTOR_IN1, PWM_START);   // attach + duty=0 garantizado
-    analogWrite(MOTOR_IN2, PWM_START);   // attach + duty=0 garantizado
+    digitalWrite(MOTOR_EN,  LOW);
+    //analogWrite(MOTOR_IN1, 0);   // attach + duty=0 garantizado
+    //analogWrite(MOTOR_IN2, 0);   // attach + duty=0 garantizado
 
-    // 4. Ahora frecuencia y resolución — el duty ya está en 0, no cambia
+    // Ahora frecuencia y resolución — el duty ya está en 0, no cambia
     analogWriteFrequency(MOTOR_IN1, 20000);
     analogWriteFrequency(MOTOR_IN2, 20000);
     analogWriteResolution(MOTOR_IN1, 8);
@@ -247,6 +243,8 @@ void init() {
     _hwOff();
     log_i("[MOTOR] init OK  IN1=%d IN2=%d EN=%d", MOTOR_IN1, MOTOR_IN2, MOTOR_EN);
 }
+
+
 
 void begin() {
     _phase       = CalibPhase::IDLE;
@@ -266,7 +264,7 @@ void startCalib() {
     _stableRef      = (int)_adcPos;
     _stableStart    = millis();
     _phaseStart     = millis();
-    _hwUp(CALIB_KICK_PWM);
+    _hwUp(PWM_MAX);
     _phase          = CalibPhase::KICK_UP;
     log_i("[CALIB] Iniciada");
 }

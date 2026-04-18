@@ -28,11 +28,55 @@ void FaderADC::begin() {
 }
 
 void FaderADC::update() {
-    int raw = 0;
-    adc_oneshot_read(_adcHandle, FADER_ADC_CHANNEL, &raw);
-    _rawLast   = raw;
-    _emaValue += FADER_EMA_ALPHA * ((float)raw - _emaValue);
-    _faderPos  = (uint16_t)_emaValue;   // raw EMA, sin map ni constrain
+    // 1. Muestreo con sobremuestreo (Oversampling)
+    auto readOneAverage = [&]() {
+        uint32_t s = 0;
+        const int samples = 32; 
+        for (int i = 0; i < samples; i++) {
+            int r = 0;
+            adc_oneshot_read(_adcHandle, FADER_ADC_CHANNEL, &r);
+            s += r;
+        }
+        return (float)s / (float)samples;
+    };
+
+    // 2. Filtro de Mediana (Elimina picos de ruido esporádicos)
+    float a = readOneAverage();
+    float b = readOneAverage();
+    float c = readOneAverage();
+
+    float median;
+    if ((a <= b && b <= c) || (c <= b && b <= a)) median = b;
+    else if ((b <= a && a <= c) || (c <= a && a <= b)) median = a;
+    else median = c;
+
+    // 3. Lógica de Histéresis Dinámica (Zona Muerta)
+    // Para 13 bits (0-8191), un ruido de 40-60 puntos es común.
+    // Usamos un umbral de 'ruido' para decidir qué tan agresivo es el EMA.
+    float diff = abs(median - _emaValue);
+    
+    if (diff > 120.0f) { 
+        // Movimiento real detectado: Respuesta rápida
+        // FADER_EMA_ALPHA debería estar entre 0.1 y 0.3
+        _emaValue += FADER_EMA_ALPHA * (median - _emaValue);
+    } 
+    else if (diff > 20.0f) {
+        // Micro-movimientos o ruido residual: Filtrado ultra agresivo
+        // Esto elimina el "jitter" cuando el fader está casi quieto
+        _emaValue += (FADER_EMA_ALPHA * 0.05f) * (median - _emaValue);
+    }
+    // Si diff < 8.0f, ignoramos el cambio por completo (estabilidad absoluta)
+
+    // 4. Actualización de estado
+    _rawLast = (int)median;
+    
+    // Aplicamos un redondeo simple para evitar saltos decimales en la salida
+    _faderPos = (uint16_t)(_emaValue + 0.5f);
+
+    // Opcional: Solo loguear si hay cambios significativos para no saturar el Serial
+    if (diff > 10.0f) {
+        log_i("[ADC] MED: %.2f | EMA: %d | Δ: %.2f", median, _faderPos, diff);
+    }
 }
 
 // Mide ruido y span en escala raw real.
