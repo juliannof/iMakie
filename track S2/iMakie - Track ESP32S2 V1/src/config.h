@@ -73,7 +73,10 @@ static uint16_t _posicionMaximaADC       = 0;
 #define FADER_ADC_MAX      4090   // leer real en 100%
 
 // ─── FaderADC ─────────────────────────────────────────────────
-static constexpr float    FADER_EMA_ALPHA          = 0.20f;   // único filtro — subir = más vivo, bajar = más suave para motor
+#define NOISE_WINDOW_SIZE     8
+#define NOISE_K_MOVE          3.0f    // diff > K×span → movimiento real
+#define NOISE_K_MICRO         0.3f    // diff > K×span → micro-ajuste
+#define FADER_EMA_ALPHA_FAST  0.20f
 
 // ─── Motor — calibración ──────────────────────────────────────
 static constexpr uint32_t CALIB_KICK_MS            = 150;     // duración del kick inicial
