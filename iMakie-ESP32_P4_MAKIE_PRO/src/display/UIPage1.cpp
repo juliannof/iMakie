@@ -11,38 +11,7 @@ extern void sendMIDIBytes(const uint8_t* data, size_t len);
 #define P1_BTN_MARGIN  4
 #define P1_RADIUS      6
 
-static const uint32_t PALETTE_HEX[9] = {
-    0x303030,  // 0: gris
-    0xFF6600,  // 1: naranja  — >>PG2
-    0x00BB44,  // 2: verde
-    0x2255FF,  // 3: azul
-    0xFFCC00,  // 4: amarillo
-    0x3366DD,  // 5: índigo
-    0x00CCCC,  // 6: cian
-    0xDDDDDD,  // 7: blanco
-    0xFF2222,  // 8: rojo
-};
 
-static const char* LABELS_PG1[P1_BTN_COUNT] = {
-    "TRACK","PAN",  "EQ",   "SEND", "PLUG", "INST", "FLIP", "GLOB",
-    "READ", "WRIT", "TCH",  "LTCH", "TRIM", "OFF",  "SOLO0","SMPT",
-    "CALIB","SCRUB","NUDGE","MARK", "CHAN<","CHAN>", "BANK<","BANK>",
-    "UNDO", "SAVE", "SHIFT","CTRL", "OPT",  "CMD",  "ENTER",">>PG2"
-};
-
-static const char* LABELS_PG1_SHIFT[P1_BTN_COUNT] = {
-    "TRACK","PAN",  "EQ",   "SEND", "PLUG", "INST", "FLIP", "GLOB",
-    "READ", "WRIT", "TCH",  "LTCH", "TRIM", "OFF",  "SOLO0","SMPT",
-    "CALIB","SCRUB","NUDGE","MARK", "CHAN<","CHAN>", "BANK<","BANK>",
-    "UNDO", "SAVE", "SHIFT","CTRL", "OPT",  "CMD",  "ENTER",">>PG2"
-};
-
-static const uint8_t BTN_COLOR_IDX[P1_BTN_COUNT] = {
-    5, 5, 5, 5, 5, 5, 6, 6,
-    2, 6, 4, 8, 8, 2, 2, 2,
-    4, 4, 4, 4, 3, 3, 3, 3,
-    6, 2, 7, 7, 7, 7, 2, 1
-};
 
 static lv_obj_t*  s_page               = NULL;
 static lv_obj_t*  s_btns[P1_BTN_COUNT] = {};
@@ -122,14 +91,15 @@ void uiPage1Create(lv_obj_t* parent) {
     lv_obj_clear_flag(s_page, LV_OBJ_FLAG_SCROLL_CHAIN_VER);
     lv_obj_add_flag(s_page, LV_OBJ_FLAG_CLICKABLE);
 
-    int32_t cell_w = HEADER_X / P1_COLS;
-    int32_t cell_h = P4_H    / P1_ROWS;
-    int32_t btn_w  = cell_w - P1_BTN_MARGIN * 2;
-    int32_t btn_h  = cell_h - P1_BTN_MARGIN * 2;
+    // En portrait: X=filas(4), Y=columnas(8)
+    int32_t cell_x = HEADER_X / P1_ROWS;   // ~102px — eje X portrait = filas landscape
+    int32_t cell_y = P4_H     / P1_COLS;   // 100px  — eje Y portrait = columnas landscape
+    int32_t btn_w  = cell_x - P1_BTN_MARGIN * 2;
+    int32_t btn_h  = cell_y - P1_BTN_MARGIN * 2;
 
     for (int i = 0; i < P1_BTN_COUNT; i++) {
-        int col = i % P1_COLS;
-        int row = i / P1_COLS;
+        int col = i % P1_COLS;   // 0-7 → eje Y portrait
+        int row = i / P1_COLS;   // 0-3 → eje X portrait
 
         uint8_t ci = BTN_COLOR_IDX[i];
         s_colActive[i]   = lv_color_hex(PALETTE_HEX[ci]);
@@ -137,8 +107,8 @@ void uiPage1Create(lv_obj_t* parent) {
 
         lv_obj_t* btn = lv_obj_create(s_page);
         lv_obj_set_pos(btn,
-                       col * cell_w + P1_BTN_MARGIN,
-                       row * cell_h + P1_BTN_MARGIN);
+               (P1_ROWS - 1 - row) * cell_x + P1_BTN_MARGIN,  // ← invertir filas
+               col * cell_y + P1_BTN_MARGIN);
         lv_obj_set_size(btn, btn_w, btn_h);
         lv_obj_set_style_radius(btn, P1_RADIUS, 0);
         lv_obj_set_style_border_width(btn, 1, 0);
@@ -151,8 +121,12 @@ void uiPage1Create(lv_obj_t* parent) {
         lv_obj_t* lbl = lv_label_create(btn);
         lv_label_set_text(lbl, LABELS_PG1[i]);
         lv_label_set_long_mode(lbl, LV_LABEL_LONG_CLIP);
-        lv_obj_set_style_text_font(lbl, &lv_font_montserrat_10, 0);
+        lv_obj_set_style_text_font(lbl, &lv_font_montserrat_16, 0);
         lv_obj_center(lbl);
+        // Rotar etiqueta para que sea legible en landscape
+        lv_obj_set_style_transform_rotation(lbl, 900, 0);
+        lv_obj_set_style_transform_pivot_x(lbl, LV_PCT(50), 0);
+        lv_obj_set_style_transform_pivot_y(lbl, LV_PCT(50), 0);
 
         lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_PRESSED,  (void*)(intptr_t)i);
         lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_RELEASED, (void*)(intptr_t)i);
@@ -163,8 +137,8 @@ void uiPage1Create(lv_obj_t* parent) {
         applyButtonState(i, false);
     }
 
-    log_i("[UIPage1] Creada: cell=%dx%d btn=%dx%d",
-          (int)cell_w, (int)cell_h, (int)btn_w, (int)btn_h);
+    log_i("[UIPage1] Creada: cell_x=%d cell_y=%d btn=%dx%d",
+          (int)cell_x, (int)cell_y, (int)btn_w, (int)btn_h);
 }
 
 void uiPage1UpdateButton(int index, bool active) {

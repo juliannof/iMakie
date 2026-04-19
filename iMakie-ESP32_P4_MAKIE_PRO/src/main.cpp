@@ -158,7 +158,7 @@ void taskCore1(void* pvParameters) {
             else if (g_currentPage == 2) uiPage3BDestroy();
             else                         uiPage3Destroy();
             uiHeaderDestroy();
-            uiOfflineCreate(displayGetContentArea());
+            uiOfflineCreate(displayGetRoot());
 
         } else if (logicConnectionState == ConnectionState::DISCONNECTED) {
             uiOfflineTick();
@@ -196,13 +196,13 @@ void setup() {
     initDisplay();
     log_e("initDisplay() OK");
     // uiHeaderCreate eliminado de aquí
-    uiOfflineCreate(displayGetContentArea());
+    
     
     Preferences prefs;
     prefs.begin("uimenu", true);
     g_currentPage = prefs.getUChar("lastPage", 0);
     prefs.end();
-    uiOfflineCreate(displayGetContentArea());
+    uiOfflineCreate(displayGetRoot());
 
     memset(timeCodeChars_clean, ' ', 12); timeCodeChars_clean[12] = '\0';
     memset(beatsChars_clean,   ' ', 12); beatsChars_clean[12]   = '\0';
