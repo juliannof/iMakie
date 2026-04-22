@@ -3,7 +3,7 @@
 #include "../config.h"
 #include <USBMIDI.h>
 #include "../RS485/RS485.h"
-
+#include "../hardware/Transporte.h"  // ← AÑADIDO
 
 extern USBMIDI MIDI;
 extern void updateLeds();
@@ -149,7 +149,16 @@ void processMidiByte(byte b) {
     if (b >= 0xF8) return;
 
     if (b & 0x80) {
-        if (b == 0xF0) { in_sysex = true; midi_idx = 0; return; }
+        if (b == 0xF0) { 
+            in_sysex = true; 
+            midi_idx = 0;
+            // Si recibimos un nuevo SysEx mientras esperamos challenge, resetear
+            if (handshakeState == HandshakeState::AWAITING_CHALLENGE_BYTES) {
+                handshakeState = HandshakeState::IDLE;
+                challenge_idx  = 0;
+            }
+            return; 
+        }
         if (b == 0xF7) {
             if (in_sysex) { in_sysex = false; processMackieSysEx(midi_buffer, midi_idx); }
             return;
@@ -210,17 +219,29 @@ void processMidiByte(byte b) {
 }
 
 void handleMcuHandshake(byte* challenge_code) {
+    if (challenge_code[0] == 0 && challenge_code[1] == 0 && 
+        challenge_code[2] == 0 && challenge_code[3] == 0) {
+        handshakeState = HandshakeState::IDLE;
+        return;
+    }
+
+    // Cooldown — ignorar si acaba de enviar un challenge
+    static unsigned long lastHandshakeTime = 0;
+    if (millis() - lastHandshakeTime < 500) {
+        handshakeState = HandshakeState::IDLE;
+        return;
+    }
+    lastHandshakeTime = millis();
+
     ConnectionState previousState = logicConnectionState;
-    byte response[15] = { 0xF0, 0x00, 0x00, 0x66, 0x14, 0x01, 0x00,
+    byte response[15] = { 0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x01, 0x00,
                           challenge_code[0], challenge_code[1], challenge_code[2],
                           challenge_code[3], challenge_code[4], challenge_code[5],
                           challenge_code[6], 0xF7 };
     sendMIDIBytes(response, sizeof(response));
-    byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x02, 0xF7};
-    sendMIDIBytes(online_msg, sizeof(online_msg));
+    handshakeState = HandshakeState::IDLE;
     if (previousState != ConnectionState::CONNECTED) {
         logicConnectionState = ConnectionState::MIDI_HANDSHAKE_COMPLETE;
-        needsTOTALRedraw = true;
     }
 }
 
@@ -232,9 +253,7 @@ void processControlChange(byte channel, byte controller, byte value) {
         uint8_t strip = controller - 48;
         rs485.setVPotValue(strip + 1, value);
         vpotValues[strip] = value;
-        needsButtonsRedraw = true;
-        log_v("[VPot] strip=%u raw=0x%02X mode=%u pos=%u center=%u",
-              strip, value, (value >> 4) & 0x03, value & 0x0F, (value >> 6) & 0x01);
+        
         return;
     }
 
@@ -246,11 +265,6 @@ void processControlChange(byte channel, byte controller, byte value) {
     byte char_to_store = (byte)ascii_char;
     if (value & 0x40) char_to_store |= 0x80;
 
-    beatsChars_clean[digit_index]    = char_to_store;
-    timeCodeChars_clean[digit_index] = char_to_store;
-
-    needsHeaderRedraw = true;
-    if (controller == 64) needsTimecodeRedraw = true;
 }
 
 String formatTimecodeString() {
@@ -290,8 +304,6 @@ String formatBeatString() {
 }
 
 void processChannelPressure(byte channel, byte value) {
-    log_v(">> CP IN: Ch=%d, Val=%d", channel, value);
-
     float normalizedLevel = 0.0f;
     int targetChannel = -1;
     bool newClipState = false;
@@ -341,7 +353,7 @@ void processChannelPressure(byte channel, byte value) {
             vuLevels[targetChannel] = 0.0f;
             stateChanged = true;
         }
-        if (stateChanged) needsVUMetersRedraw = true;
+        
     }
 }
 
@@ -351,27 +363,32 @@ void processMackieSysEx(byte* payload, int len) {
     byte device_family = payload[3];
     byte command = payload[4];
 
-    if (device_family != 0x14 && device_family != 0x15) return;
+    if (device_family != 0x15 && device_family != 0x15) return;
 
     if (command == 0x00 && len == 5) {
-        if (logicConnectionState == ConnectionState::CONNECTED) {
-            fadersAtMinMask      = 0;
-            firstFaderMinTime    = 0;
-            lastMidiActivityTime = millis();
-            byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x02, 0xF7};
-            sendMIDIBytes(online_msg, sizeof(online_msg));
-            return;
-        }
-        byte l1 = random(0x01, 0x7F), l2 = random(0x01, 0x7F);
-        byte l3 = random(0x01, 0x7F), l4 = random(0x01, 0x7F);
-        challenge_buffer[0] = l1; challenge_buffer[1] = l2;
-        challenge_buffer[2] = l3; challenge_buffer[3] = l4;
-        byte response[15] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x01, 0x00,
-                             l1, l2, l3, l4, 0x00, 0x00, 0x00, 0xF7};
-        sendMIDIBytes(response, sizeof(response));
-        handshakeState = HandshakeState::AWAITING_CHALLENGE_BYTES;
-        challenge_idx  = 0;
+    if (logicConnectionState == ConnectionState::CONNECTED) {
+        fadersAtMinMask      = 0;
+        firstFaderMinTime    = 0;
+        lastMidiActivityTime = millis();
+        byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x02, 0xF7};
+        sendMIDIBytes(online_msg, sizeof(online_msg));
         return;
+    }
+
+    // ← AÑADIR: ignorar si ya hay handshake en curso
+    if (handshakeState == HandshakeState::AWAITING_CHALLENGE_BYTES) return;
+    if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) return;
+
+    byte l1 = random(0x01, 0x7F), l2 = random(0x01, 0x7F);
+    byte l3 = random(0x01, 0x7F), l4 = random(0x01, 0x7F);
+    challenge_buffer[0] = l1; challenge_buffer[1] = l2;
+    challenge_buffer[2] = l3; challenge_buffer[3] = l4;
+    byte response[15] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x01, 0x00,
+                         l1, l2, l3, l4, 0x00, 0x00, 0x00, 0xF7};
+    sendMIDIBytes(response, sizeof(response));
+    handshakeState = HandshakeState::AWAITING_CHALLENGE_BYTES;
+    challenge_idx  = 0;
+    return;
     }
 
     switch (command) {
@@ -385,11 +402,18 @@ void processMackieSysEx(byte* payload, int len) {
             byte r3 = 0x7F & (l4 - (l3 << 2) ^ (l1 | l2));
             byte r4 = 0x7F & (l2 - l3 + (0xF0 ^ (l4 << 4)));
             (void)r1; (void)r2; (void)r3; (void)r4;
-            byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x02, 0xF7};
+            byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x02, 0xF7};
             sendMIDIBytes(online_msg, sizeof(online_msg));
             handshakeState       = HandshakeState::IDLE;
             logicConnectionState = ConnectionState::MIDI_HANDSHAKE_COMPLETE;
-            needsTOTALRedraw     = true;
+         
+            break;
+        }
+
+        case 0x02: {
+            handshakeState       = HandshakeState::IDLE;
+            logicConnectionState = ConnectionState::MIDI_HANDSHAKE_COMPLETE;
+            g_logicConnected     = 1;
             break;
         }
 
@@ -406,53 +430,52 @@ void processMackieSysEx(byte* payload, int len) {
         case 0x13: {
             unsigned long now = millis();
             if (now - lastVersionReplyTime > VERSION_REPLY_COOLDOWN_MS) {
-                byte version_reply[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x14,
-                        '1', '.', '2', '.', '0', 0xF7};
-                sendMIDIBytes(version_reply, sizeof(version_reply));
-                lastVersionReplyTime = now;
-            }
+                byte version_reply[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, VERSION_REPLY_CMD,
+                    '1', '.', '2', '.', '0', 0xF7};
+            sendMIDIBytes(version_reply, sizeof(version_reply));
+            lastVersionReplyTime = now;
+        // ← NO tocar handshakeState aquí
+            }   
             break;
         }
 
         case 0x12: {
-    if (len < 6) break;
-    byte startOffset = payload[5];
-    int  text_len    = len - 6;
-    if (text_len <= 0) break;
+            if (len < 6) break;
+            byte startOffset = payload[5];
+            int  text_len    = len - 6;
+            if (text_len <= 0) break;
 
-    auto trimRight = [](char* s) {
-        for (int j = 6; j >= 0; j--) {
-            if (s[j] == ' ' || s[j] == '\0') s[j] = '\0';
-            else break;
+            auto trimRight = [](char* s) {
+                for (int j = 6; j >= 0; j--) {
+                    if (s[j] == ' ' || s[j] == '\0') s[j] = '\0';
+                    else break;
+                }
+            };
+
+            char nameBufs[8][8] = {};
+            bool nameChanged[8] = {};
+
+            for (int t = 0; t < 8; t++) {
+                strncpy(nameBufs[t], trackNames[t].c_str(), 7);
+                nameBufs[t][7] = '\0';
+            }
+
+            for (int i = 0; i < text_len; i++) {
+                byte offset = startOffset + i;
+                if (offset >= 56) break;
+                nameBufs[offset / 7][offset % 7] = (char)payload[6 + i];
+                nameChanged[offset / 7] = true;
+            }
+
+            for (int t = 0; t < 8; t++) {
+                if (!nameChanged[t]) continue;
+                trimRight(nameBufs[t]);
+                if (trackNames[t] == nameBufs[t]) continue;
+                trackNames[t] = String(nameBufs[t]);
+                rs485.setTrackName(t + 1, nameBufs[t]);
+            }
+            break;
         }
-    };
-
-    char nameBufs[8][8] = {};
-    bool nameChanged[8] = {};
-
-    for (int t = 0; t < 8; t++) {
-        strncpy(nameBufs[t], trackNames[t].c_str(), 7);
-        nameBufs[t][7] = '\0';
-    }
-
-    for (int i = 0; i < text_len; i++) {
-        byte offset = startOffset + i;
-        if (offset >= 56) break;             // offset<56 garantiza track<8
-        nameBufs[offset / 7][offset % 7] = (char)payload[6 + i];
-        nameChanged[offset / 7] = true;
-    }
-
-    for (int t = 0; t < 8; t++) {
-        if (!nameChanged[t]) continue;
-        trimRight(nameBufs[t]);
-        if (trackNames[t] == nameBufs[t]) continue;
-        trackNames[t] = String(nameBufs[t]);
-        needsMainAreaRedraw = true;
-        needsButtonsRedraw  = true;
-        rs485.setTrackName(t + 1, nameBufs[t]);
-    }
-    break;
-}
 
         case 0x11: {
             if (len < 7) break;
@@ -462,7 +485,6 @@ void processMackieSysEx(byte* payload, int len) {
             char assign_buf[3] = {c1, c2, '\0'};
             if (assignmentString != assign_buf) {
                 assignmentString = String(assign_buf);
-                needsHeaderRedraw = true;
             }
             break;
         }
@@ -486,7 +508,6 @@ void processMackieSysEx(byte* payload, int len) {
                     if (vuLevels[channel] != normalized) {
                         vuLevels[channel]    = normalized;
                         vuClipState[channel] = clip;
-                        needsVUMetersRedraw  = true;
                     }
                     rs485.setVuLevel(channel + 1, (uint8_t)(normalized * 127.0f));
                 }
@@ -495,15 +516,14 @@ void processMackieSysEx(byte* payload, int len) {
         }
 
         case 0x0E: {
-    if (len < 7) break;
-    byte channel = payload[5];
-    byte mode    = payload[6];
-    if (channel < 8) {
-        g_channelAutoMode[channel] = mode;
-        needsButtonsRedraw = true;
-    }
-    break;
-}
+            if (len < 7) break;
+            byte channel = payload[5];
+            byte mode    = payload[6];
+            if (channel < 8) {
+                g_channelAutoMode[channel] = mode;
+            }
+            break;
+        }
 
         default:
             log_v("processMackieSysEx: Comando 0x%02X no manejado.", command);
@@ -515,8 +535,6 @@ void processNote(byte status, byte note, byte velocity) {
     bool is_on       = ((status & 0xF0) == 0x90 && velocity > 0);
     bool is_flashing = ((status & 0xF0) == 0x90 && velocity == 1);
 
-    if (note == 113) { if (is_on) { currentTimecodeMode = MODE_SMPTE; needsHeaderRedraw = true; needsTimecodeRedraw = true; } return; }
-    if (note == 114) { if (is_on) { currentTimecodeMode = MODE_BEATS; needsHeaderRedraw = true; needsTimecodeRedraw = true; } return; }
 
     if (note <= 31) {
         int group     = note / 8;
@@ -533,8 +551,6 @@ void processNote(byte status, byte note, byte velocity) {
                 break;
         }
         if (stateChanged) {
-            needsMainAreaRedraw = true;
-            needsButtonsRedraw  = true;
             uint8_t slaveId = track_idx + 1;
             uint8_t flags = 0;
             if (recStates[track_idx])    flags |= FLAG_REC;
@@ -560,8 +576,6 @@ void processNote(byte status, byte note, byte velocity) {
                 btnFlashPG1[key]  = is_flashing;
             }
         }
-        needsMainAreaRedraw = true;
-        needsButtonsRedraw  = true;
         return;
     }
 
@@ -582,10 +596,8 @@ void processNote(byte status, byte note, byte velocity) {
             }
         }
     }
-    if (stateChanged) {
-        needsMainAreaRedraw = true;
-        needsButtonsRedraw  = true;
-    }
+   
+    Transporte::setLedByNote(note, is_on);  // ← AÑADIDO
 }
 
 void processPitchBend(byte channel, int bendValue) {
@@ -601,7 +613,6 @@ void processPitchBend(byte channel, int bendValue) {
             int bitsSet = __builtin_popcount(fadersAtMinMask);
             if (bitsSet >= DISCONNECT_THRESHOLD &&
                 (now - firstFaderMinTime) <= DISCONNECT_WINDOW_MS) {
-                unsigned long elapsed = now - firstFaderMinTime;
                 logicConnectionState = ConnectionState::DISCONNECTED;
                 g_logicConnected     = 0;
                 fadersAtMinMask      = 0;
@@ -609,7 +620,6 @@ void processPitchBend(byte channel, int bendValue) {
                 for (uint8_t i = 1; i <= NUM_SLAVES; i++)
                     rs485.setFaderTarget(i, rs485.getChannel(i).faderPos);
                 g_switchToOffline = true;
-                log_d("[DISCONNECT] %d faders en 0 en %lums.", bitsSet, elapsed);
                 return;
             }
             if ((now - firstFaderMinTime) > DISCONNECT_WINDOW_MS) {
@@ -625,7 +635,6 @@ void processPitchBend(byte channel, int bendValue) {
         logicConnectionState = ConnectionState::CONNECTED;
         g_logicConnected     = 1;
         connectedSinceTime   = millis();
-        needsTOTALRedraw     = true;
         fadersAtMinMask      = 0;
         for (uint8_t i = 0; i < 8; i++) {
             if (selectStates[i]) {
@@ -636,9 +645,7 @@ void processPitchBend(byte channel, int bendValue) {
         }
         _calibPendingFrom = 1;
         _calibNextTime    = millis();
-        log_i("[CALIB] Secuencia iniciada para %d slaves", NUM_SLAVES);
         g_switchToPage3 = true;
-        log_d("DAW conectado: Primer PitchBend Track %d -> CONNECTED.", channel + 1);
     }
 
     if (channel < 9) {
@@ -647,7 +654,6 @@ void processPitchBend(byte channel, int bendValue) {
         float faderPositionNormalized = (float)fader14bit / 16383.0f;
         if (abs(faderPositions[channel] - faderPositionNormalized) > 0.001f) {
             faderPositions[channel] = faderPositionNormalized;
-            needsMainAreaRedraw = true;
         }
     }
 }
@@ -656,7 +662,6 @@ void checkMidiTimeout() {
     if (logicConnectionState == ConnectionState::CONNECTED) {
         if (millis() - lastMidiActivityTime > MIDI_TIMEOUT_MS) {
             logicConnectionState = ConnectionState::DISCONNECTED;
-            needsTOTALRedraw     = true;
             fadersAtMinMask      = 0;
             g_switchToOffline    = true;
         }

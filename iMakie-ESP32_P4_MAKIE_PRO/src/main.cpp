@@ -175,52 +175,82 @@ void taskCore1(void* pvParameters) {
         lv_task_handler();
         vTaskDelay(pdMS_TO_TICKS(10));
     }
+    static unsigned long lastStatusLog = 0;
+    // Log de estado cada 2 segundos
+        if (millis() - lastStatusLog > 2000) {
+            lastStatusLog = millis();
+            
+            const char* stateStr = "UNKNOWN";
+            if (logicConnectionState == ConnectionState::DISCONNECTED) stateStr = "DISCONNECTED";
+            else if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) stateStr = "HANDSHAKE_OK";
+            else if (logicConnectionState == ConnectionState::CONNECTED) stateStr = "CONNECTED";
+            
+            log_i("[STATUS] %s | g_logicConnected=%d | Page=%d", 
+                  stateStr, g_logicConnected, g_currentPage);
+        }
 }
 
 
 
 void setup() {
+    randomSeed(esp_random());  // ← AÑADIR al principio
     Serial.begin(115200);
-    //while (!Serial) delay(10);  // esperar USB CDC
-    //delay(3000);  // esperar USB
-    log_e("iMakie P4 arrancando...");
-    
+    log_i("=== BOOT P4 Master ===");
 
-
+    // 1. LittleFS
+    log_i("1. LittleFS.begin()...");
     if (!LittleFS.begin(false)) {
-        log_e("[FS] LittleFS no montado");
+        log_e("   LittleFS FALLO");
     } else {
-        log_i("[FS] LittleFS OK");
+        log_i("   LittleFS OK");
     }
 
+    // 2. Display + LVGL
+    log_i("2. initDisplay()...");
     initDisplay();
-    log_e("initDisplay() OK");
-    // uiHeaderCreate eliminado de aquí
-    
-    
+    log_i("   Display OK");
+
+    // 3. Preferences
+    log_i("3. Preferences...");
     Preferences prefs;
     prefs.begin("uimenu", true);
     g_currentPage = prefs.getUChar("lastPage", 0);
     prefs.end();
-    uiOfflineCreate(displayGetRoot());
+    log_i("   Preferences OK. lastPage=%d", g_currentPage);
 
+    // 4. UI Offline inicial
+    log_i("4. uiOfflineCreate()...");
+    uiOfflineCreate(displayGetRoot());
+    log_i("   UI Offline OK");
+
+    // 5. Timecode buffers
     memset(timeCodeChars_clean, ' ', 12); timeCodeChars_clean[12] = '\0';
     memset(beatsChars_clean,   ' ', 12); beatsChars_clean[12]   = '\0';
 
+    // 6. USB
+    log_i("5. USB.begin()...");
     USB.begin();
-    delay(200);
+    delay(100);  // Solo 100ms
+    log_i("   USB OK");
+
+    // 7. MIDI (sin delay largo)
+    log_i("6. MIDI.begin()...");
     MIDI.begin();
-    delay(2000);
+    log_i("   MIDI OK");
 
-    
+    // 8. RS485
+    log_i("7. RS485.begin(%d)...", NUM_SLAVES);
     rs485.begin(NUM_SLAVES);
-    log_e("RS485 OK — slaves: %d TX:%d RX:%d EN:%d",
-          NUM_SLAVES, RS485_TX_PIN, RS485_RX_PIN, RS485_ENABLE_PIN);
+    log_i("   RS485 OK — TX:%d RX:%d EN:%d", 
+          RS485_TX_PIN, RS485_RX_PIN, RS485_ENABLE_PIN);
 
+    // 9. Crear tareas
+    log_i("8. Creando tareas...");
     xTaskCreatePinnedToCore(taskCore0, "MIDI", 4096, NULL, 2, &taskCore0Handle, 0);
     xTaskCreatePinnedToCore(taskCore1, "UI", 16384, NULL, 1, &taskCore1Handle, 1);
+    log_i("   Tareas creadas");
 
-    log_e("iMakie P4 listo.");
+    log_i("=== P4 Master ACTIVO. Slaves: %d ===", NUM_SLAVES);
 }
 
 void loop() { vTaskDelay(portMAX_DELAY); }

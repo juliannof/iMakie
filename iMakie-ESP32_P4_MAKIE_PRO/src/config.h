@@ -2,6 +2,25 @@
 #pragma once
 #include <Arduino.h>
 
+// ====================================================================
+// CONFIGURACIÓN AUTOMÁTICA SEGÚN DISPOSITIVO
+// ====================================================================
+#if defined(DEVICE_P4_MASTER)
+    #define DEVICE_FAMILY       0x14
+    #define VERSION_REPLY_CMD   0x14
+    #define NUM_SLAVES          9
+
+#elif defined(DEVICE_S3_EXTENDER)
+    #define DEVICE_FAMILY       0x15
+    #define VERSION_REPLY_CMD   0x15
+    #define NUM_SLAVES          8
+
+#else
+    #error "DEBE DEFINIR: DEVICE_P4_MASTER o DEVICE_S3_EXTENDER en platformio.ini build_flags"
+#endif
+
+
+
 // --- RS485 pines P4 ---
 #define RS485_TX_PIN      52
 #define RS485_RX_PIN      51

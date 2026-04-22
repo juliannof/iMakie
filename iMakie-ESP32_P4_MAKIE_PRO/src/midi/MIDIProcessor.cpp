@@ -3,8 +3,6 @@
 #include "../config.h"
 #include <USBMIDI.h>
 #include "../RS485/RS485.h"
-#include "../display/UIOffline.h"
-#include "../display/UIPage3.h"
 
 extern USBMIDI MIDI;
 extern void updateLeds();
@@ -150,7 +148,17 @@ void processMidiByte(byte b) {
     if (b >= 0xF8) return;
 
     if (b & 0x80) {
-        if (b == 0xF0) { in_sysex = true; midi_idx = 0; return; }
+        if (b == 0xF0) { 
+            in_sysex = true; 
+            midi_idx = 0;
+            // CRÍTICO: Si recibimos nuevo SysEx mientras esperamos challenge, resetear
+            if (handshakeState == HandshakeState::AWAITING_CHALLENGE_BYTES) {
+                handshakeState = HandshakeState::IDLE;
+                challenge_idx  = 0;
+                log_v("[MCU] SysEx nuevo — handshake reseteado");
+            }
+            return; 
+        }
         if (b == 0xF7) {
             if (in_sysex) { in_sysex = false; processMackieSysEx(midi_buffer, midi_idx); }
             return;
@@ -211,18 +219,42 @@ void processMidiByte(byte b) {
 }
 
 void handleMcuHandshake(byte* challenge_code) {
+    // REGLA 1: Rechazar challenge cero
+    if (challenge_code[0] == 0 && challenge_code[1] == 0 && 
+        challenge_code[2] == 0 && challenge_code[3] == 0) {
+        log_w("[MCU] Challenge cero recibido — ignorando");
+        handshakeState = HandshakeState::IDLE;
+        return;
+    }
+
+    // REGLA 2: Cooldown 500ms — ignorar challenges duplicados
+    static unsigned long lastHandshakeTime = 0;
+    if (millis() - lastHandshakeTime < 500) {
+        log_v("[MCU] Challenge ignorado — cooldown activo");
+        handshakeState = HandshakeState::IDLE;
+        return;
+    }
+    lastHandshakeTime = millis();
+
+    // REGLA 3: Responder challenge
     ConnectionState previousState = logicConnectionState;
-    byte response[15] = { 0xF0, 0x00, 0x00, 0x66, 0x14, 0x01, 0x00,
+    byte response[15] = { 0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x01, 0x00,
                           challenge_code[0], challenge_code[1], challenge_code[2],
                           challenge_code[3], challenge_code[4], challenge_code[5],
                           challenge_code[6], 0xF7 };
     sendMIDIBytes(response, sizeof(response));
-    byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x02, 0xF7};
+    
+    // REGLA 4: Enviar GoOnline
+    byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x02, 0xF7};
     sendMIDIBytes(online_msg, sizeof(online_msg));
+    
+    // REGLA 5: Actualizar estado + FLAG DE PANTALLA
     if (previousState != ConnectionState::CONNECTED) {
         logicConnectionState = ConnectionState::MIDI_HANDSHAKE_COMPLETE;
         needsTOTALRedraw = true;
     }
+    
+    log_i("[MCU] Challenge respondido + GoOnline enviado");
 }
 
 void processControlChange(byte channel, byte controller, byte value) {
@@ -355,23 +387,41 @@ void processMackieSysEx(byte* payload, int len) {
     if (device_family != 0x14 && device_family != 0x15) return;
 
     if (command == 0x00 && len == 5) {
+        // REGLA 1: Si ya estamos CONNECTED → GoOnline directo (reconexión rápida)
         if (logicConnectionState == ConnectionState::CONNECTED) {
             fadersAtMinMask      = 0;
             firstFaderMinTime    = 0;
             lastMidiActivityTime = millis();
-            byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x02, 0xF7};
+            byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x02, 0xF7};
             sendMIDIBytes(online_msg, sizeof(online_msg));
             return;
         }
+
+        // REGLA 2: Ignorar Device Query si ya hay handshake en curso
+        if (handshakeState == HandshakeState::AWAITING_CHALLENGE_BYTES) {
+            log_v("[MCU] Device Query ignorado — handshake en curso");
+            return;
+        }
+        if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) {
+            log_v("[MCU] Device Query ignorado — handshake completo");
+            return;
+        }
+
+        // REGLA 3: Generar challenge
         byte l1 = random(0x01, 0x7F), l2 = random(0x01, 0x7F);
         byte l3 = random(0x01, 0x7F), l4 = random(0x01, 0x7F);
+        
         challenge_buffer[0] = l1; challenge_buffer[1] = l2;
         challenge_buffer[2] = l3; challenge_buffer[3] = l4;
-        byte response[15] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x01, 0x00,
+        
+        byte response[15] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x01, 0x00,
                              l1, l2, l3, l4, 0x00, 0x00, 0x00, 0xF7};
         sendMIDIBytes(response, sizeof(response));
+        
         handshakeState = HandshakeState::AWAITING_CHALLENGE_BYTES;
         challenge_idx  = 0;
+        
+        log_i("[MCU] Device Query → Challenge enviado");
         return;
     }
 
@@ -379,18 +429,26 @@ void processMackieSysEx(byte* payload, int len) {
 
         case 0x01: {
             if (len < 12) break;
+            
+            // Validar challenge no-cero
             byte l1 = challenge_buffer[0], l2 = challenge_buffer[1];
             byte l3 = challenge_buffer[2], l4 = challenge_buffer[3];
-            byte r1 = 0x7F & (l1 + (l2 ^ 0x0a) - l4);
-            byte r2 = 0x7F & ((l3 >> 4) ^ (l1 + l4));
-            byte r3 = 0x7F & (l4 - (l3 << 2) ^ (l1 | l2));
-            byte r4 = 0x7F & (l2 - l3 + (0xF0 ^ (l4 << 4)));
-            (void)r1; (void)r2; (void)r3; (void)r4;
-            byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x02, 0xF7};
+            
+            if (l1 == 0 && l2 == 0 && l3 == 0 && l4 == 0) {
+                log_w("[MCU] Logic envió challenge cero — ignorando");
+                handshakeState = HandshakeState::IDLE;
+                break;
+            }
+            
+            // No validamos respuesta, enviar GoOnline directo
+            byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x02, 0xF7};
             sendMIDIBytes(online_msg, sizeof(online_msg));
+            
             handshakeState       = HandshakeState::IDLE;
             logicConnectionState = ConnectionState::MIDI_HANDSHAKE_COMPLETE;
             needsTOTALRedraw     = true;
+            
+            log_i("[MCU] GoOnline enviado — handshake completo");
             break;
         }
 
@@ -407,7 +465,7 @@ void processMackieSysEx(byte* payload, int len) {
         case 0x13: {
             unsigned long now = millis();
             if (now - lastVersionReplyTime > VERSION_REPLY_COOLDOWN_MS) {
-                byte version_reply[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x14,
+                byte version_reply[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, VERSION_REPLY_CMD,
                         '1', '.', '2', '.', '0', 0xF7};
                 sendMIDIBytes(version_reply, sizeof(version_reply));
                 lastVersionReplyTime = now;
@@ -416,44 +474,44 @@ void processMackieSysEx(byte* payload, int len) {
         }
 
         case 0x12: {
-    if (len < 6) break;
-    byte startOffset = payload[5];
-    int  text_len    = len - 6;
-    if (text_len <= 0) break;
+            if (len < 6) break;
+            byte startOffset = payload[5];
+            int  text_len    = len - 6;
+            if (text_len <= 0) break;
 
-    auto trimRight = [](char* s) {
-        for (int j = 6; j >= 0; j--) {
-            if (s[j] == ' ' || s[j] == '\0') s[j] = '\0';
-            else break;
+            auto trimRight = [](char* s) {
+                for (int j = 6; j >= 0; j--) {
+                    if (s[j] == ' ' || s[j] == '\0') s[j] = '\0';
+                    else break;
+                }
+            };
+
+            char nameBufs[8][8] = {};
+            bool nameChanged[8] = {};
+
+            for (int t = 0; t < 8; t++) {
+                strncpy(nameBufs[t], trackNames[t].c_str(), 7);
+                nameBufs[t][7] = '\0';
+            }
+
+            for (int i = 0; i < text_len; i++) {
+                byte offset = startOffset + i;
+                if (offset >= 56) break;
+                nameBufs[offset / 7][offset % 7] = (char)payload[6 + i];
+                nameChanged[offset / 7] = true;
+            }
+
+            for (int t = 0; t < 8; t++) {
+                if (!nameChanged[t]) continue;
+                trimRight(nameBufs[t]);
+                if (trackNames[t] == nameBufs[t]) continue;
+                trackNames[t] = String(nameBufs[t]);
+                needsMainAreaRedraw = true;
+                needsButtonsRedraw  = true;
+                rs485.setTrackName(t + 1, nameBufs[t]);
+            }
+            break;
         }
-    };
-
-    char nameBufs[8][8] = {};
-    bool nameChanged[8] = {};
-
-    for (int t = 0; t < 8; t++) {
-        strncpy(nameBufs[t], trackNames[t].c_str(), 7);
-        nameBufs[t][7] = '\0';
-    }
-
-    for (int i = 0; i < text_len; i++) {
-        byte offset = startOffset + i;
-        if (offset >= 56) break;             // offset<56 garantiza track<8
-        nameBufs[offset / 7][offset % 7] = (char)payload[6 + i];
-        nameChanged[offset / 7] = true;
-    }
-
-    for (int t = 0; t < 8; t++) {
-        if (!nameChanged[t]) continue;
-        trimRight(nameBufs[t]);
-        if (trackNames[t] == nameBufs[t]) continue;
-        trackNames[t] = String(nameBufs[t]);
-        needsMainAreaRedraw = true;
-        needsButtonsRedraw  = true;
-        rs485.setTrackName(t + 1, nameBufs[t]);
-    }
-    break;
-}
 
         case 0x11: {
             if (len < 7) break;
@@ -496,15 +554,15 @@ void processMackieSysEx(byte* payload, int len) {
         }
 
         case 0x0E: {
-    if (len < 7) break;
-    byte channel = payload[5];
-    byte mode    = payload[6];
-    if (channel < 8) {
-        g_channelAutoMode[channel] = mode;
-        needsButtonsRedraw = true;
-    }
-    break;
-}
+            if (len < 7) break;
+            byte channel = payload[5];
+            byte mode    = payload[6];
+            if (channel < 8) {
+                g_channelAutoMode[channel] = mode;
+                needsButtonsRedraw = true;
+            }
+            break;
+        }
 
         default:
             log_v("processMackieSysEx: Comando 0x%02X no manejado.", command);
