@@ -225,7 +225,6 @@ void handleMcuHandshake(byte* challenge_code) {
         return;
     }
 
-    // Cooldown — ignorar si acaba de enviar un challenge
     static unsigned long lastHandshakeTime = 0;
     if (millis() - lastHandshakeTime < 500) {
         handshakeState = HandshakeState::IDLE;
@@ -234,12 +233,20 @@ void handleMcuHandshake(byte* challenge_code) {
     lastHandshakeTime = millis();
 
     ConnectionState previousState = logicConnectionState;
+    
+    // Responder challenge
     byte response[15] = { 0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x01, 0x00,
                           challenge_code[0], challenge_code[1], challenge_code[2],
                           challenge_code[3], challenge_code[4], challenge_code[5],
                           challenge_code[6], 0xF7 };
     sendMIDIBytes(response, sizeof(response));
+    
+    // ✅ AÑADIR: Enviar GoOnline
+    byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x02, 0xF7};
+    sendMIDIBytes(online_msg, sizeof(online_msg));
+    
     handshakeState = HandshakeState::IDLE;
+    
     if (previousState != ConnectionState::CONNECTED) {
         logicConnectionState = ConnectionState::MIDI_HANDSHAKE_COMPLETE;
     }
@@ -363,36 +370,23 @@ void processMackieSysEx(byte* payload, int len) {
     byte device_family = payload[3];
     byte command = payload[4];
 
-    if (device_family != 0x15 && device_family != 0x15) return;
+    log_i("[SYSEX] device_family=0x%02X command=0x%02X len=%d", device_family, command, len);
 
-    if (command == 0x00 && len == 5) {
-    if (logicConnectionState == ConnectionState::CONNECTED) {
-        fadersAtMinMask      = 0;
-        firstFaderMinTime    = 0;
-        lastMidiActivityTime = millis();
-        byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x02, 0xF7};
-        sendMIDIBytes(online_msg, sizeof(online_msg));
-        return;
-    }
+    if (device_family != 0x14 && device_family != 0x15) return;
 
-    // ← AÑADIR: ignorar si ya hay handshake en curso
-    if (handshakeState == HandshakeState::AWAITING_CHALLENGE_BYTES) return;
-    if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) return;
-
-    byte l1 = random(0x01, 0x7F), l2 = random(0x01, 0x7F);
-    byte l3 = random(0x01, 0x7F), l4 = random(0x01, 0x7F);
-    challenge_buffer[0] = l1; challenge_buffer[1] = l2;
-    challenge_buffer[2] = l3; challenge_buffer[3] = l4;
-    byte response[15] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x01, 0x00,
-                         l1, l2, l3, l4, 0x00, 0x00, 0x00, 0xF7};
-    sendMIDIBytes(response, sizeof(response));
-    handshakeState = HandshakeState::AWAITING_CHALLENGE_BYTES;
-    challenge_idx  = 0;
-    return;
+    // ✅ AUTO-CONECTAR: Si recibimos comandos operacionales y NO estamos conectados
+    if (logicConnectionState != ConnectionState::CONNECTED) {
+        if (command == 0x0E || command == 0x12 || command == 0x72 || 
+            command == 0x20 || command == 0x21 || command == 0x0A || 
+            command == 0x0B || command == 0x0C) {
+            logicConnectionState = ConnectionState::CONNECTED;
+            g_logicConnected = 1;
+            log_i("[MCU] Auto-conectado por comando operacional 0x%02X", command);
+        }
     }
 
     switch (command) {
-
+        // ... resto del código
         case 0x01: {
             if (len < 12) break;
             byte l1 = challenge_buffer[0], l2 = challenge_buffer[1];
@@ -412,8 +406,9 @@ void processMackieSysEx(byte* payload, int len) {
 
         case 0x02: {
             handshakeState       = HandshakeState::IDLE;
-            logicConnectionState = ConnectionState::MIDI_HANDSHAKE_COMPLETE;
+            logicConnectionState = ConnectionState::CONNECTED;  // ← CORREGIR
             g_logicConnected     = 1;
+            log_i("[MCU] Host Connection Reply recibido — CONNECTED");
             break;
         }
 

@@ -106,6 +106,8 @@ static void processSlaveResponse(uint8_t slaveId) {
 // ====================================================================
 void taskCore0(void* pvParameters) {
     log_e("MIDI task arrancando en Core %d", xPortGetCoreID());
+    static unsigned long lastStatusLog = 0;  // ← MOVER AQUÍ
+    
     for (;;) {
         uint8_t rx_buf[64];
         uint32_t count = tud_midi_stream_read(rx_buf, sizeof(rx_buf));
@@ -122,10 +124,8 @@ void taskCore0(void* pvParameters) {
         }
 
         tickCalibracion();
-        vTaskDelay(1);
-    }
-    static unsigned long lastStatusLog = 0;
-    // Log de estado cada 2 segundos
+        
+        // ← LOG DE ESTADO (DENTRO DEL LOOP):
         if (millis() - lastStatusLog > 2000) {
             lastStatusLog = millis();
             
@@ -134,9 +134,11 @@ void taskCore0(void* pvParameters) {
             else if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) stateStr = "HANDSHAKE_OK";
             else if (logicConnectionState == ConnectionState::CONNECTED) stateStr = "CONNECTED";
             
-            log_i("[STATUS] %s | g_logicConnected=%d | Page=%d", 
-                  stateStr, g_logicConnected);
+            log_i("[STATUS] %s | g_logicConnected=%d", stateStr, g_logicConnected);
         }
+        
+        vTaskDelay(1);
+    }
 }
 
 // ====================================================================
