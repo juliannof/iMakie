@@ -21,7 +21,7 @@ const SatMenu::Item SatMenu::_mainItems[] = {
     {"RB","Reiniciar",   Scr::REINICIAR },
 };
 const SatMenu::Item SatMenu::_identItems[] = {
-    {"ID","Track ID (1-8)",   Scr::EDIT_TRACKID},
+    {"ID","Track ID (1-9)",   Scr::EDIT_TRACKID},
     {"LB","Etiqueta (6 chr)", Scr::EDIT_LABEL  },
 };
 const SatMenu::Item SatMenu::_motorItems[] = {

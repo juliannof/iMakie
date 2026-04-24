@@ -530,7 +530,6 @@ void processNote(byte status, byte note, byte velocity) {
     bool is_on       = ((status & 0xF0) == 0x90 && velocity > 0);
     bool is_flashing = ((status & 0xF0) == 0x90 && velocity == 1);
 
-
     if (note <= 31) {
         int group     = note / 8;
         int track_idx = note % 8;

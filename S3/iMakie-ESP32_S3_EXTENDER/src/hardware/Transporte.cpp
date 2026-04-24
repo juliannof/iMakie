@@ -33,7 +33,16 @@ static void onButtonPressed(Button2& b) {
     for (uint8_t i = 0; i < N; i++) {
         if (&buttons[i] == &b) {
             byte msg[3] = { 0x90, MIDI_NOTES[i], 0x7F };
-            log_i("[TRANSP] Botón %d → Note 0x%02X", i, MIDI_NOTES[i]);
+            sendMIDIBytes(msg, 3);
+            return;
+        }
+    }
+}
+
+static void onButtonReleased(Button2& b) {
+    for (uint8_t i = 0; i < N; i++) {
+        if (&buttons[i] == &b) {
+            byte msg[3] = { 0x80, MIDI_NOTES[i], 0x00 };
             sendMIDIBytes(msg, 3);
             return;
         }
@@ -45,6 +54,7 @@ void begin() {
         pinMode(LEDS[i], OUTPUT);
         setLed(LEDS[i], false);
         buttons[i].setPressedHandler(onButtonPressed);
+        buttons[i].setReleasedHandler(onButtonReleased);
     }
 
     // Secuencia de encendido

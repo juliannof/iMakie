@@ -152,24 +152,18 @@ ESP32-P4  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 ## Bugs conocidos activos
 
 ### P4
-1. **`uiOfflineCreate()` doble llamada en `setup()`** — primera antes de `prefs.begin()`, segunda después. Leak de LVGL garantizado. Fix: eliminar la primera llamada.
-2. **Ghost state en desconexión** — en SysEx `0x0F`, los arrays `recStates[]`, `soloStates[]`, `muteStates[]`, `selectStates[]`, `vuLevels[]`, `vuClipState[]`, `btnStatePG1[]`, `btnStatePG2[]` no se resetean. Ventana de estado fantasma visible en UI hasta que Logic sobrescribe.
+1. **`uiOfflineCreate()` doble llamada en `setup()`** — ~~primera antes de `prefs.begin()`, segunda después. Leak de LVGL garantizado.~~ **RESUELTO** — solo existe una llamada, después de `prefs.begin()`.
 
-### S2
-3. **Encoder sin lógica de lectura** — `pinMode` configurado en `Hardware.cpp` pero sin ISR ni lógica de decodificación cuadratura. Patrón ISR establecido en S3: `ENC_TABLE[16]`, `IRAM_ATTR`, lectura directa `GPIO.in`.
-4. **SatMenu Track ID limitado a 1–8** — pendiente extender a 1–9. Portal OTA de WiFiManager usa 1–17 erróneamente — corregir a 1–9.
+### S3 Extender
+- **Note Off ausente en botones de transporte** — ~~`onButtonPressed` enviaba Note On pero no había handler de release; Logic veía los botones como eternamente pulsados.~~ **RESUELTO** — añadido `onButtonReleased` en `Transporte.cpp` que envía `0x80 + note + 0x00` al soltar.
 
 ---
 
 ## Pendientes ordenados por prioridad
 
-1. Fix P4: eliminar primera llamada `uiOfflineCreate()` en `setup()`
-2. Fix P4: reset de arrays de estado en evento disconnect `0x0F`
-3. S2: implementar ISR encoder cuadratura (GPIO12/13/21)
-4. S2: extender Track ID editor en SatMenu a 1–9
-5. S2: FaderTouch por varianza (plástico) — `TOUCH_VAR_THRESHOLD` etc ya en `config.h`
-6. S3/P4 MCU: VPot ring LEDs (CC 16–23, 48–55), jog wheel (CC 60), transport LEDs (notas 91–95), rude solo (nota 115)
-7. P4: considerar mutex o double-buffer en `vuLevels[]`
+1. S2: FaderTouch por varianza (plástico) — `TOUCH_VAR_THRESHOLD` etc ya en `config.h`
+2. S3/P4 MCU: VPot ring LEDs (CC 16–23, 48–55), jog wheel (CC 60), transport LEDs (notas 91–95), rude solo (nota 115)
+3. P4: considerar mutex o double-buffer en `vuLevels[]`
 
 ---
 

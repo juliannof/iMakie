@@ -458,6 +458,22 @@ void processMackieSysEx(byte* payload, int len) {
             fadersAtMinMask      = 0;
             firstFaderMinTime    = 0;
             g_switchToOffline    = true;
+            memset(recStates,    0, sizeof(recStates));
+            memset(soloStates,   0, sizeof(soloStates));
+            memset(muteStates,   0, sizeof(muteStates));
+            memset(selectStates, 0, sizeof(selectStates));
+            memset(vuLevels,     0, sizeof(vuLevels));
+            memset(vuClipState,  0, sizeof(vuClipState));
+            memset(vuPeakLevels, 0, sizeof(vuPeakLevels));
+            memset(faderPositions, 0, sizeof(faderPositions));
+            memset(btnStatePG1,  0, sizeof(bool) * 32);
+            memset(btnStatePG2,  0, sizeof(bool) * 32);
+            memset(btnFlashPG1,  0, sizeof(bool) * 32);
+            memset(btnFlashPG2,  0, sizeof(bool) * 32);
+            memset(g_channelAutoMode, 0, sizeof(g_channelAutoMode));
+            g_selectedChannel = -1;
+            for (int i = 0; i < 9; i++) trackNames[i] = "";
+            for (uint8_t i = 1; i <= NUM_SLAVES; i++) rs485.setFlags(i, 0);
             log_i("[MCU] GoOffline recibido");
             break;
         }

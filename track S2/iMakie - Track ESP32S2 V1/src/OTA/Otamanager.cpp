@@ -55,7 +55,7 @@ void OtaManager::launchPortal() {
     wm.setBreakAfterConfig(true);
 
     WiFiManagerParameter paramOtaPass("otapass", "OTA Password", "", 32);
-    WiFiManagerParameter paramTrackId("trackid", "Track ID (1-17)", defaultId, 3);
+    WiFiManagerParameter paramTrackId("trackid", "Track ID (1-9)", defaultId, 3);
     wm.addParameter(&paramOtaPass);
     wm.addParameter(&paramTrackId);
 
