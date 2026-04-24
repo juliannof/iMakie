@@ -167,6 +167,8 @@ void setup() {
     Serial.println("------------------------------------");
     
     // Configurar pines
+    pinMode(8, OUTPUT);
+    digitalWrite(8, LOW);
     pinMode(ENABLE_PIN, OUTPUT);
     digitalWrite(ENABLE_PIN, HIGH);
     
@@ -362,14 +364,24 @@ void loop() {
     }
 
     static unsigned long lastRead = 0;
+    static bool ledOn = false;
+    static unsigned long ledTime = 0;
     if (millis() - lastRead > 1000) {
         lastRead = millis();
         float d = measureDistance();
         if (d > 0 && d < UMBRAL_DISTANCIA) {
             Serial.println("[SENSOR] Detectado!");
+            digitalWrite(8, HIGH);
+            ledOn = true;
+            ledTime = millis();
             triggerWLED();
         }
-    }
+
+        if (ledOn && millis() - ledTime > 200) {
+            digitalWrite(8, LOW);
+            ledOn = false;
+        }
+    ?}
 
 
     
