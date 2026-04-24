@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
 #include <AccelStepper.h>
 #include "config.h"
 
@@ -34,24 +36,19 @@ volatile bool endstopTriggered = false;
 unsigned long lastSensorRead = 0;
 unsigned long errorStateStartTime = 0;
 
-// ============================================================================
-// CONTROL DEL RELÉ
-// ============================================================================
-void relayOn() {
-    digitalWrite(RELAY_PIN, HIGH);
-    Serial.println("[RELAY] 10V ON");
-}
-
-void relayOff() {
-    digitalWrite(RELAY_PIN, LOW);
-    Serial.println("[RELAY] 10V OFF");
-}
 
 // ============================================================================
 // INTERRUPCIÓN FINAL DE CARRERA
 // ============================================================================
+
 void IRAM_ATTR handleEndstop() {
-    endstopTriggered = true;
+    if (digitalRead(ENDSTOP_PIN) == LOW) {  // Verificar que sigue LOW
+        unsigned long now = millis();
+        if (now - lastEndstopTime > ENDSTOP_DEBOUNCE) {
+            endstopTriggered = true;
+            lastEndstopTime = now;
+        }
+    }
 }
 
 // ============================================================================
@@ -119,6 +116,48 @@ void performHoming() {
 }
 
 // ============================================================================
+// TRIGGER WLED
+// ============================================================================
+void triggerWLED() {
+    Serial.println("[WLED] Conectando WiFi...");
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    
+    unsigned long start = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - start < 10000) {
+    delay(1);
+    }
+    
+    if (WiFi.status() == WL_CONNECTED) {
+        HTTPClient http;
+        http.begin("http://" WLED_IP "/win&T=2");  // T=2 = toggle
+        int code = http.GET();
+        http.end();
+        
+        Serial.println(code == 200 ? "[WLED] ✓ Toggle" : "[WLED] ✗ Error");
+    } else {
+        Serial.println("[WLED] ✗ WiFi timeout");
+    }
+    
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+}
+
+// ============================================================================
+// CONTROL DEL RELÉ
+// ============================================================================
+void relayOn() {
+    digitalWrite(RELAY_PIN, HIGH);
+    Serial.println("[RELAY] 10V ON");
+    //triggerWLED();
+}
+
+void relayOff() {
+    digitalWrite(RELAY_PIN, LOW);
+    Serial.println("[RELAY] 10V OFF");
+}
+
+
+// ============================================================================
 // SETUP
 // ============================================================================
 void setup() {
@@ -133,6 +172,11 @@ void setup() {
     
     pinMode(ENDSTOP_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(ENDSTOP_PIN), handleEndstop, FALLING);
+    // AÑADIR ESTO:
+    delay(100);
+    if (digitalRead(ENDSTOP_PIN) == LOW) {
+        Serial.println("[ERROR] FDC activado en reposo - cable invertido o roto");
+    }
     
     pinMode(TRIG_PIN, OUTPUT);
     pinMode(ECHO_PIN, INPUT);
@@ -147,8 +191,12 @@ void setup() {
     stepper.setAcceleration(ACCELERATION);
     stepper.disableOutputs();
 
+
+
     // Ejecutar homing
-    performHoming();
+    // Comentado para pruebas sin FDC, descomentar para uso real con FDC
+    //performHoming();
+    currentMotorState = IDLE_AT_HOME_POSITION;
 }
 
 // ============================================================================
@@ -231,6 +279,7 @@ void loop() {
         float distance = measureDistance();
         
         if (distance > 0 && distance < UMBRAL_DISTANCIA) {
+            triggerWLED();
             if (currentMotorState == IDLE_AT_HOME_POSITION || currentMotorState == IDLE_AWAY_FROM_HOME) {
                 Serial.print("Sensor activado a ");
                 Serial.print(distance);
@@ -304,4 +353,24 @@ void loop() {
             errorStateStartTime = millis();
             break;
     }
-}
+
+    static bool done = false;
+    static unsigned long t0 = millis();
+    if (!done && millis() - t0 >= (RELAY_ACTIVATION_TIME * 1000)) {
+        relayOn();
+        done = true;
+    }
+
+    static unsigned long lastRead = 0;
+    if (millis() - lastRead > 1000) {
+        lastRead = millis();
+        float d = measureDistance();
+        if (d > 0 && d < UMBRAL_DISTANCIA) {
+            Serial.println("[SENSOR] Detectado!");
+            triggerWLED();
+        }
+    }
+
+
+    
+} // Fin del loop

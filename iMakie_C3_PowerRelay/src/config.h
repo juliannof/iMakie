@@ -25,7 +25,7 @@
 #define ENDSTOP_PIN         21      // Final de carrera (INPUT_PULLUP)
 
 // Relé de 10V
-#define RELAY_PIN           2       // Control del relé (GPIO2)
+#define RELAY_PIN            1       // Control del relé (GPIO2)
 
 // ============================================================================
 // PARÁMETROS DEL MOTOR
@@ -50,3 +50,22 @@
 // ============================================================================
 
 #define SERIAL_BAUD_RATE    115200      // Velocidad del puerto serie
+
+// ============================================================================
+// ANTIREBOTE DEL FDC
+// ============================================================================
+
+volatile unsigned long lastEndstopTime = 0;
+const unsigned long ENDSTOP_DEBOUNCE = 50;  // 50ms
+
+// ============================================================================
+// RELÉ
+// ============================================================================
+#define RELAY_ACTIVATION_TIME   15     // Segundos
+
+// ============================================================================
+// WIFI (opcional, para futuras funciones de monitoreo remoto)
+// ============================================================================
+#define WIFI_SSID       "Julianno-WiFi"
+#define WIFI_PASSWORD   "JULIANf1"
+#define WLED_IP         "192.168.1.195"
