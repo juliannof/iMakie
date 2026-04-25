@@ -78,15 +78,27 @@ void begin() {
 }
 
 void setLedByNote(uint8_t note, bool on) {
-    log_i("[TRANSP LED] note=0x%02X(%d) on=%d", note, note, on);
+    // Nota 94 (0x5E = PLAY): Play y Stop son complementarios
+    if (note == 0x5E) {
+        log_i("[TRANSP LED] PLAY note on=%d", on);
+        setLed(LED_PLAY, on);
+        setLed(LED_STOP, !on);
+        return;
+    }
+    // Nota 97 (0x61 = REC global según Logic)
+    if (note == 0x61) {
+        log_i("[TRANSP LED] REC(97) note on=%d", on);
+        setLed(LED_REC, on);
+        return;
+    }
+    // Resto: FF (0x5C), RW (0x5B), REC (0x5F fallback)
     for (uint8_t i = 0; i < N; i++) {
         if (MCU_TRANSPORT_NOTES[i] == note) {
-            log_i("[TRANSP LED] MATCH idx=%d pin=%d", i, LEDS[i]);
+            log_i("[TRANSP LED] MATCH note=0x%02X pin=%d on=%d", note, LEDS[i], on);
             setLed(LEDS[i], on);
             return;
         }
     }
-    log_i("[TRANSP LED] no match");
 }
 
 void update() {

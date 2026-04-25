@@ -325,15 +325,6 @@ void processMackieSysEx(byte* payload, int len) {
     }
 
     switch (command) {
-        case 0x00: {
-            // Device Query — Logic pregunta quién está ahí
-            byte reply[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x01,
-                            0x00, 0x00, 0x00, 0x01,    // Serial
-                            0x01, 0x02, 0x00, 0x00,     // Versión: 1.2.0.0 (binario)
-                            0xF7};
-            sendMIDIBytes(reply, sizeof(reply));
-            break;
-        }
 
         case 0x0F: {
             logicConnectionState = ConnectionState::DISCONNECTED;
@@ -449,7 +440,15 @@ void processMackieSysEx(byte* payload, int len) {
             break;
         }
 
-        case 0x20: case 0x21:
+        case 0x21: {
+            // Host Connection Query — echo inmediato, sin ningún otro mensaje antes
+            byte echo[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x21, 0x01, 0xF7};
+            sendMIDIBytes(echo, sizeof(echo));
+            log_i("[MCU] 0x21 echo — handshake completo");
+            break;
+        }
+
+        case 0x20:
         case 0x0A: case 0x0B: case 0x0C: {
             byte echo[32];
             int  elen = len + 2;
