@@ -313,17 +313,6 @@ void processMackieSysEx(byte* payload, int len) {
 
     if (device_family != 0x14 && device_family != 0x15) return;
 
-    // ✅ AUTO-CONECTAR: Si recibimos comandos operacionales y NO estamos conectados
-    if (logicConnectionState != ConnectionState::CONNECTED) {
-        if (command == 0x0E || command == 0x12 || command == 0x72 || 
-            command == 0x20 || command == 0x21 || command == 0x0A || 
-            command == 0x0B || command == 0x0C) {
-            logicConnectionState = ConnectionState::CONNECTED;
-            g_logicConnected = 1;
-            log_i("[MCU] Auto-conectado por comando operacional 0x%02X", command);
-        }
-    }
-
     switch (command) {
 
         case 0x0F: {
@@ -333,24 +322,6 @@ void processMackieSysEx(byte* payload, int len) {
             firstFaderMinTime    = 0;
             g_switchToOffline    = true;
             log_i("[MCU] GoOffline recibido");
-            break;
-        }
-
-        case 0x13: {
-            // Host Connection Query — Logic pide confirmación para conectar
-            byte reply[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x14, 0x00, 0xF7};
-            sendMIDIBytes(reply, sizeof(reply));
-            logicConnectionState = ConnectionState::CONNECTED;
-            g_logicConnected     = 1;
-            log_i("[MCU] Host Connection Query 0x13 recibido — CONNECTED");
-            break;
-        }
-
-        case 0x15: {
-            // Firmware Version Request
-            byte version_reply[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x15,
-                '1', '.', '2', '.', '0', 0xF7};
-            sendMIDIBytes(version_reply, sizeof(version_reply));
             break;
         }
 
@@ -441,10 +412,17 @@ void processMackieSysEx(byte* payload, int len) {
         }
 
         case 0x21: {
-            // Host Connection Query — echo inmediato, sin ningún otro mensaje antes
+            // Fase 2 CRÍTICA — echo inmediato
             byte echo[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x21, 0x01, 0xF7};
             sendMIDIBytes(echo, sizeof(echo));
-            log_i("[MCU] 0x21 echo — handshake completo");
+            if (logicConnectionState != ConnectionState::CONNECTED) {
+                logicConnectionState = ConnectionState::CONNECTED;
+                g_logicConnected     = 1;
+                connectedSinceTime   = millis();
+                _calibPendingFrom    = 1;
+                _calibNextTime       = millis();
+                log_i("[MCU] 0x21 — CONNECTED");
+            }
             break;
         }
 
