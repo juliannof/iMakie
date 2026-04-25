@@ -208,6 +208,13 @@ void setup() {
     // 2. Display + LVGL
     log_i("2. initDisplay()...");
     initDisplay();
+    {
+        Preferences bprefs;
+        bprefs.begin("uimenu", true);
+        uint8_t brightness = bprefs.getUChar("brightness", 80);
+        bprefs.end();
+        displaySetBrightness(brightness);
+    }
     log_i("   Display OK");
 
     // 3. Preferences

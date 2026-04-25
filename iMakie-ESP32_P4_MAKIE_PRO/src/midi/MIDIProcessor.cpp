@@ -16,14 +16,6 @@ namespace {
     bool in_sysex = false;
     byte last_status_byte = 0;
 
-    enum class HandshakeState {
-        IDLE,
-        AWAITING_CHALLENGE_BYTES
-    };
-    HandshakeState handshakeState = HandshakeState::IDLE;
-    byte challenge_buffer[7];
-    int challenge_idx = 0;
-
     static uint16_t fadersAtMinMask = 0;
     static unsigned long firstFaderMinTime = 0;
     static const uint16_t ALL_FADERS_MIN_MASK = 0x01FF;
@@ -33,8 +25,6 @@ namespace {
     static const int DISCONNECT_THRESHOLD = 9;
     static const unsigned long DISCONNECT_WINDOW_MS = 150;
 
-    unsigned long lastVersionReplyTime = 0;
-    const unsigned long VERSION_REPLY_COOLDOWN_MS = 200;
     static int8_t  g_selectedChannel    = -1;
     static unsigned long connectedSinceTime  = 0;
     static const unsigned long CONNECT_GRACE_MS = 1500;
@@ -43,10 +33,8 @@ namespace {
 }
 
 void processMidiByte(byte b);
-void onHostQueryDetected();
 void processMackieSysEx(byte* payload, int len);
 void processNote(byte status, byte note, byte velocity);
-void handleMcuHandshake(byte* challenge_code);
 void processChannelPressure(byte channel, byte value);
 void processControlChange(byte channel, byte controller, byte value);
 void processPitchBend(byte channel, int bendValue);
@@ -148,16 +136,10 @@ void processMidiByte(byte b) {
     if (b >= 0xF8) return;
 
     if (b & 0x80) {
-        if (b == 0xF0) { 
-            in_sysex = true; 
+        if (b == 0xF0) {
+            in_sysex = true;
             midi_idx = 0;
-            // CRÍTICO: Si recibimos nuevo SysEx mientras esperamos challenge, resetear
-            if (handshakeState == HandshakeState::AWAITING_CHALLENGE_BYTES) {
-                handshakeState = HandshakeState::IDLE;
-                challenge_idx  = 0;
-                log_v("[MCU] SysEx nuevo — handshake reseteado");
-            }
-            return; 
+            return;
         }
         if (b == 0xF7) {
             if (in_sysex) { in_sysex = false; processMackieSysEx(midi_buffer, midi_idx); }
@@ -165,8 +147,6 @@ void processMidiByte(byte b) {
         }
         if (in_sysex) {
             in_sysex = false;
-            if (handshakeState == HandshakeState::AWAITING_CHALLENGE_BYTES)
-                handshakeState = HandshakeState::IDLE;
         }
         last_status_byte = b;
         midi_idx = 0;
@@ -174,15 +154,6 @@ void processMidiByte(byte b) {
     }
 
     if (in_sysex) {
-        if (handshakeState == HandshakeState::AWAITING_CHALLENGE_BYTES) {
-            if (challenge_idx < 7) {
-                challenge_buffer[challenge_idx++] = b;
-                if (challenge_idx == 7) {
-                    handleMcuHandshake(challenge_buffer);
-                    handshakeState = HandshakeState::IDLE;
-                }
-            }
-        }
         if (midi_idx < (int)sizeof(midi_buffer)) midi_buffer[midi_idx++] = b;
         return;
     }
@@ -218,44 +189,6 @@ void processMidiByte(byte b) {
     }
 }
 
-void handleMcuHandshake(byte* challenge_code) {
-    // REGLA 1: Rechazar challenge cero
-    if (challenge_code[0] == 0 && challenge_code[1] == 0 && 
-        challenge_code[2] == 0 && challenge_code[3] == 0) {
-        log_w("[MCU] Challenge cero recibido — ignorando");
-        handshakeState = HandshakeState::IDLE;
-        return;
-    }
-
-    // REGLA 2: Cooldown 500ms — ignorar challenges duplicados
-    static unsigned long lastHandshakeTime = 0;
-    if (millis() - lastHandshakeTime < 500) {
-        log_v("[MCU] Challenge ignorado — cooldown activo");
-        handshakeState = HandshakeState::IDLE;
-        return;
-    }
-    lastHandshakeTime = millis();
-
-    // REGLA 3: Responder challenge
-    ConnectionState previousState = logicConnectionState;
-    byte response[15] = { 0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x01, 0x00,
-                          challenge_code[0], challenge_code[1], challenge_code[2],
-                          challenge_code[3], challenge_code[4], challenge_code[5],
-                          challenge_code[6], 0xF7 };
-    sendMIDIBytes(response, sizeof(response));
-    
-    // REGLA 4: Enviar GoOnline
-    byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x02, 0xF7};
-    sendMIDIBytes(online_msg, sizeof(online_msg));
-    
-    // REGLA 5: Actualizar estado + FLAG DE PANTALLA
-    if (previousState != ConnectionState::CONNECTED) {
-        logicConnectionState = ConnectionState::MIDI_HANDSHAKE_COMPLETE;
-        needsTOTALRedraw = true;
-    }
-    
-    log_i("[MCU] Challenge respondido + GoOnline enviado");
-}
 
 void processControlChange(byte channel, byte controller, byte value) {
     log_d("CC CH=%d, CC=%d, Val=0x%02X", channel, controller, value);
@@ -386,69 +319,15 @@ void processMackieSysEx(byte* payload, int len) {
 
     if (device_family != 0x14 && device_family != 0x15) return;
 
-    if (command == 0x00 && len == 5) {
-        // REGLA 1: Si ya estamos CONNECTED → GoOnline directo (reconexión rápida)
-        if (logicConnectionState == ConnectionState::CONNECTED) {
-            fadersAtMinMask      = 0;
-            firstFaderMinTime    = 0;
-            lastMidiActivityTime = millis();
-            byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x02, 0xF7};
-            sendMIDIBytes(online_msg, sizeof(online_msg));
-            return;
-        }
-
-        // REGLA 2: Ignorar Device Query si ya hay handshake en curso
-        if (handshakeState == HandshakeState::AWAITING_CHALLENGE_BYTES) {
-            log_v("[MCU] Device Query ignorado — handshake en curso");
-            return;
-        }
-        if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) {
-            log_v("[MCU] Device Query ignorado — handshake completo");
-            return;
-        }
-
-        // REGLA 3: Generar challenge
-        byte l1 = random(0x01, 0x7F), l2 = random(0x01, 0x7F);
-        byte l3 = random(0x01, 0x7F), l4 = random(0x01, 0x7F);
-        
-        challenge_buffer[0] = l1; challenge_buffer[1] = l2;
-        challenge_buffer[2] = l3; challenge_buffer[3] = l4;
-        
-        byte response[15] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x01, 0x00,
-                             l1, l2, l3, l4, 0x00, 0x00, 0x00, 0xF7};
-        sendMIDIBytes(response, sizeof(response));
-        
-        handshakeState = HandshakeState::AWAITING_CHALLENGE_BYTES;
-        challenge_idx  = 0;
-        
-        log_i("[MCU] Device Query → Challenge enviado");
-        return;
-    }
-
     switch (command) {
 
-        case 0x01: {
-            if (len < 12) break;
-            
-            // Validar challenge no-cero
-            byte l1 = challenge_buffer[0], l2 = challenge_buffer[1];
-            byte l3 = challenge_buffer[2], l4 = challenge_buffer[3];
-            
-            if (l1 == 0 && l2 == 0 && l3 == 0 && l4 == 0) {
-                log_w("[MCU] Logic envió challenge cero — ignorando");
-                handshakeState = HandshakeState::IDLE;
-                break;
-            }
-            
-            // No validamos respuesta, enviar GoOnline directo
-            byte online_msg[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x02, 0xF7};
-            sendMIDIBytes(online_msg, sizeof(online_msg));
-            
-            handshakeState       = HandshakeState::IDLE;
-            logicConnectionState = ConnectionState::MIDI_HANDSHAKE_COMPLETE;
-            needsTOTALRedraw     = true;
-            
-            log_i("[MCU] GoOnline enviado — handshake completo");
+        case 0x00: {
+            // Device Query — Logic pregunta quién está ahí
+            byte reply[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x01,
+                            0x00, 0x00, 0x00, 0x01,    // Serial
+                            0x31, 0x32, 0x30, 0x30,    // Versión "1200"
+                            0xF7};
+            sendMIDIBytes(reply, sizeof(reply));
             break;
         }
 
@@ -479,13 +358,35 @@ void processMackieSysEx(byte* payload, int len) {
         }
 
         case 0x13: {
-            unsigned long now = millis();
-            if (now - lastVersionReplyTime > VERSION_REPLY_COOLDOWN_MS) {
-                byte version_reply[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, VERSION_REPLY_CMD,
-                        '1', '.', '2', '.', '0', 0xF7};
-                sendMIDIBytes(version_reply, sizeof(version_reply));
-                lastVersionReplyTime = now;
+            // Host Connection Query — Logic siempre espera 0x14
+            byte reply[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x14, 0x00, 0xF7};
+            sendMIDIBytes(reply, sizeof(reply));
+            if (logicConnectionState != ConnectionState::CONNECTED) {
+                logicConnectionState = ConnectionState::CONNECTED;
+                g_logicConnected     = 1;
+                connectedSinceTime   = millis();
+                needsTOTALRedraw     = true;
+                fadersAtMinMask      = 0;
+                for (uint8_t i = 0; i < 8; i++) {
+                    if (selectStates[i]) {
+                        byte offMsg[3] = { 0x80, (uint8_t)(24 + i), 0x00 };
+                        sendMIDIBytes(offMsg, 3);
+                        selectStates[i] = false;
+                    }
+                }
+                _calibPendingFrom = 1;
+                _calibNextTime    = millis();
+                g_switchToPage3   = true;
+                log_i("[MCU] Host Connection Query 0x13 — CONNECTED");
             }
+            break;
+        }
+
+        case 0x15: {
+            // Firmware Version Request
+            byte version_reply[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x15,
+                    '1', '.', '2', '.', '0', 0xF7};
+            sendMIDIBytes(version_reply, sizeof(version_reply));
             break;
         }
 
@@ -694,26 +595,6 @@ void processPitchBend(byte channel, int bendValue) {
         }
     } else {
         fadersAtMinMask &= ~(1 << channel);
-    }
-
-    if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) {
-        logicConnectionState = ConnectionState::CONNECTED;
-        g_logicConnected     = 1;
-        connectedSinceTime   = millis();
-        needsTOTALRedraw     = true;
-        fadersAtMinMask      = 0;
-        for (uint8_t i = 0; i < 8; i++) {
-            if (selectStates[i]) {
-                byte offMsg[3] = { 0x80, (uint8_t)(24 + i), 0x00 };
-                sendMIDIBytes(offMsg, 3);
-                selectStates[i] = false;
-            }
-        }
-        _calibPendingFrom = 1;
-        _calibNextTime    = millis();
-        log_i("[CALIB] Secuencia iniciada para %d slaves", NUM_SLAVES);
-        g_switchToPage3 = true;
-        log_d("DAW conectado: Primer PitchBend Track %d -> CONNECTED.", channel + 1);
     }
 
     if (channel < 9) {

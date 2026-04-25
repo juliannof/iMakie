@@ -124,7 +124,7 @@ void taskCore0(void* pvParameters) {
         }
 
         tickCalibracion();
-        
+
         // ← LOG DE ESTADO (DENTRO DEL LOOP):
         if (millis() - lastStatusLog > 2000) {
             lastStatusLog = millis();
