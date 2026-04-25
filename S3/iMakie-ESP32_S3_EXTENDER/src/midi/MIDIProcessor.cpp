@@ -329,7 +329,7 @@ void processMackieSysEx(byte* payload, int len) {
             // Device Query — Logic pregunta quién está ahí
             byte reply[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x01,
                             0x00, 0x00, 0x00, 0x01,    // Serial
-                            0x31, 0x32, 0x30, 0x30,    // Versión "1200"
+                            0x01, 0x02, 0x00, 0x00,     // Versión: 1.2.0.0 (binario)
                             0xF7};
             sendMIDIBytes(reply, sizeof(reply));
             break;
@@ -449,6 +449,20 @@ void processMackieSysEx(byte* payload, int len) {
             break;
         }
 
+        case 0x20: case 0x21:
+        case 0x0A: case 0x0B: case 0x0C: {
+            byte echo[32];
+            int  elen = len + 2;
+            if (elen <= (int)sizeof(echo)) {
+                echo[0] = 0xF0;
+                memcpy(echo + 1, payload, len);
+                echo[len + 1] = 0xF7;
+                sendMIDIBytes(echo, elen);
+                log_i("[MCU] Echo cmd=0x%02X (%d bytes)", command, elen);
+            }
+            break;
+        }
+
         default:
             log_v("processMackieSysEx: Comando 0x%02X no manejado.", command);
             break;
@@ -458,6 +472,8 @@ void processMackieSysEx(byte* payload, int len) {
 void processNote(byte status, byte note, byte velocity) {
     bool is_on       = ((status & 0xF0) == 0x90 && velocity > 0);
     bool is_flashing = ((status & 0xF0) == 0x90 && velocity == 1);
+
+    log_i("[NOTE] st=0x%02X note=0x%02X(%d) vel=%d is_on=%d", status, note, note, velocity, is_on);
 
     if (note <= 31) {
         int group     = note / 8;

@@ -10,8 +10,8 @@
     #define NUM_SLAVES          9
 
 #elif defined(DEVICE_S3_EXTENDER)
-    #define DEVICE_FAMILY       0x15
-    #define VERSION_REPLY_CMD   0x15
+    #define DEVICE_FAMILY       0x14
+    #define VERSION_REPLY_CMD   0x14
     #define NUM_SLAVES          8
 
 #else

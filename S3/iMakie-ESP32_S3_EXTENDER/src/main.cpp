@@ -134,7 +134,7 @@ void taskCore0(void* pvParameters) {
             else if (logicConnectionState == ConnectionState::MIDI_HANDSHAKE_COMPLETE) stateStr = "HANDSHAKE_OK";
             else if (logicConnectionState == ConnectionState::CONNECTED) stateStr = "CONNECTED";
             
-            log_i("[STATUS] %s | g_logicConnected=%d", stateStr, g_logicConnected);
+            log_v("[STATUS] %s | g_logicConnected=%d", stateStr, g_logicConnected);
         }
         
         vTaskDelay(1);

@@ -55,7 +55,7 @@
 // ANTIREBOTE DEL FDC
 // ============================================================================
 
-volatile unsigned long lastEndstopTime = 0;
+//volatile unsigned long lastEndstopTime = 0;
 const unsigned long ENDSTOP_DEBOUNCE = 50;  // 50ms
 
 // ============================================================================
