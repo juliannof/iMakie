@@ -47,6 +47,8 @@ DisplayMode currentTimecodeMode = MODE_BEATS;
 TaskHandle_t taskCore0Handle = NULL;
 TaskHandle_t taskCore1Handle = NULL;
 
+uint8_t g_savedBrightness = 80;
+
 extern void handleVUMeterDecay();
 
 volatile bool g_switchToPage3 = false;

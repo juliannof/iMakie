@@ -75,8 +75,7 @@ void uiOfflineCreate(lv_obj_t* parent) {
     lv_obj_set_style_transform_rotation(s_blink_label, 900, 0);
     lv_obj_set_style_transform_pivot_x(s_blink_label, LV_PCT(50), 0);
     lv_obj_set_style_transform_pivot_y(s_blink_label, LV_PCT(50), 0);
-    lv_obj_add_flag(s_blink_label, LV_OBJ_FLAG_HIDDEN);
-
+    // label visible desde el arranque
     s_logo_reveal    = 0;
     s_blink_cnt      = 0;
     s_lastTick       = 0;
@@ -102,13 +101,12 @@ void uiOfflineTick() {
         }
     }
 
-    if (s_logo_reveal >= LOGO_W) {
-        s_blink_cnt++;
-        if ((s_blink_cnt & 0x1F) == 0) {
-            bool show = (s_blink_cnt & 0x20);
-            if (show) lv_obj_remove_flag(s_blink_label, LV_OBJ_FLAG_HIDDEN);
-            else      lv_obj_add_flag(s_blink_label, LV_OBJ_FLAG_HIDDEN);
-        }
+    // parpadeo del label siempre activo, independiente del logo
+    s_blink_cnt++;
+    if ((s_blink_cnt & 0x1F) == 0) {
+        bool show = !(s_blink_cnt & 0x20);
+        if (show) lv_obj_remove_flag(s_blink_label, LV_OBJ_FLAG_HIDDEN);
+        else      lv_obj_add_flag(s_blink_label, LV_OBJ_FLAG_HIDDEN);
     }
 }
 

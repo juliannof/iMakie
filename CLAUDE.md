@@ -153,9 +153,12 @@ ESP32-P4  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 
 ### P4
 1. **`uiOfflineCreate()` doble llamada en `setup()`** — ~~primera antes de `prefs.begin()`, segunda después. Leak de LVGL garantizado.~~ **RESUELTO** — solo existe una llamada, después de `prefs.begin()`.
+2. **Pantalla negra en boot** — Dos causas independientes: (a) ~~backlight off si `lastPage` era 1 o 2 (backlight solo se encendía vía `uiMenuInit()` → `uiPage3Create()`). Fix: `displaySetBrightness()` en `setup()` después de `initDisplay()`.~~ **RESUELTO**. (b) ~~`UIOffline` empieza con `s_blink_label` en HIDDEN y solo lo muestra cuando el logo termina de revelarse (~5-6 s); sin logo, pantalla negra permanente.~~ **RESUELTO** — label visible desde el inicio, parpadeo activo desde el primer tick independientemente del estado del logo.
+3. **Handshake MCU incorrecto** — ~~código antiguo implementaba un challenge/response propio; P4 actuaba como HOST generando challenges aleatorios.~~ **RESUELTO** — ver sección "Mackie MCU — handshake" abajo.
 
 ### S3 Extender
 - **Note Off ausente en botones de transporte** — ~~`onButtonPressed` enviaba Note On pero no había handler de release; Logic veía los botones como eternamente pulsados.~~ **RESUELTO** — añadido `onButtonReleased` en `Transporte.cpp` que envía `0x80 + note + 0x00` al soltar.
+- **Handshake MCU incorrecto** — ~~mismo problema que P4; S3 anunciaba `0x00` periódicamente siendo Logic quien debe iniciar.~~ **RESUELTO** — protocolo estándar implementado (commit d80f15f).
 
 ---
 
@@ -183,6 +186,23 @@ Flags slave → master incluyen `SLAVE_FLAG_NOT_CALIBRATED`. Master detecta y di
 - SELECT es latch-style
 - MIDI fader max para recorrido físico completo: **14848** (no 16383)
 - `track_idx = currentOffset / 7`, `char_pos = currentOffset % 7` — parser SysEx `0x12`
+
+### Mackie MCU — handshake correcto
+
+Logic es siempre el iniciador. El dispositivo nunca envía `0x00` por su cuenta.
+
+```
+Logic → Device:  F0 00 00 66 <family> 00 F7          (Device Query)
+Device → Logic:  F0 00 00 66 <family> 01 <serial 4B> <version 4B> F7
+
+Logic → Device:  F0 00 00 66 <family> 13 F7          (Host Connection Query, 8-10 veces)
+Device → Logic:  F0 00 00 66 <family> 14 00 F7       → logicConnectionState = CONNECTED
+```
+
+- `DEVICE_FAMILY`: `0x14` = P4 MCU, `0x15` = S3 Extender
+- Logic sondea múltiples familias (0x10, 0x11, 0x14, 0x15, 0x17) — responder solo a la propia
+- `case 0x13` en `processMackieSysEx` tiene guard `if (logicConnectionState != CONNECTED)` para no re-disparar calibración y cambio de página en las 8-10 queries repetidas
+- `case 0x15` responde con versión de firmware (`F0 00 00 66 <family> 15 '1'.'.'2'.'.'0' F7`)
 
 ---
 
