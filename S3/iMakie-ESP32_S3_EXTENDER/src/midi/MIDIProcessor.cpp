@@ -426,8 +426,18 @@ void processMackieSysEx(byte* payload, int len) {
             break;
         }
 
+        case 0x0C: {
+            // Echo Surface Type + suscripción a feedback
+            byte echo[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x0C, 0x00, 0xF7};
+            sendMIDIBytes(echo, sizeof(echo));
+            byte sub[]  = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x10, 0x00, 0xF7};
+            sendMIDIBytes(sub, sizeof(sub));
+            log_i("[MCU] 0x0C echo + 0x10 suscripcion feedback");
+            break;
+        }
+
         case 0x20:
-        case 0x0A: case 0x0B: case 0x0C: {
+        case 0x0A: case 0x0B: {
             byte echo[32];
             int  elen = len + 2;
             if (elen <= (int)sizeof(echo)) {
