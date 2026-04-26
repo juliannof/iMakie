@@ -128,10 +128,14 @@ void setup() {
     // Configurar pines del sensor
     pinMode(TRIG_PIN, OUTPUT);
     pinMode(ECHO_PIN, INPUT);
-    
+
+    // Configurar pin del relé
+    pinMode(RELAY_PIN, OUTPUT);
+    digitalWrite(RELAY_PIN, LOW);
+
     // Configurar pin de LED indicador (opcional)
     pinMode(8, OUTPUT);
-    digitalWrite(8, LOW);
+    digitalWrite(8, HIGH);
     
     // Configurar motor (inicializado pero no se usa)
     pinMode(ENABLE_PIN, OUTPUT);
@@ -170,9 +174,9 @@ void loop() {
                 toggleWLED();
                 
                 // LED indicador (opcional)
-                digitalWrite(8, HIGH);
-                delay(200);
                 digitalWrite(8, LOW);
+                delay(200);
+                digitalWrite(8, HIGH);
             }
         }
     }

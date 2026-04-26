@@ -25,7 +25,7 @@
 #define ENDSTOP_PIN         21      // Final de carrera (INPUT_PULLUP)
 
 // Relé de 10V
-#define RELAY_PIN            1       // Control del relé (GPIO2)
+#define RELAY_PIN            1       // Control del relé (GPIO1)
 
 // ============================================================================
 // PARÁMETROS DEL MOTOR
