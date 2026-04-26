@@ -515,16 +515,16 @@ void SatMenu::_tickTestFader(Btn b) {
     }
     y+=108;
     _drawHints("","","Atras","Calibrar");
+    _push();
 }
 
 void SatMenu::_tickTestTouch(Btn b) {
-    if (b == Btn::BACK) { _goto(Scr::DIAG); return; }
+    if (b == Btn::BACK) { _tchBase = 0; _goto(Scr::DIAG); return; }
 
     unsigned long now = millis();
     if (now - _fadT > 50) {
         _fadT = now;
         _tchRaw = _touchRead();
-        static int _tchBase = 0;
         if (_tchBase == 0 && _tchRaw > 100) _tchBase = _tchRaw;
         
         int W = _spr.width();
@@ -560,6 +560,7 @@ void SatMenu::_tickTestTouch(Btn b) {
 
         _drawHints("", "", "Atras", "");
     }
+    _push();
 }
 
 void SatMenu::_hMain(Btn b) {
