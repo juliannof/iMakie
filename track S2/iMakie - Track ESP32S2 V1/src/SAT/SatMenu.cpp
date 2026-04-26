@@ -151,7 +151,7 @@ void SatMenu::update() {
         case Scr::DIAG:          _hDiag(b);            break;
         case Scr::EDIT_TRACKID:
         case Scr::EDIT_PWMMIN:
-        case Scr::EDIT_PWMMAX:
+        case Scr::EDIT_PWMMAX:   _hEditVal(b);         break;
         case Scr::EDIT_LABEL:    _hEditLbl(b);         break;
         case Scr::CONFIRM:       _hConfirm(b);         break;
         case Scr::TOAST:         _hToast(b);           break;

@@ -196,6 +196,9 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 - **Transport LEDs** — **RESUELTO** — notas 91–95 mapeadas a LEDs físicos en `setLedByNote()`.
 - **RS485 intermitente** — **FUNCIONANDO CON TIMEOUTS** — Sistema comunica: LEDs actualizan, pantalla muestra datos. Timeouts ocasionales e impredecibles (~10-20 consecutivos, luego OK, repite). Comunicación física funciona a 500kbaud. NO se debe modificar arquitectura actual de lectura sin probar compilación first.
 
+### S2
+- **OTA WiFi no conecta en CIERTAS unidades — PROBLEMA DE HARDWARE** — En `OtaManager::enableForUpload()`, WiFi falla a conectarse (timeout 10s, error "No response from device" en cliente OTA). RS485 se deshabilita correctamente (EN=HIGH, GPIO8=LOW, Serial1.end()). **Causa:** problema de alimentación específico en esas unidades (regulador dañado, capacitor muerto, o soldadura mala en PCB). Afecta solo a ciertos S2, no todos. **Fix:** (a) desconectar cables RS485 antes de OTA, (b) alimentar con PSU de 5V @ 1A+ en lugar de USB, (c) si persiste, revisar físicamente PCB (soldaduras, regulador 3.3V, capacitores). Verificar brownout: `[BROWNOUT]` o `[RST]` en logs durante OTA.
+
 ---
 
 ## Pendientes ordenados por complejidad (S3 → P4 → S2 → Cross-system)
