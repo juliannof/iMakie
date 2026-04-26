@@ -6,6 +6,7 @@
 #include "../config.h"
 
 #include "../hardware/fader/FaderADC.h"   // ← añadir
+#include "../hardware/fader/FaderTouch.h"
 #include "../hardware/Motor/Motor.h"
 
 extern FaderADC faderADC;                  // ← añadir
@@ -519,13 +520,17 @@ void SatMenu::_tickTestFader(Btn b) {
 }
 
 void SatMenu::_tickTestTouch(Btn b) {
-    if (b == Btn::BACK) { digitalWrite(LED_BUILTIN_PIN, LOW); _tchBase = 0; _goto(Scr::DIAG); return; }
+    if (b == Btn::BACK) { _goto(Scr::DIAG); return; }
+
+    FaderTouch::update();
 
     unsigned long now = millis();
     if (now - _fadT > 50) {
         _fadT = now;
-        _tchRaw = _touchRead();
-        if (_tchBase == 0 && _tchRaw > 100) _tchBase = _tchRaw;
+        
+        uint32_t raw = FaderTouch::getRaw();
+        uint32_t base = FaderTouch::getBase();
+        bool touched = FaderTouch::isTouched();
         
         int W = _spr.width();
         _spr.fillScreen(C_BG);
@@ -536,28 +541,25 @@ void SatMenu::_tickTestTouch(Btn b) {
         _spr.setTextColor(C_CYAN, C_BG); _spr.setTextSize(1);
         _spr.setTextDatum(textdatum_t::top_left);
         _spr.drawString("BASELINE", 4, y);
-        snprintf(buf, 40, "%5d", _tchBase);
+        snprintf(buf, 40, "%5lu", base);
         _spr.setTextColor(C_TEXT, C_BG); _spr.drawString(buf, 80, y); y += 14;
 
         _spr.setTextColor(C_YELLOW, C_BG);
         _spr.drawString("RAW", 4, y);
-        snprintf(buf, 40, "%5d", _tchRaw);
+        snprintf(buf, 40, "%5lu", raw);
         _spr.setTextColor(C_TEXT, C_BG); _spr.drawString(buf, 80, y); y += 14;
 
         _drawDivider(y + 2); y += 8;
 
-        if (_tchBase > 0) {
-            float ratio = constrain(1.0f - (float)_tchRaw / _tchBase, 0.0f, 1.0f);
-            bool touchDetected = _tchRaw < (int)(_tchBase * 0.80f);
-            _spr.setTextColor(touchDetected ? C_GREEN : C_GRAY, C_BG);
-            _spr.drawString(touchDetected ? "TOCADO" : "LIBRE", 4, y); y += 14;
-            _drawHBar(4, y, W - 8, 12, ratio, touchDetected ? C_GREEN : C_DARK);
+        if (base > 0) {
+            float ratio = constrain(1.0f - (float)raw / base, 0.0f, 1.0f);
+            _spr.setTextColor(touched ? C_GREEN : C_GRAY, C_BG);
+            _spr.drawString(touched ? "TOCADO" : "LIBRE", 4, y); y += 14;
+            _drawHBar(4, y, W - 8, 12, ratio, touched ? C_GREEN : C_DARK);
             y += 16;
-            digitalWrite(LED_BUILTIN_PIN, touchDetected ? HIGH : LOW);
         } else {
             _spr.setTextColor(C_GRAY, C_BG);
             _spr.drawString("Calibrando...", 4, y); y += 14;
-            digitalWrite(LED_BUILTIN_PIN, LOW);
         }
 
         _drawHints("", "", "Atras", "");
