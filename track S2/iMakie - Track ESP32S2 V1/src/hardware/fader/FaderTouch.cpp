@@ -5,16 +5,17 @@
 // ─── Constantes internas ──────────────────────────────────────
 static constexpr uint32_t POLL_MS        = 20;
 static constexpr uint8_t  BASELINE_SAMPS = 16;
-static constexpr float    THR_TOUCH      =
-    FADER_TOUCH_THRESHOLD_PERCENTAGE / 100.0f;
-static constexpr float    THR_RELEASE    =
-    (FADER_TOUCH_THRESHOLD_PERCENTAGE + 5) / 100.0f;
+static constexpr float    THR_TOUCH      = 0.015f;  // 1.5% por encima baseline
+static constexpr float    THR_RELEASE    = 0.01f;   // 1.0% por encima baseline
+static constexpr uint8_t  SOSTENIMIENTO  = 6;       // 6 frames (~120ms) para confirmar
 
 // ─── Estado privado ───────────────────────────────────────────
 static uint32_t _base     = 0;
 static uint32_t _raw      = 0;
 static bool     _touched  = false;
 static unsigned long _lastPoll = 0;
+static uint8_t  _sostenidoAlto = 0;
+static uint8_t  _sostenidoBajo = 0;
 
 static void (*_cbTouch)()   = nullptr;
 static void (*_cbRelease)() = nullptr;
@@ -46,8 +47,6 @@ namespace FaderTouch {
 
 void init() {
     _touched = false;
-    // Baseline será capturada gradualmente por IIR filter en update()
-    // No hacer captureBaseline() aquí porque al arranque puede estar tocado
 }
 
 bool update() {
@@ -65,18 +64,47 @@ bool update() {
 
     // AUTOCALIBRACION CONSTANTE (única fuente de verdad)
     // Baseline sigue el valor de reposo actual para adaptarse a:
-    // - Variaciones del plástico
-    // - Cambios de temperatura
-    // - Envejecimiento del material
-    // Solo se actualiza cuando NO hay toque (detección confiable)
-    if (!_touched) {
-        // IIR filter: alpha = 1/16 → sigue lentamente pero constantemente
-        _base = (_base * 15 + _raw) / 16;
-    }
+    // - Variaciones del plástico, cambios de temperatura, envejecimiento
+    // Se actualiza siempre con IIR filter (alpha = 1/16)
+    _base = (_base * 15 + _raw) / 16;
 
     bool prev = _touched;
-    if (!_touched && _raw > _base * THR_TOUCH)   _touched = true;
-    if ( _touched && _raw < _base * THR_RELEASE) _touched = false;
+    
+    // Solo detectar si baseline está establecido (>10000 para evitar falsos en arranque)
+    if (_base > 10000) {
+        float ratioThresholdTouch = _base * (1.0f + THR_TOUCH);
+        float ratioThresholdRelease = _base * (1.0f + THR_RELEASE);
+        
+        // Contar frames donde raw está sostenidamente alto (tocado)
+        if (_raw > ratioThresholdTouch) {
+            _sostenidoAlto++;
+            _sostenidoBajo = 0;
+        } else {
+            _sostenidoAlto = 0;
+            // Contar frames donde raw está sostenidamente bajo (libre)
+            if (_raw < ratioThresholdRelease) {
+                _sostenidoBajo++;
+            } else {
+                _sostenidoBajo = 0;
+            }
+        }
+        
+        // TOUCH: raw se mantiene alto durante SOSTENIMIENTO frames
+        if (!_touched && _sostenidoAlto >= SOSTENIMIENTO) {
+            _touched = true;
+            _sostenidoAlto = 0;
+        }
+        
+        // RELEASE: raw se mantiene bajo durante SOSTENIMIENTO frames
+        if (_touched && _sostenidoBajo >= SOSTENIMIENTO) {
+            _touched = false;
+            _sostenidoBajo = 0;
+        }
+    } else {
+        _touched = false;
+        _sostenidoAlto = 0;
+        _sostenidoBajo = 0;
+    }
 
     log_v("Touch raw=%lu base=%lu ratio=%.2f%% touch=%d", 
           _raw, _base, (_raw * 100.0f / _base), _touched);

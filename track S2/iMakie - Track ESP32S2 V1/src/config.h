@@ -46,7 +46,7 @@ enum class ConnectionState {
 // --- SENSOR TÁCTIL DEL FADER ---
 #define FADER_TOUCH_PIN     T1 // Pin táctil para el fader (GPIO1 en ESP32-S2)
 // Porcentaje del valor base táctil para el umbral de detección (80% significa que detecta si el valor cae por debajo del 80% del valor base).
-#define FADER_TOUCH_THRESHOLD_PERCENTAGE 103
+#define FADER_TOUCH_THRESHOLD_PERCENTAGE 0.7
 
 #define MOTOR_IN1    18
 #define MOTOR_IN2    16

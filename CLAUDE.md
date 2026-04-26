@@ -178,7 +178,7 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 
 ### S2
 7. **Encoder — RESUELTO** — Lógica única en `Encoder.cpp` (SAT ya no duplica). Debounce 3ms. Derecha suma, izquierda resta. Infinito (sin límites).
-8. **FaderTouch — RESUELTO** — Auto-calibración constante con filtro IIR (alpha=1/16) en `FaderTouch.cpp`. Baseline se adapta a varianza de plástico, temperatura, envejecimiento. SAT ya no tiene config de touchThreshold.
+8. **FaderTouch — EN DESARROLLO** — Detección por sostenimiento (tiempo). Perfecto sin plástico, necesita ajuste con plástico. Lógica actual: raw debe sostenerse > baseline×1.015 durante 6 frames (120ms) para detectar toque. Baseline actualizado siempre con IIR (alpha=1/16, no congelado). TEST_TOUCH en SAT testea correctamente. Próximos pasos: validar con plástico real, ajustar thresholds si es necesario.
 9. revisar FaderADC tras reescritura — validar lecturas actuales con hardware real
 10. ADS1015 pedido — cuando llegue, reemplazar lectura ADC nativa por I2C ADS1015 para resolver ruido en fader
 
