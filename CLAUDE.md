@@ -194,7 +194,7 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 - **Note Off en botones de transporte** — **RESUELTO** — `onButtonReleased` envía `0x80 + note + 0x00`.
 - **Handshake MCU** — **RESUELTO** — protocolo completo implementado (ver sección handshake).
 - **Transport LEDs** — **RESUELTO** — notas 91–95 mapeadas a LEDs físicos en `setLedByNote()`.
-- **RS485 intermitente** — **SIN RESOLVER** — Múltiples timeouts ocasionales pero comunicación funciona. Patrón: ~10-20 timeouts, luego respuesta OK, repetición. 500kbaud, tasa variable.
+- **RS485 intermitente** — **FUNCIONANDO CON TIMEOUTS** — Sistema comunica: LEDs actualizan, pantalla muestra datos. Timeouts ocasionales e impredecibles (~10-20 consecutivos, luego OK, repite). Comunicación física funciona a 500kbaud. NO se debe modificar arquitectura actual de lectura sin probar compilación first.
 
 ---
 
@@ -204,7 +204,7 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 1. **LED REC — RESUELTO**
 2. **LED FF — RESUELTO**
 3. **LED RW — RESUELTO**
-4. **RS485 intermitente — SIN DOCUMENTAR** — Múltiples timeouts ocasionales intercalados con respuestas exitosas. Comunicación funciona a 500kbaud pero con tasa de éxito variable e impredecible. Patrón: ~10-20 timeouts consecutivos, luego respuesta OK, luego se repite. Problema arrastrado desde S3 original. Causa probable: timing RS485 en hardware o timeout (1500µs) insuficiente.
+4. **RS485 intermitente — DOCUMENTADO, BAJO CONTROL** — Sistema S3 funciona: comunica datos, LEDs y pantalla actualizan correctamente. Timeouts ocasionales no bloquean operación. Patrón: ~10-20 timeouts, luego respuesta OK, repite. Causa desconocida (posible: timing hardware, timeout 1500µs, ISR conflicts). No intentar buffer circular o cambios arquitectónicos sin compilar first. Problema arrastrado desde S3 original.
 5. VPot ring LEDs (CC 16–23, 48–55), jog wheel (CC 60), rude solo (nota 115)
 
 ### P4
