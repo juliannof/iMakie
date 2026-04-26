@@ -126,7 +126,6 @@ private:
     int           _fadRaw    = 0;
     float         _fadPct    = 0.0f;
     int           _tchRaw    = 0;
-    int           _tchBase   = 0;
     bool          _tchOn     = false;
     int           _motPWM    = 0;
     unsigned long _fadT      = 0;
