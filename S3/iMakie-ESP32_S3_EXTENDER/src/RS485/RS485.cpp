@@ -79,7 +79,7 @@ void RS485Master::runTask() {
                     _stateTimer = micros();
                 } else if (micros() - _stateTimer > RS485_RESP_TIMEOUT_US) {
                     _timeouts++;
-                    log_v("[RS485] TIMEOUT slave %d (rx bytes=%d)", _currentId, Serial1.available());  // ← añade esto
+                    log_i("[RS485] TIMEOUT slave %d (rx bytes=%d)", _currentId, Serial1.available());
                     if (xSemaphoreTake(_mutex, 0) == pdTRUE) {
                         _ch[_currentId].responded = false;
                         xSemaphoreGive(_mutex);
@@ -102,6 +102,7 @@ void RS485Master::runTask() {
 
 void RS485Master::_sendPacket(uint8_t id) {
     MasterPacket pkt = {};
+    log_i("[RS485] → slave %d", id);
 
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(2)) == pdTRUE) {
         pkt.header      = RS485_START_BYTE;
@@ -145,7 +146,7 @@ void RS485Master::_sendPacket(uint8_t id) {
 bool RS485Master::_readResponse() {
     while (Serial1.available()) {
         uint8_t b = (uint8_t)Serial1.read();
-        log_v("RX byte: 0x%02X", b);  // ← solo esta línea
+        log_i("RX byte: 0x%02X", b);
 
         if (!_rxHeader) {
             if (b == RS485_RESP_BYTE) {

@@ -188,6 +188,7 @@ void setup() {
     log_i("5. Creando tareas...");
     xTaskCreatePinnedToCore(taskCore0, "MIDI", 4096, NULL, 2, &taskCore0Handle, 0);
     xTaskCreatePinnedToCore(taskCore1, "TRANSP", 4096, NULL, 1, &taskCore1Handle, 1);
+    rs485.startTask();
     log_i("   Tareas creadas");
 
     log_i("=== S3-02 Extender ACTIVO. Slaves: %d ===", NUM_SLAVES);

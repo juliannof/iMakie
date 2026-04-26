@@ -150,6 +150,39 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 
 ---
 
+## Hardware S3 (Extender)
+
+**Chip:** ESP32-S3 | **Familia Mackie:** 0x14 | **Slaves:** 8 (IDs 1–8)
+
+### RS485 (bus B)
+- TX=GPIO15, RX=GPIO16, EN=GPIO1
+- 500 kbaud, CRC8
+- Controla 8 slaves S2 (IDs 1–8)
+- Timing: TX_EN=10µs, TX_DONE=10µs, RESP_TIMEOUT=1500µs, GAP=300µs, POLL_CYCLE=20ms
+
+### Transporte — Botones y LEDs
+| Función | LED GPIO | BTN GPIO |
+|---------|----------|----------|
+| REC | 12 | 11 |
+| PLAY | 10 | 9 |
+| FF | 8 | 7 |
+| STOP | 6 | 5 |
+| RW | 4 | 3 |
+
+### Notas MIDI Transporte
+| Función | Nota (hex) | Decimal |
+|---------|-----------|---------|
+| RW | 0x5B | 91 |
+| FF | 0x5C | 92 |
+| STOP | 0x5D | 93 |
+| PLAY | 0x5E | 94 |
+| REC | 0x5F | 95 |
+
+- Recibe feedback de Logic vía MIDI handshake familia `0x14`
+- LEDs controlados por `Transporte::setLedByNote()` con velocidad 127 (on) / 0 (off)
+
+---
+
 ## Bugs conocidos activos
 
 ### P4
@@ -160,31 +193,35 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 ### S3 Extender
 - **Note Off en botones de transporte** — **RESUELTO** — `onButtonReleased` envía `0x80 + note + 0x00`.
 - **Handshake MCU** — **RESUELTO** — protocolo completo implementado (ver sección handshake).
-- **Transport LEDs** — **RESUELTO** — notas 94/95/97 mapeadas a LEDs físicos en `setLedByNote()`.
+- **Transport LEDs** — **RESUELTO** — notas 91–95 mapeadas a LEDs físicos en `setLedByNote()`.
+- **RS485 intermitente** — **SIN RESOLVER** — Múltiples timeouts ocasionales pero comunicación funciona. Patrón: ~10-20 timeouts, luego respuesta OK, repetición. 500kbaud, tasa variable.
 
 ---
 
 ## Pendientes ordenados por complejidad (S3 → P4 → S2 → Cross-system)
 
 ### S3 Extender
-1. LEDs REC y FF no encienden — verificar notas exactas que envía Logic para el Extender (pueden diferir del MCU principal)
-2. VPot ring LEDs (CC 16–23, 48–55), jog wheel (CC 60), rude solo (nota 115)
+1. **LED REC — RESUELTO**
+2. **LED FF — RESUELTO**
+3. **LED RW — RESUELTO**
+4. **RS485 intermitente — SIN DOCUMENTAR** — Múltiples timeouts ocasionales intercalados con respuestas exitosas. Comunicación funciona a 500kbaud pero con tasa de éxito variable e impredecible. Patrón: ~10-20 timeouts consecutivos, luego respuesta OK, luego se repite. Problema arrastrado desde S3 original. Causa probable: timing RS485 en hardware o timeout (1500µs) insuficiente.
+5. VPot ring LEDs (CC 16–23, 48–55), jog wheel (CC 60), rude solo (nota 115)
 
 ### P4
-3. mutex o double-buffer en `vuLevels[]`
-4. respuesta táctil lenta en vista de faders — investigar qué bloquea el hilo de touch, especialmente en UIPage faders
-5. no muestra datos en pantalla tras conectarse — posible regresión en la transición a CONNECTED tras cambios en handshake
-6. NeoTrellis sin implementar — atención a pines I2C nuevos (SDA=GPIO33, SCL=GPIO31)
+6. mutex o double-buffer en `vuLevels[]`
+7. respuesta táctil lenta en vista de faders — investigar qué bloquea el hilo de touch, especialmente en UIPage faders
+8. no muestra datos en pantalla tras conectarse — posible regresión en la transición a CONNECTED tras cambios en handshake
+9. NeoTrellis sin implementar — atención a pines I2C nuevos (SDA=GPIO33, SCL=GPIO31)
 
 ### S2
-7. **Encoder — RESUELTO** — Lógica única en `Encoder.cpp` (SAT ya no duplica). Debounce 3ms. Derecha suma, izquierda resta. Infinito (sin límites).
-8. **FaderTouch — EN DESARROLLO** — Detección por sostenimiento (tiempo). Perfecto sin plástico, necesita ajuste con plástico. Lógica actual: raw debe sostenerse > baseline×1.015 durante 6 frames (120ms) para detectar toque. Baseline actualizado siempre con IIR (alpha=1/16, no congelado). TEST_TOUCH en SAT testea correctamente. Próximos pasos: validar con plástico real, ajustar thresholds si es necesario.
-9. revisar FaderADC tras reescritura — validar lecturas actuales con hardware real
-10. ADS1015 pedido — cuando llegue, reemplazar lectura ADC nativa por I2C ADS1015 para resolver ruido en fader
+10. **Encoder — RESUELTO** — Lógica única en `Encoder.cpp` (SAT ya no duplica). Debounce 3ms. Derecha suma, izquierda resta. Infinito (sin límites).
+11. **FaderTouch — EN DESARROLLO** — Detección por sostenimiento (tiempo). Perfecto sin plástico, necesita ajuste con plástico. Lógica actual: raw debe sostenerse > baseline×1.015 durante 6 frames (120ms) para detectar toque. Baseline actualizado siempre con IIR (alpha=1/16, no congelado). TEST_TOUCH en SAT testea correctamente. Próximos pasos: validar con plástico real, ajustar thresholds si es necesario.
+12. revisar FaderADC tras reescritura — validar lecturas actuales con hardware real
+13. ADS1015 pedido — cuando llegue, reemplazar lectura ADC nativa por I2C ADS1015 para resolver ruido en fader
 
 ### Cross-system
-11. RS485: verificar pines en S3 (legacy) y P4 (TX=50, RX=51, EN=52) — confirmar que ambos compilan y funcionan correctamente
-12. LEDs NeoPixel: implementar control de brillo centralizado — estudiar si viable vía MIDI (CC o SysEx dedicado) para controlar brillo de todos los slaves desde Logic/P4
+14. RS485: verificar pines en S3 (legacy) y P4 (TX=50, RX=51, EN=52) — confirmar que ambos compilan y funcionan correctamente
+15. LEDs NeoPixel: implementar control de brillo centralizado — estudiar si viable vía MIDI (CC o SysEx dedicado) para controlar brillo de todos los slaves desde Logic/P4
 
 ---
 
@@ -242,13 +279,15 @@ Device → Logic:  F0 00 00 66 14 0B 0F F7
 
 Logic envía notas en canal 1 para controlar los LEDs de transporte:
 
-| Nota | Decimal | Vel 127 | Vel 0 |
-|------|---------|---------|-------|
-| A♯5 | 94 | PLAY on + STOP off | PLAY off + STOP on |
-| B5  | 95 | REC on | REC off |
-| C♯6 | 97 | FF on  | FF off |
+| Nota | Decimal | LED GPIO | Vel 127 | Vel 0 |
+|------|---------|----------|---------|-------|
+| 0x5B | 91 | GPIO4 (RW) | RW on | RW off |
+| 0x5C | 92 | GPIO8 (FF) | FF on | FF off |
+| 0x5D | 93 | GPIO6 (STOP) | STOP on | STOP off |
+| 0x5E | 94 | GPIO10 (PLAY) | PLAY on | PLAY off |
+| 0x5F | 95 | GPIO12 (REC) | REC on | REC off |
 
-Implementado en `Transporte::setLedByNote()`. La nota 94 controla Play y Stop de forma complementaria.
+Implementado en `Transporte::setLedByNote()`.
 
 ---
 

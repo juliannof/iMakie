@@ -39,7 +39,7 @@ extern volatile ConnectionState logicConnectionState;
 #define RS485_RX_PIN        16
 #define RS485_ENABLE_PIN     1
 #define RS485_BAUD          500000
-#define NUM_SLAVES           8
+#define NUM_SLAVES           2
 
 // --- Timing (µs) ---
 #define RS485_TX_ENABLE_US   10
