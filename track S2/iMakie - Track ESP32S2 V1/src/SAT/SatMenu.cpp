@@ -519,7 +519,7 @@ void SatMenu::_tickTestFader(Btn b) {
 }
 
 void SatMenu::_tickTestTouch(Btn b) {
-    if (b == Btn::BACK) { _tchBase = 0; _goto(Scr::DIAG); return; }
+    if (b == Btn::BACK) { digitalWrite(LED_BUILTIN_PIN, LOW); _tchBase = 0; _goto(Scr::DIAG); return; }
 
     unsigned long now = millis();
     if (now - _fadT > 50) {
@@ -553,9 +553,11 @@ void SatMenu::_tickTestTouch(Btn b) {
             _spr.drawString(touchDetected ? "TOCADO" : "LIBRE", 4, y); y += 14;
             _drawHBar(4, y, W - 8, 12, ratio, touchDetected ? C_GREEN : C_DARK);
             y += 16;
+            digitalWrite(LED_BUILTIN_PIN, touchDetected ? HIGH : LOW);
         } else {
             _spr.setTextColor(C_GRAY, C_BG);
             _spr.drawString("Calibrando...", 4, y); y += 14;
+            digitalWrite(LED_BUILTIN_PIN, LOW);
         }
 
         _drawHints("", "", "Atras", "");
