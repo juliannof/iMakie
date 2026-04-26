@@ -157,20 +157,17 @@ ESP32-P4  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 3. **Handshake MCU incorrecto** — ~~código antiguo implementaba un challenge/response propio; P4 actuaba como HOST generando challenges aleatorios.~~ **RESUELTO** — ver sección "Mackie MCU — handshake" abajo.
 
 ### S3 Extender
-- **Note Off ausente en botones de transporte** — ~~`onButtonPressed` enviaba Note On pero no había handler de release; Logic veía los botones como eternamente pulsados.~~ **RESUELTO** — `onButtonReleased` en `Transporte.cpp` envía `0x80 + note + 0x00` al soltar.
-- **Handshake MCU incorrecto** — ~~mismo problema que P4; S3 anunciaba `0x00` periódicamente siendo Logic quien debe iniciar.~~ **RESUELTO** — protocolo estándar implementado (commit d80f15f).
-- **DEVICE_FAMILY cambiado a 0x14** — S3 Extender ahora se anuncia como familia 0x14 (igual que P4). Logic configurado con dos "Mackie Control" en vez de MCU + Extender. Los botones de transporte funcionan.
-- **Echo de comandos de configuración** — añadido echo de SysEx 0x20, 0x21, 0x0A, 0x0B, 0x0C en `MIDIProcessor.cpp`.
-- **Transport LEDs pendiente** — Logic envía notas de transporte al Extender (confirmado funcionando en sesiones anteriores). Investigación en curso para estabilizar el comportamiento.
+- **Note Off en botones de transporte** — **RESUELTO** — `onButtonReleased` envía `0x80 + note + 0x00`.
+- **Handshake MCU** — **RESUELTO** — protocolo completo implementado (ver sección handshake).
+- **Transport LEDs** — **RESUELTO** — notas 94/95/97 mapeadas a LEDs físicos en `setLedByNote()`.
 
 ---
 
 ## Pendientes ordenados por prioridad
 
-1. **S3 Extender: Transport LEDs** — Logic envía las notas (confirmado), falta estabilizar el manejo en firmware. Investigar qué mensajes exactos llegan al Extender en MIDI Monitor filtrado por "iMakie-Extender".
-2. S2: FaderTouch por varianza (plástico) — `TOUCH_VAR_THRESHOLD` etc ya en `config.h`
-3. S3/P4 MCU: VPot ring LEDs (CC 16–23, 48–55), jog wheel (CC 60), rude solo (nota 115)
-4. P4: considerar mutex o double-buffer en `vuLevels[]`
+1. S2: FaderTouch por varianza (plástico) — `TOUCH_VAR_THRESHOLD` etc ya en `config.h`
+2. S3/P4 MCU: VPot ring LEDs (CC 16–23, 48–55), jog wheel (CC 60), rude solo (nota 115)
+3. P4: considerar mutex o double-buffer en `vuLevels[]`
 
 ---
 
@@ -191,34 +188,50 @@ Flags slave → master incluyen `SLAVE_FLAG_NOT_CALIBRATED`. Master detecta y di
 - MIDI fader max para recorrido físico completo: **14848** (no 16383)
 - `track_idx = currentOffset / 7`, `char_pos = currentOffset % 7` — parser SysEx `0x12`
 
-### Mackie MCU — handshake correcto
+### Mackie MCU — handshake correcto (S3 Extender / familia 0x14)
 
-Logic es siempre el iniciador. El dispositivo nunca envía `0x00` por su cuenta.
+Logic sondea varias familias. El dispositivo responde a **cualquier familia** para los comandos de sondeo, luego solo procesa familia `0x14`.
 
 ```
-Logic → Device:  F0 00 00 66 <family> 00 F7          (Device Query)
-Device → Logic:  F0 00 00 66 <family> 01 <serial 4B> <version 4B> F7
+── Fase 0: sondeo (cualquier familia) ──────────────────────────────
+Logic → Device:  F0 00 00 66 <any> 00 F7
+Device → Logic:  F0 00 00 66 14 01 00 00 00 01 00 00 00 00 F7
 
-Logic → Device:  F0 00 00 66 <family> 13 F7          (Host Connection Query, 8-10 veces)
-Device → Logic:  F0 00 00 66 <family> 14 00 F7       → logicConnectionState = CONNECTED
+Logic → Device:  F0 00 00 66 <any> 13 F7
+Device → Logic:  F0 00 00 66 14 14 00 F7
+
+── Fase 1: handshake (familia 0x14) ────────────────────────────────
+Logic → Device:  F0 00 00 66 14 21 01 F7
+Device → Logic:  F0 00 00 66 14 21 01 F7   → CONNECTED
+
+Logic → Device:  F0 00 00 66 14 20 0x 07 F7  (×8, opcional)
+Logic → Device:  F0 00 00 66 14 0A 01 F7
+Device → Logic:  F0 00 00 66 14 0A 01 F7
+
+Logic → Device:  F0 00 00 66 14 0C 00 F7
+Device → Logic:  F0 00 00 66 14 0C 00 F7
+Device → Logic:  F0 00 00 66 14 10 00 F7   ← suscripción a feedback (inmediato)
+
+Logic → Device:  F0 00 00 66 14 0B 0F F7
+Device → Logic:  F0 00 00 66 14 0B 0F F7
 ```
 
-- `DEVICE_FAMILY`: `0x14` tanto para P4 MCU como para S3 Extender — Logic configurado con **dos unidades "Mackie Control"** (no MCU + Extender)
-- Logic sondea múltiples familias (0x10, 0x11, 0x14, 0x15, 0x17) — responder solo a la propia
-- `case 0x13` en `processMackieSysEx` tiene guard `if (logicConnectionState != CONNECTED)` para no re-disparar calibración y cambio de página en las 8-10 queries repetidas
-- `case 0x15` responde con versión de firmware (`F0 00 00 66 <family> 15 '1'.'.'2'.'.'0' F7`)
+- `DEVICE_FAMILY 0x14` para P4 y S3 Extender — Logic configurado con **dos "Mackie Control"**
+- `CONNECTED` se establece al recibir `0x21` (con `connectedSinceTime = millis()`)
+- `0x0C` hardcodeado a `0x00` (Surface Type = Master) — **no cambiar**, necesario para recibir transport LEDs
+- `0x10 00` es la suscripción a feedback — sin él Logic no envía Note On de transporte
 
-### Mackie MCU — comandos de configuración que requieren echo
+### Mackie MCU — transport LEDs (S3 Extender)
 
-Logic envía estos SysEx tras el handshake y espera que el dispositivo los devuelva tal cual para completar la inicialización:
+Logic envía notas en canal 1 para controlar los LEDs de transporte:
 
-- `0x20` — Fader touch sensitivity
-- `0x21` — Fader touch sensitivity (canal)
-- `0x0A` — LCD backlight timeout
-- `0x0B` — MIDI port routing
-- `0x0C` — Fader motor enable
+| Nota | Decimal | Vel 127 | Vel 0 |
+|------|---------|---------|-------|
+| A♯5 | 94 | PLAY on + STOP off | PLAY off + STOP on |
+| B5  | 95 | REC on | REC off |
+| C♯6 | 97 | FF on  | FF off |
 
-Sin el echo, Logic no completa la inicialización y no envía estado de botones/LEDs. El echo está implementado en `processMackieSysEx` (S3 Extender `MIDIProcessor.cpp`).
+Implementado en `Transporte::setLedByNote()`. La nota 94 controla Play y Stop de forma complementaria.
 
 ---
 

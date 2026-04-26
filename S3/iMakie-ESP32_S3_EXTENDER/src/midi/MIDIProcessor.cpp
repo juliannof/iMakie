@@ -309,9 +309,23 @@ void processMackieSysEx(byte* payload, int len) {
     byte device_family = payload[3];
     byte command = payload[4];
 
-    log_i("[SYSEX] device_family=0x%02X command=0x%02X len=%d", device_family, command, len);
+    log_v("[SYSEX] family=0x%02X cmd=0x%02X len=%d", device_family, command, len);
 
-    if (device_family != 0x14 && device_family != 0x15) return;
+    // Fase 0: sondeo — responder a cmd 0x00 y 0x13 en cualquier familia
+    if (command == 0x00) {
+        byte reply[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x01,
+                        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0xF7};
+        sendMIDIBytes(reply, sizeof(reply));
+        return;
+    }
+    if (command == 0x13) {
+        byte reply[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x14, 0x00, 0xF7};
+        sendMIDIBytes(reply, sizeof(reply));
+        return;
+    }
+
+    // Fase 1+: solo familia 0x14
+    if (device_family != 0x14) return;
 
     switch (command) {
 
@@ -432,7 +446,7 @@ void processMackieSysEx(byte* payload, int len) {
             sendMIDIBytes(echo, sizeof(echo));
             byte sub[]  = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x10, 0x00, 0xF7};
             sendMIDIBytes(sub, sizeof(sub));
-            log_i("[MCU] 0x0C echo + 0x10 suscripcion feedback");
+            log_v("[MCU] 0x0C echo + 0x10 suscripcion feedback");
             break;
         }
 
@@ -445,7 +459,7 @@ void processMackieSysEx(byte* payload, int len) {
                 memcpy(echo + 1, payload, len);
                 echo[len + 1] = 0xF7;
                 sendMIDIBytes(echo, elen);
-                log_i("[MCU] Echo cmd=0x%02X (%d bytes)", command, elen);
+                log_v("[MCU] Echo cmd=0x%02X (%d bytes)", command, elen);
             }
             break;
         }
@@ -460,7 +474,7 @@ void processNote(byte status, byte note, byte velocity) {
     bool is_on       = ((status & 0xF0) == 0x90 && velocity > 0);
     bool is_flashing = ((status & 0xF0) == 0x90 && velocity == 1);
 
-    log_i("[NOTE] st=0x%02X note=0x%02X(%d) vel=%d is_on=%d", status, note, note, velocity, is_on);
+    log_v("[NOTE] st=0x%02X note=0x%02X(%d) vel=%d is_on=%d", status, note, note, velocity, is_on);
 
     if (note <= 31) {
         int group     = note / 8;

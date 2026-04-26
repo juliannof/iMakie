@@ -85,8 +85,8 @@ void setLedByNote(uint8_t note, bool on) {
             setLed(LED_STOP, !on);
             break;
         case 95:  // REWIND
-            log_i("[TRANSP] RW=%d", on);
-            setLed(LED_RW, on);
+            log_i("[TRANSP] REC=%d", on);
+            setLed(LED_REC, on);
             break;
         case 97:  // FORWARD
             log_i("[TRANSP] FF=%d", on);

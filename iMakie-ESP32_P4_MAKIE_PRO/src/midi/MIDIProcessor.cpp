@@ -317,19 +317,25 @@ void processMackieSysEx(byte* payload, int len) {
     byte device_family = payload[3];
     byte command = payload[4];
 
-    if (device_family != 0x14 && device_family != 0x15) return;
+    log_v("[SYSEX] family=0x%02X cmd=0x%02X len=%d", device_family, command, len);
+
+    // Fase 0: sondeo — responder a cmd 0x00 y 0x13 en cualquier familia
+    if (command == 0x00) {
+        byte reply[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x01,
+                        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0xF7};
+        sendMIDIBytes(reply, sizeof(reply));
+        return;
+    }
+    if (command == 0x13) {
+        byte reply[] = {0xF0, 0x00, 0x00, 0x66, 0x14, 0x14, 0x00, 0xF7};
+        sendMIDIBytes(reply, sizeof(reply));
+        return;
+    }
+
+    // Fase 1+: solo familia 0x14
+    if (device_family != 0x14) return;
 
     switch (command) {
-
-        case 0x00: {
-            // Device Query — Logic pregunta quién está ahí
-            byte reply[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x01,
-                            0x00, 0x00, 0x00, 0x01,    // Serial
-                            0x31, 0x32, 0x30, 0x30,    // Versión "1200"
-                            0xF7};
-            sendMIDIBytes(reply, sizeof(reply));
-            break;
-        }
 
         case 0x0F: {
             logicConnectionState = ConnectionState::DISCONNECTED;
@@ -357,10 +363,10 @@ void processMackieSysEx(byte* payload, int len) {
             break;
         }
 
-        case 0x13: {
-            // Host Connection Query — Logic siempre espera 0x14
-            byte reply[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x14, 0x00, 0xF7};
-            sendMIDIBytes(reply, sizeof(reply));
+        case 0x21: {
+            // Fase 2 CRÍTICA — echo inmediato
+            byte echo[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x21, 0x01, 0xF7};
+            sendMIDIBytes(echo, sizeof(echo));
             if (logicConnectionState != ConnectionState::CONNECTED) {
                 logicConnectionState = ConnectionState::CONNECTED;
                 g_logicConnected     = 1;
@@ -377,16 +383,31 @@ void processMackieSysEx(byte* payload, int len) {
                 _calibPendingFrom = 1;
                 _calibNextTime    = millis();
                 g_switchToPage3   = true;
-                log_i("[MCU] Host Connection Query 0x13 — CONNECTED");
+                log_i("[MCU] 0x21 — CONNECTED");
             }
             break;
         }
 
-        case 0x15: {
-            // Firmware Version Request
-            byte version_reply[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x15,
-                    '1', '.', '2', '.', '0', 0xF7};
-            sendMIDIBytes(version_reply, sizeof(version_reply));
+        case 0x0C: {
+            // Surface Type + suscripción a feedback
+            byte echo[] = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x0C, 0x00, 0xF7};
+            sendMIDIBytes(echo, sizeof(echo));
+            byte sub[]  = {0xF0, 0x00, 0x00, 0x66, DEVICE_FAMILY, 0x10, 0x00, 0xF7};
+            sendMIDIBytes(sub, sizeof(sub));
+            log_i("[MCU] 0x0C echo + 0x10 suscripcion feedback");
+            break;
+        }
+
+        case 0x20:
+        case 0x0A: case 0x0B: {
+            byte echo[32];
+            int  elen = len + 2;
+            if (elen <= (int)sizeof(echo)) {
+                echo[0] = 0xF0;
+                memcpy(echo + 1, payload, len);
+                echo[len + 1] = 0xF7;
+                sendMIDIBytes(echo, elen);
+            }
             break;
         }
 
