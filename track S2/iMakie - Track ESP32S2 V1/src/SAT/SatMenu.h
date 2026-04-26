@@ -74,7 +74,7 @@ private:
         EDIT_TRACKID, EDIT_LABEL,
         EDIT_PWMMIN, EDIT_PWMMAX,
         CONFIRM, TOAST,
-        TEST_DISPLAY, TEST_ENCODER, TEST_FADER, TEST_NEOPIXEL,
+        TEST_DISPLAY, TEST_ENCODER, TEST_FADER, TEST_NEOPIXEL, TEST_TOUCH,
         MOTOR_CALIB,
         MOTOR_POS,
     };
@@ -167,7 +167,7 @@ private:
     void _tickTestEncoder(Btn b);
     void _tickTestFader(Btn b);
     void _tickTestNeopixel(Btn b);
-
+    void _tickTestTouch(Btn b);
     
 
     void _motorStop();

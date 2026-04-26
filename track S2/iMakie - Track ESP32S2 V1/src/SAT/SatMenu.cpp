@@ -41,12 +41,13 @@ const SatMenu::Item SatMenu::_diagItems[] = {
     {"EC","Test Encoder",  Scr::TEST_ENCODER  },
     {"FD","Test Fader",    Scr::TEST_FADER    },
     {"NP","Test Botones",  Scr::TEST_NEOPIXEL },
+    {"TC","Test Touch",    Scr::TEST_TOUCH    },
 };
 const int SatMenu::_mainN  = 6;
 const int SatMenu::_identN = 2;
 const int SatMenu::_motorN = 5;   
 const int SatMenu::_touchN = 2;
-const int SatMenu::_diagN  = 4;
+const int SatMenu::_diagN  = 5;
 
 // ─────────────────────────────────────────────────────────────
 //  Constructor
@@ -117,6 +118,7 @@ void SatMenu::update() {
              _scr == Scr::TEST_ENCODER   ||
              _scr == Scr::TEST_FADER     ||
              _scr == Scr::TEST_NEOPIXEL  ||
+             _scr == Scr::TEST_TOUCH     ||
              _scr == Scr::MOTOR_CALIB    ||  // ← añadir
              _scr == Scr::MOTOR_POS);         // ← añadir
 
@@ -156,6 +158,7 @@ void SatMenu::update() {
         case Scr::TEST_ENCODER:  _tickTestEncoder(b);  break;
         case Scr::TEST_FADER:    _tickTestFader(b);    break;
         case Scr::TEST_NEOPIXEL: _tickTestNeopixel(b); break;
+        case Scr::TEST_TOUCH:    _tickTestTouch(b);    break;
         case Scr::REINICIAR:
             _confirm("Reiniciar dispositivo?", Scr::REINICIAR); break;
         default: break;
@@ -184,6 +187,7 @@ void SatMenu::_render() {
         case Scr::TEST_ENCODER:  _tickTestEncoder(Btn::NONE);  return;
         case Scr::TEST_FADER:    _tickTestFader(Btn::NONE);    return;
         case Scr::TEST_NEOPIXEL: _tickTestNeopixel(Btn::NONE); return;
+        case Scr::TEST_TOUCH:    _tickTestTouch(Btn::NONE);    return;
         case Scr::MOTOR_CALIB:   _tickMotorCalib(Btn::NONE); return;
         case Scr::MOTOR_POS:     _tickMotorPos(Btn::NONE);   return;
         default: break;
@@ -441,74 +445,50 @@ void SatMenu::_tickTestEncoder(Btn b) {
 static int _touchRead() { return (int)touchRead(FADER_TOUCH_PIN); }
 
 void SatMenu::_tickTestFader(Btn b) {
-    // Asegurar motor apagado al entrar en el test
-    static bool _firstEntry = true;
-    if (_firstEntry) { _firstEntry = false; _motorStop(); }
-    
-    int W = _spr.width(), H = _spr.height();
-
-    if (b == Btn::BACK)  { _motorStop(); _goto(Scr::DIAG); return; }
-    if (b == Btn::UP)    { _motPWM=constrain(_motPWM+20,-255,255); _motorDrive(_motPWM); }
-    if (b == Btn::DOWN)  { _motPWM=constrain(_motPWM-20,-255,255); _motorDrive(_motPWM); }
+    if (b == Btn::BACK) { _goto(Scr::DIAG); return; }
     if (b == Btn::ENTER) {
-        _motPWM=0;
-        _motorStop();
         _fadCalMin=8191; _fadCalMax=0;
-        _noiseMin=8191;  _noiseMax=0;   // ← añadido
+        _noiseMin=8191;  _noiseMax=0;
         _reported=false; _stopT=0;
         faderADC.measureRange();
     }
 
     unsigned long now=millis();
-if (now-_fadT>25) {
-    _fadT=now;
-    faderADC.update();
-    _fadRaw = faderADC.getRawLast();
-    uint16_t fadEma = faderADC.getFaderPos();
+    if (now-_fadT>25) {
+        _fadT=now;
+        faderADC.update();
+        _fadRaw = faderADC.getRawLast();
+        uint16_t fadEma = faderADC.getFaderPos();
 
-    // ── Rango de recorrido total (para Motor) ─────────────
-    if ((int)fadEma < _fadCalMin) { _fadCalMin = fadEma; _reported = false; }
-    if ((int)fadEma > _fadCalMax) { _fadCalMax = fadEma; _reported = false; }
+        if ((int)fadEma < _fadCalMin) { _fadCalMin = fadEma; _reported = false; }
+        if ((int)fadEma > _fadCalMax) { _fadCalMax = fadEma; _reported = false; }
 
-    // ── Ventana deslizante de ruido local ─────────────────
-    // Solo mide el span de las últimas N muestras en reposo
-    if (abs((int)fadEma - (int)_lastRaw) > 15) {
-        // Fader en movimiento: resetea ventana local
-        _stopT       = now;
-        _lastRaw     = (int)fadEma;
-        _noiseMin    = fadEma;
-        _noiseMax    = fadEma;
-        _reported    = false;
-    } else {
-        // Fader quieto: acumula ventana local
-        if (fadEma < _noiseMin) _noiseMin = fadEma;
-        if (fadEma > _noiseMax) _noiseMax = fadEma;
+        if (abs((int)fadEma - (int)_lastRaw) > 15) {
+            _stopT       = now;
+            _lastRaw     = (int)fadEma;
+            _noiseMin    = fadEma;
+            _noiseMax    = fadEma;
+            _reported    = false;
+        } else {
+            if (fadEma < _noiseMin) _noiseMin = fadEma;
+            if (fadEma > _noiseMax) _noiseMax = fadEma;
+            if (!_reported && now - _stopT > 500 && _fadCalMax > _fadCalMin) {
+                _reported = true;
+            }
+        }
 
-        if (!_reported && now - _stopT > 500 && _fadCalMax > _fadCalMin) {
-            //log_i("[ADC] NOISE  min=%d  max=%d  span=%d  |  RANGE  min=%d  max=%d  span=%d",
-            //      _noiseMin, _noiseMax, _noiseMax - _noiseMin,
-            //      _fadCalMin, _fadCalMax, _fadCalMax - _fadCalMin);
-            _reported = true;
+        _fadPct = (_fadCalMax > _fadCalMin) ?
+                  constrain((float)((int)fadEma - _fadCalMin) / (_fadCalMax - _fadCalMin), 0.0f, 1.0f) :
+                  constrain((float)fadEma / 8191.0f, 0.0f, 1.0f);
+
+        if (now-_fadHistT>50) {
+            _fadHistT=now;
+            _fadHist[_fadHistIdx]=(uint8_t)(_fadPct*255);
+            _fadHistIdx=(_fadHistIdx+1)%FAD_HIST;
         }
     }
 
-    // ── _fadPct sobre rango acumulado ─────────────────────
-    _fadPct = (_fadCalMax > _fadCalMin) ?
-              constrain((float)((int)fadEma - _fadCalMin) / (_fadCalMax - _fadCalMin), 0.0f, 1.0f) :
-              constrain((float)fadEma / 8191.0f, 0.0f, 1.0f);
-
-    if (now-_fadHistT>50) {
-        _fadHistT=now;
-        _fadHist[_fadHistIdx]=(uint8_t)(_fadPct*255);
-        _fadHistIdx=(_fadHistIdx+1)%FAD_HIST;
-    }
-}
-
-    _tchRaw=_touchRead();
-    static int tchBase=0;
-    if (tchBase==0&&_tchRaw>100) tchBase=_tchRaw;
-    _tchOn=(tchBase>0)&&(_tchRaw<(int)(tchBase*0.80f));
-
+    int W = _spr.width();
     _spr.fillScreen(C_BG);
     _drawHdr("TEST FADER");
     int y=SAT_HDR_H+6;
@@ -527,60 +507,61 @@ if (now-_fadT>25) {
     _spr.drawString("0dB",ugX,y); y+=12;
 
     _drawDivider(y+2); y+=8;
-    _spr.setTextColor(C_YELLOW,C_BG); _spr.setTextDatum(textdatum_t::top_left);
-    _spr.drawString("TOUCH",4,y);
-    _spr.fillCircle(55,y+5,6,_tchOn?C_GREEN:C_DARK);
-    snprintf(buf,32," %s  raw=%5d  base=%5d",_tchOn?"TOCADO  ":"libre   ",_tchRaw,tchBase);
-    _spr.setTextColor(_tchOn?C_GREEN:C_GRAY,C_BG); _spr.drawString(buf,62,y); y+=20;
-    if (tchBase>0) {
-        float ratio=constrain(1.0f-(float)_tchRaw/tchBase,0.0f,1.0f);
-        _drawHBar(4,y,W-8,10,ratio,_tchOn?C_GREEN:C_DARK);
+    _spr.setTextColor(C_TEXT,C_BG); _spr.setTextDatum(textdatum_t::top_left);
+    for (int i=0; i<FAD_HIST-1; i++) {
+        int h1=(int)_fadHist[i]*100/256;
+        int h2=(int)_fadHist[(i+1)%FAD_HIST]*100/256;
+        _spr.drawLine(4+i,y+100-h1, 4+i+1,y+100-h2, C_CYAN);
     }
-    y+=16;
-
-    _drawDivider(y+2); y+=8;
-    _spr.setTextColor(C_ORANGE,C_BG); _spr.setTextDatum(textdatum_t::top_left);
-    _spr.drawString("MOTOR",4,y);
-    float mPct=((float)_motPWM+255.f)/510.f;
-    int bx=44, bw=W-48;
-    _spr.fillRect(bx,y,bw,14,C_DARK);
-    int center=bx+bw/2, barEnd=bx+(int)(mPct*bw);
-    if (barEnd>=center) _spr.fillRect(center,y,barEnd-center,14,_motPWM>0?C_GREEN:C_DARK);
-    else                _spr.fillRect(barEnd,y,center-barEnd,14,C_ACCENT);
-    _spr.drawFastVLine(center,y,14,C_WHITE);
-    snprintf(buf,32,"PWM:%+d",_motPWM);
-    _spr.setTextColor(C_TEXT,C_BG);
-    _spr.setTextDatum(textdatum_t::top_center);
-    _spr.drawString(buf,bx+bw/2,y);
-    _spr.setTextDatum(textdatum_t::top_left);
-    y+=18;
-    snprintf(buf,32,"IN1=%s  IN2=%s  EN=%s",
-        _motPWM>0?"PWM":"0",_motPWM<0?"PWM":"0",abs(_motPWM)>0?"HIGH":"LOW");
-    _spr.setTextColor(C_GRAY,C_BG); _spr.drawString(buf,44,y); y+=16;
-
-    _drawDivider(y); y+=4;
-    int gH=H-SAT_HINT_H-y-4; if (gH<20) gH=20;
-    int gW=W-8;
-    _spr.drawRect(3,y,gW+2,gH+2,C_DARK);
-    _spr.drawFastHLine(4,y+gH-(int)(0.75f*gH),gW,C_YELLOW);
-    int pxW=gW/FAD_HIST; if (pxW<1) pxW=1;
-    for (int i=0;i<FAD_HIST;i++) {
-        int idx=(_fadHistIdx+i)%FAD_HIST;
-        int fh=(_fadHist[idx]*gH)/255;
-        _spr.fillRect(4+i*(gW/FAD_HIST),y+gH-fh,pxW,fh+1,C_CYAN);
-    }
-
-    _spr.fillRect(0,H-SAT_HINT_H,W,SAT_HINT_H,C_BG);
-    _spr.drawFastHLine(0,H-SAT_HINT_H,W,C_DARK);
-    _spr.setTextSize(1); _spr.setTextColor(C_GRAY,C_BG);
-    _spr.setTextDatum(textdatum_t::middle_left);
-    _spr.drawString("REC=mot+  SOL=mot-  SEL=medir  MUT=salir",4,H-SAT_HINT_H/2);
-    _push();
+    y+=108;
+    _drawHints("","","Atras","Calibrar");
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Handlers menú
-// ─────────────────────────────────────────────────────────────
+void SatMenu::_tickTestTouch(Btn b) {
+    if (b == Btn::BACK) { _goto(Scr::DIAG); return; }
+
+    unsigned long now = millis();
+    if (now - _fadT > 50) {
+        _fadT = now;
+        _tchRaw = _touchRead();
+        static int _tchBase = 0;
+        if (_tchBase == 0 && _tchRaw > 100) _tchBase = _tchRaw;
+        
+        int W = _spr.width();
+        _spr.fillScreen(C_BG);
+        _drawHdr("TEST TOUCH");
+        int y = SAT_HDR_H + 6;
+        char buf[40];
+
+        _spr.setTextColor(C_CYAN, C_BG); _spr.setTextSize(1);
+        _spr.setTextDatum(textdatum_t::top_left);
+        _spr.drawString("BASELINE", 4, y);
+        snprintf(buf, 40, "%5d", _tchBase);
+        _spr.setTextColor(C_TEXT, C_BG); _spr.drawString(buf, 80, y); y += 14;
+
+        _spr.setTextColor(C_YELLOW, C_BG);
+        _spr.drawString("RAW", 4, y);
+        snprintf(buf, 40, "%5d", _tchRaw);
+        _spr.setTextColor(C_TEXT, C_BG); _spr.drawString(buf, 80, y); y += 14;
+
+        _drawDivider(y + 2); y += 8;
+
+        if (_tchBase > 0) {
+            float ratio = constrain(1.0f - (float)_tchRaw / _tchBase, 0.0f, 1.0f);
+            bool touchDetected = _tchRaw < (int)(_tchBase * 0.80f);
+            _spr.setTextColor(touchDetected ? C_GREEN : C_GRAY, C_BG);
+            _spr.drawString(touchDetected ? "TOCADO" : "LIBRE", 4, y); y += 14;
+            _drawHBar(4, y, W - 8, 12, ratio, touchDetected ? C_GREEN : C_DARK);
+            y += 16;
+        } else {
+            _spr.setTextColor(C_GRAY, C_BG);
+            _spr.drawString("Calibrando...", 4, y); y += 14;
+        }
+
+        _drawHints("", "", "Atras", "");
+    }
+}
+
 void SatMenu::_hMain(Btn b) {
     if (b == Btn::UP)   { if (_cur>0)        { _cur--; _dirty=true; } }
     if (b == Btn::DOWN) { if (_cur<_mainN-1) { _cur++; _dirty=true; } }
