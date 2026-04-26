@@ -150,8 +150,11 @@ void checkTimeout(unsigned long lastRxTime) {
         recStates = soloStates = muteStates = selectStates = false;
         setScreenBrightness(0);
         neoWaitingHandshake = true;
-        neopixels.ClearTo(RgbColor(0, 0, 5));
-        neopixels.Show();
+        clearAllNeopixels();
+        for (int i = 0; i < NEOPIXEL_COUNT; i++) setNeopixelState(i, 0, 0, 5);
+        showNeopixels();
+
+
         needsTOTALRedraw = true;
     }
 }

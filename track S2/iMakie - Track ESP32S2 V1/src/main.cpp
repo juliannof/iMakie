@@ -55,8 +55,10 @@ static void _satMotorDrive(int pwm) { Motor::driveRaw(pwm); }
 static void _satConfigSaved(const SatConfig& cfg) { rs485.begin(cfg.trackId); }
 static void _satWiFiOta()   { otaManager.enableForUpload(); }
 static void _satLedsOff() {
-    neopixels.ClearTo(RgbColor(0));
-    neopixels.Show();
+    clearAllNeopixels();
+    showNeopixels();
+
+
 }
 static void _satSuspendSprites() {
     header.deleteSprite();
@@ -93,6 +95,7 @@ static void _otaStatus(const char* msg) {
         satMenu->showStatus(msg);
 }
 static void _satLedsTest(int idx, uint8_t r, uint8_t g, uint8_t b) {
+    log_i("[SAT-LED] idx=%d rgb=(%d,%d,%d)", idx, r, g, b);
     setNeopixelState(idx, r, g, b);
     showNeopixels();
 }

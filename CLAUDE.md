@@ -12,13 +12,13 @@ Logic Pro (macOS)
     │ USB-MIDI
     ▼
 ESP32-P4  ←→  RS485 bus A  ←→  17× ESP32-S2 (PTxx Track)
-(MCU #1, 9 tracks, IDs 1–9)
+(MCU, 9 tracks, IDs 1–9)
 
-ESP32-P4  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
-(MCU #2 / Extender, IDs 1–8)
+ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
+(Extender, IDs 1–8)
 ```
 
-- **P4 #1** reemplaza S3 #1 (MCU). **P4 #2** reemplaza S3 #2 (Extender).
+- **P4** es el master MCU (reemplaza S3 #1 original). **S3 Extender** controla 8 slaves adicionales (hardware actual).
 - **S2 slaves** son el hardware definitivo — 17 unidades Lolin S2 Mini.
 - RP2040 descartado permanentemente. S2 es la plataforma slave definitiva.
 
@@ -28,7 +28,7 @@ ESP32-P4  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 
 | Directorio | MCU | Rol |
 |---|---|---|
-| `S3/` | ESP32-S3 (legacy) / ESP32-P4 | Master MCU — USB-MIDI + RS485 |
+| `S3/` | ESP32-P4 (master) / ESP32-S3 (extender) | Master MCU + Extender — USB-MIDI + RS485 |
 | `track S2/` | ESP32-S2 (Lolin S2 Mini) | Slave — 1 canal físico completo |
 
 ---
@@ -78,9 +78,10 @@ ESP32-P4  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 - Verificación: `esp_ptr_external_ram()`, direcciones `0x3f8xxxxx`
 
 ### NeoPixels
-- Librería: `makuna/NeoPixelBus@^2.8.4`, método `NeoEsp32I2s0800KbpsMethod`
-- **Una sola instancia global** — segunda instancia reinicializa I2S0 y corrompe el strip
+- Librería: `adafruit/Adafruit NeoPixel` (cambio desde NeoPixelBus 2.8.4)
+- **Una sola instancia global** — `Adafruit_NeoPixel neopixels(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800)`
 - Acceso exclusivamente a través de `Neopixel.cpp`
+- **Razón del cambio:** NeoPixelBus con pioarduino 55.03.37 falla por campo `tx_pcm_bypass` no disponible en IDF5; Adafruit NeoPixel es más simple y mantenido por Adafruit
 
 ### ADC fader
 - API IDF5 `adc_oneshot` directamente (`ADC_ATTEN_DB_11`, `ADC_BITWIDTH_13`)
@@ -163,11 +164,26 @@ ESP32-P4  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 
 ---
 
-## Pendientes ordenados por prioridad
+## Pendientes ordenados por complejidad (S3 → P4 → S2 → Cross-system)
 
-1. S2: FaderTouch por varianza (plástico) — `TOUCH_VAR_THRESHOLD` etc ya en `config.h`
-2. S3/P4 MCU: VPot ring LEDs (CC 16–23, 48–55), jog wheel (CC 60), rude solo (nota 115)
-3. P4: considerar mutex o double-buffer en `vuLevels[]`
+### S3 Extender
+1. LEDs REC y FF no encienden — verificar notas exactas que envía Logic para el Extender (pueden diferir del MCU principal)
+2. VPot ring LEDs (CC 16–23, 48–55), jog wheel (CC 60), rude solo (nota 115)
+
+### P4
+3. mutex o double-buffer en `vuLevels[]`
+4. respuesta táctil lenta en vista de faders — investigar qué bloquea el hilo de touch, especialmente en UIPage faders
+5. no muestra datos en pantalla tras conectarse — posible regresión en la transición a CONNECTED tras cambios en handshake
+6. NeoTrellis sin implementar — atención a pines I2C nuevos (SDA=GPIO33, SCL=GPIO31)
+
+### S2
+7. FaderTouch por varianza (plástico) — `TOUCH_VAR_THRESHOLD` etc ya en `config.h`
+8. revisar FaderADC tras reescritura — validar lecturas actuales con hardware real
+9. ADS1015 pedido — cuando llegue, reemplazar lectura ADC nativa por I2C ADS1015 para resolver ruido en fader
+
+### Cross-system
+10. RS485: verificar pines en S3 (legacy) y P4 (TX=50, RX=51, EN=52) — confirmar que ambos compilan y funcionan correctamente
+11. LEDs NeoPixel: implementar control de brillo centralizado — estudiar si viable vía MIDI (CC o SysEx dedicado) para controlar brillo de todos los slaves desde Logic/P4
 
 ---
 
