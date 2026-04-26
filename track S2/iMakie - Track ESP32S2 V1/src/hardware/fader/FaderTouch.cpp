@@ -3,11 +3,11 @@
 #include "config.h"
 
 // ─── Constantes internas ──────────────────────────────────────
-static constexpr uint32_t POLL_MS        = 20;    // intervalo de lectura
-static constexpr uint8_t  BASELINE_SAMPS = 16;    // muestras para baseline
-static constexpr float    THR_TOUCH      =         // umbral toque
+static constexpr uint32_t POLL_MS        = 20;
+static constexpr uint8_t  BASELINE_SAMPS = 16;
+static constexpr float    THR_TOUCH      =
     FADER_TOUCH_THRESHOLD_PERCENTAGE / 100.0f;
-static constexpr float    THR_RELEASE    =         // histéresis +5%
+static constexpr float    THR_RELEASE    =
     (FADER_TOUCH_THRESHOLD_PERCENTAGE + 5) / 100.0f;
 
 // ─── Estado privado ───────────────────────────────────────────
@@ -21,7 +21,7 @@ static void (*_cbRelease)() = nullptr;
 
 // ─── Helpers ─────────────────────────────────────────────────
 static uint32_t _sample() {
-    return touchRead(FADER_TOUCH_PIN);   // Arduino ESP32-S2 API
+    return touchRead(FADER_TOUCH_PIN);
 }
 
 static uint32_t _sampleAvg() {
@@ -30,9 +30,8 @@ static uint32_t _sampleAvg() {
     return sum / 16;
 }
 
-
 static void _captureBaseline() {
-    delay(100);    // ← dejar estabilizar el periférico
+    delay(100);
     uint32_t sum = 0;
     for (uint8_t i = 0; i < BASELINE_SAMPS; i++) {
         sum += _sample();
@@ -63,20 +62,23 @@ bool update() {
 
     _raw = _sampleAvg();
 
-
-    // baseline solo sigue valores altos (reposo real)
-    // los valores bajos son ruido o toque — ignorar para el IIR
-    if (!_touched && _raw > _base * 0.98f) {
-        _base = (_base * 63 + _raw) / 64;
+    // AUTOCALIBRACION CONSTANTE (única fuente de verdad)
+    // Baseline sigue el valor de reposo actual para adaptarse a:
+    // - Variaciones del plástico
+    // - Cambios de temperatura
+    // - Envejecimiento del material
+    // Solo se actualiza cuando NO hay toque (detección confiable)
+    if (!_touched) {
+        // IIR filter: alpha = 1/16 → sigue lentamente pero constantemente
+        _base = (_base * 15 + _raw) / 16;
     }
-
-    bool suspect = (_raw > _base * 1.02f);
-
-    log_v("T raw=%lu  base=%lu  suspect=%d", _raw, _base, suspect);
 
     bool prev = _touched;
     if (!_touched && _raw > _base * THR_TOUCH)   _touched = true;
     if ( _touched && _raw < _base * THR_RELEASE) _touched = false;
+
+    log_v("Touch raw=%lu base=%lu ratio=%.2f%% touch=%d", 
+          _raw, _base, (_raw * 100.0f / _base), _touched);
 
     if (_touched != prev) {
         if (_touched  && _cbTouch)   _cbTouch();
@@ -85,7 +87,6 @@ bool update() {
     }
     return false;
 }
-
 
 bool     isTouched()  { return _touched; }
 uint32_t getRaw()     { return _raw;     }

@@ -35,7 +35,6 @@ const SatMenu::Item SatMenu::_motorItems[] = {
 
 const SatMenu::Item SatMenu::_touchItems[] = {
     {"EN","Habilitado",  Scr::TOUCH        },
-    {"TH","Umbral %",    Scr::EDIT_TOUCHTHR},
 };
 const SatMenu::Item SatMenu::_diagItems[] = {
     {"DP","Test Display",  Scr::TEST_DISPLAY  },
@@ -150,7 +149,6 @@ void SatMenu::update() {
         case Scr::EDIT_TRACKID:
         case Scr::EDIT_PWMMIN:
         case Scr::EDIT_PWMMAX:
-        case Scr::EDIT_TOUCHTHR: _hEditVal(b);         break;
         case Scr::EDIT_LABEL:    _hEditLbl(b);         break;
         case Scr::CONFIRM:       _hConfirm(b);         break;
         case Scr::TOAST:         _hToast(b);           break;
@@ -231,18 +229,7 @@ void SatMenu::_render() {
             _spr.setTextDatum(textdatum_t::middle_right);
             _spr.setTextColor(en?C_GREEN:C_GRAY, _cur==0?C_ACCENT:C_BG);
             _spr.drawString(en?"ON":"OFF", W-10, y+SAT_ROW_H/2);
-            _drawDivider(y+SAT_ROW_H);
-            y += SAT_ROW_H;
-            char buf[8]; snprintf(buf,8,"%d%%",_tmp.touchThreshold);
-            _spr.fillRect(0, y, W, SAT_ROW_H, _cur==1?C_ACCENT:C_BG);
-            _drawBadge(6, y+(SAT_ROW_H-SAT_BADGE_H)/2, "TH",
-                _cur==1?C_WHITE:C_ACCENT, _cur==1?C_ACCENT:C_WHITE);
-            _spr.setTextColor(_cur==1?C_WHITE:C_TEXT, _cur==1?C_ACCENT:C_BG);
-            _spr.setTextDatum(textdatum_t::middle_left);
-            _spr.drawString("Umbral", SAT_BADGE_W+14, y+SAT_ROW_H/2);
-            _spr.setTextDatum(textdatum_t::middle_right);
-            _spr.drawString(buf, W-10, y+SAT_ROW_H/2);
-            _drawHints("","","Atras","Editar");
+            _drawHints("","","Atras","Activar/Desactivar");
             break;
         }
         case Scr::DIAG:
@@ -253,9 +240,7 @@ void SatMenu::_render() {
         case Scr::EDIT_TRACKID:
         case Scr::EDIT_PWMMIN:
         case Scr::EDIT_PWMMAX:
-        case Scr::EDIT_TOUCHTHR:
-            _drawValEdit(_eTitle, _eVal, _eMin, _eMax,
-                _scr==Scr::EDIT_TOUCHTHR ? "%" : "");
+            _drawValEdit(_eTitle, _eVal, _eMin, _eMax, "");
             break;
         case Scr::EDIT_LABEL:
             _drawHdr("Etiqueta");
@@ -662,8 +647,6 @@ void SatMenu::_hTouch(Btn b) {
             _save(); if (_cbSaved) _cbSaved(_cfg);
             _toast(_tmp.touchEnabled?"Touch: ON":"Touch: OFF", Scr::TOUCH);
         } else {
-            _eTitle="Umbral Touch"; _eVal=_tmp.touchThreshold; _eMin=10; _eMax=90;
-            _goto(Scr::EDIT_TOUCHTHR);
         }
     }
 }
@@ -692,7 +675,6 @@ void SatMenu::_hEditVal(Btn b) {
             case Scr::EDIT_TRACKID:  _cfg.trackId=_tmp.trackId=(uint8_t)_eVal; break;
             case Scr::EDIT_PWMMIN:   _cfg.pwmMin =_tmp.pwmMin =(uint8_t)_eVal; break;
             case Scr::EDIT_PWMMAX:   _cfg.pwmMax =_tmp.pwmMax =(uint8_t)_eVal; break;
-            case Scr::EDIT_TOUCHTHR: _cfg.touchThreshold=_tmp.touchThreshold=(uint8_t)_eVal; break;
             default: break;
         }
         _save(); if (_cbSaved) _cbSaved(_cfg);
@@ -880,7 +862,6 @@ void SatMenu::_load() {
     _cfg.pwmMin         = _prefs.getUChar("pwmMin", 40);
     _cfg.pwmMax         = _prefs.getUChar("pwmMax", 220);
     _cfg.touchEnabled   = _prefs.getBool ("touchEn",true);
-    _cfg.touchThreshold = _prefs.getUChar("touchThr",80);
     _cfg.motorDisabled = _prefs.getBool("motorDis", false);
     String lbl=_prefs.getString("label","CH-01 ");
     strncpy(_cfg.label,lbl.c_str(),6); _cfg.label[6]='\0';
@@ -892,7 +873,6 @@ void SatMenu::_save() {
     _prefs.putUChar("pwmMin",  _cfg.pwmMin);
     _prefs.putUChar("pwmMax",  _cfg.pwmMax);
     _prefs.putBool ("touchEn", _cfg.touchEnabled);
-    _prefs.putUChar("touchThr",_cfg.touchThreshold);
     _prefs.putString("label",  String(_cfg.label).substring(0,6));
     _prefs.putBool("motorDis", _cfg.motorDisabled);
     _prefs.end();

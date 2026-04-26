@@ -34,7 +34,6 @@ struct SatConfig {
     uint8_t pwmMin;
     uint8_t pwmMax;
     bool    touchEnabled;
-    uint8_t touchThreshold;
     bool    motorDisabled; 
 };
 
@@ -73,7 +72,7 @@ private:
         MAIN, IDENTIDAD, MOTOR, TOUCH, DIAG,
         OTA, REINICIAR,
         EDIT_TRACKID, EDIT_LABEL,
-        EDIT_PWMMIN, EDIT_PWMMAX, EDIT_TOUCHTHR,
+        EDIT_PWMMIN, EDIT_PWMMAX,
         CONFIRM, TOAST,
         TEST_DISPLAY, TEST_ENCODER, TEST_FADER, TEST_NEOPIXEL,
         MOTOR_CALIB,
