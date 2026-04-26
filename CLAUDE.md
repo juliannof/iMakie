@@ -177,7 +177,7 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 6. NeoTrellis sin implementar — atención a pines I2C nuevos (SDA=GPIO33, SCL=GPIO31)
 
 ### S2
-7. **Encoder salta pasos** — Gray code sin debounce. Ruido en pines A/B causa transiciones falsas. Fix: debounce timer (2-5ms) antes de procesar cambio en ISR
+7. **Encoder — RESUELTO** — Lógica única en `Encoder.cpp` (SAT ya no duplica). Debounce 3ms. Derecha suma, izquierda resta. Infinito (sin límites).
 8. FaderTouch por varianza (plástico) — `TOUCH_VAR_THRESHOLD` etc ya en `config.h`
 9. revisar FaderADC tras reescritura — validar lecturas actuales con hardware real
 10. ADS1015 pedido — cuando llegue, reemplazar lectura ADC nativa por I2C ADS1015 para resolver ruido en fader

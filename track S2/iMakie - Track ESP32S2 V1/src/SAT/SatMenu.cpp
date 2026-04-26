@@ -2,6 +2,7 @@
 //  SatMenu.cpp  –  iMakie PTxx Track S2
 // ============================================================
 #include "SatMenu.h"
+#include "../hardware/encoder/Encoder.h"
 #include "../config.h"
 
 #include "../hardware/fader/FaderADC.h"   // ← añadir
@@ -389,21 +390,13 @@ void SatMenu::_tickTestEncoder(Btn b) {
     if (b == Btn::UP || b == Btn::DOWN) { _encCnt=0; memset(_encHist,0,ENC_HIST); }
     if (b == Btn::ENTER) { _encCnt=0; memset(_encHist,0,ENC_HIST); }
 
+    // Lógica de encoder está en Encoder.cpp (única fuente de verdad)
+    _encCnt = Encoder::getCount();
+    _encHist[_encHistIdx] = (int8_t)constrain(_encCnt,-63,63);
+    _encHistIdx = (_encHistIdx+1) % ENC_HIST;
+    
     int A = digitalRead(ENCODER_PIN_A);
     int B = digitalRead(ENCODER_PIN_B);
-    unsigned long now = millis();
-    if (A != _encLastA) {
-        if (now - _encDebT > 3) {
-            _encDebT = now;
-            if (A == LOW) {
-                _encCnt += (B == HIGH) ? 1 : -1;
-                _encHist[_encHistIdx] = (int8_t)constrain(_encCnt,-63,63);
-                _encHistIdx = (_encHistIdx+1) % ENC_HIST;
-            }
-        }
-        _encLastA = A;
-    }
-    if (B != _encLastB) _encLastB = B;
     bool sw = (digitalRead(ENCODER_SW_PIN) == LOW);
     _encSW = sw;
 
