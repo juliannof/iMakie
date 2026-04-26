@@ -46,7 +46,8 @@ namespace FaderTouch {
 
 void init() {
     _touched = false;
-    _captureBaseline();
+    // Baseline será capturada gradualmente por IIR filter en update()
+    // No hacer captureBaseline() aquí porque al arranque puede estar tocado
 }
 
 bool update() {
