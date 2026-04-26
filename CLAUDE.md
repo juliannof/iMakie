@@ -108,11 +108,11 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 - Provisioning via sketch USB que cachea credenciales en NVS namespace `"ptxx"`
 
 ### NVS namespace S2
-`"ptxx"` — claves: `wifiSsid`, `wifiPass`, `otaPass`, `trackId`, `label`, `pwmMin`, `pwmMax`, `touchEn`, `touchThr`, `motorDis`
+`"ptxx"` — claves: `wifiSsid`, `wifiPass`, `otaPass`, `trackId`, `label`, `pwmMin`, `pwmMax`, `touchEn`, `motorDis`
 
 ### Build S2
-- Platform: pioarduino 53.03.11 / IDF5 — **no actualizar**, USB-MIDI del S3 funciona en esta versión
-- LovyanGFX 1.2.19
+- Platform: pioarduino 55.03.37 / IDF5 — unificado con P4 (requiere P4)
+- LovyanGFX 1.2.19, Adafruit NeoPixel (cambio desde NeoPixelBus)
 - Orden de init obligatorio: `initDisplay()` → `initNeopixels()` → `initHardware()`
 - FreeRTOS: `rs485.begin()` en setup, `rs485.startTask()` al final del setup
 - `Serial.printf` para logging — `log_i`/`log_w` no son fiables en S2
@@ -178,7 +178,7 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 
 ### S2
 7. **Encoder — RESUELTO** — Lógica única en `Encoder.cpp` (SAT ya no duplica). Debounce 3ms. Derecha suma, izquierda resta. Infinito (sin límites).
-8. FaderTouch por varianza (plástico) — `TOUCH_VAR_THRESHOLD` etc ya en `config.h`
+8. **FaderTouch — RESUELTO** — Auto-calibración constante con filtro IIR (alpha=1/16) en `FaderTouch.cpp`. Baseline se adapta a varianza de plástico, temperatura, envejecimiento. SAT ya no tiene config de touchThreshold.
 9. revisar FaderADC tras reescritura — validar lecturas actuales con hardware real
 10. ADS1015 pedido — cuando llegue, reemplazar lectura ADC nativa por I2C ADS1015 para resolver ruido en fader
 
