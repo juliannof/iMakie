@@ -644,6 +644,8 @@ void SatMenu::_hDiag(Btn b) {
                     _goto(Scr::TEST_FADER); break;
             case 3: memset(_neoPressed,0,sizeof(_neoPressed));
                     _goto(Scr::TEST_NEOPIXEL); break;
+            case 4: _fadHistIdx=0; memset(_fadHist,0,FAD_HIST); _fadT=0;
+                    _goto(Scr::TEST_TOUCH); break;
         }
     }
 }
