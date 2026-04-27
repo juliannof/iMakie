@@ -36,16 +36,18 @@ void onMasterData(const MasterPacket& pkt) {
 
     if (newState == ConnectionState::CONNECTED) {
         neoWaitingHandshake = false;
-        updateAllNeopixels();
+        // ¡CRÍTICO! NO llamar updateAllNeopixels() aquí — retarda RS485 response
+        // Neopixels se actualizan en main.cpp DESPUÉS de sendResponse()
     } else {
         // ── Desconexión limpia ────────────────────────────
-        Motor::off();  
-        Motor::setTarget(Motor::getRawADC()); 
+        Motor::off();
+        Motor::setTarget(Motor::getRawADC());
         recStates = soloStates = muteStates = selectStates = false;
         vuLevels = vuPeakLevels = 0.0f;
-        //setScreenBrightness(0); 
+        //setScreenBrightness(0);
         neoWaitingHandshake = true;
-        updateAllNeopixels();
+        // ¡CRÍTICO! NO llamar updateAllNeopixels() aquí — retarda RS485 response
+        // Neopixels se actualizan en main.cpp DESPUÉS de sendResponse()
     }
 }
     if (logicConnectionState != ConnectionState::CONNECTED) return;
@@ -150,11 +152,8 @@ void checkTimeout(unsigned long lastRxTime) {
         recStates = soloStates = muteStates = selectStates = false;
         setScreenBrightness(0);
         neoWaitingHandshake = true;
-        clearAllNeopixels();
-        for (int i = 0; i < NEOPIXEL_COUNT; i++) setNeopixelState(i, 0, 0, 5);
-        showNeopixels();
-
-
+        // ¡CRÍTICO! NO actualizar neopixels aquí — timeout podría estar en path RS485
+        // Los neopixels se actualizarán en el siguiente ciclo main.cpp
         needsTOTALRedraw = true;
     }
 }

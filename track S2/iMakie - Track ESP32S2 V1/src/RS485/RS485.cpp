@@ -34,10 +34,21 @@ void RS485Slave::sendResponse(const SlavePacket& pkt) {
     tx.id           = _myId;
     tx.crc          = rs485_crc8((const uint8_t*)&tx, sizeof(SlavePacket) - 1);
 
+    // ════════════════════════════════════════════════════════════════════
+    // TIMING CRÍTICO — RS485 requiere setup/hold de EN
+    // ════════════════════════════════════════════════════════════════════
+    // Transceiver típico (MAX485, SN75176, etc.) requiere:
+    //   - Setup: 30-50µs ANTES de enviar (EN HIGH → ready to TX)
+    //   - Hold: 50-100µs DESPUÉS de TX completo (EN LOW después de último bit)
+    //
+    // Paquete: 9 bytes × 10 bits/byte = 90 bits @ 500kbaud = 180µs
+    // ════════════════════════════════════════════════════════════════════
+
     digitalWrite(RS485_ENABLE_PIN, HIGH);
-    delayMicroseconds(10);
+    delayMicroseconds(50);          // ← Setup time para transceiver (30-50µs típico)
     Serial1.write((const uint8_t*)&tx, sizeof(SlavePacket));
-    Serial1.flush();
+    Serial1.flush();                // ← Espera TX completo (~180µs)
+    delayMicroseconds(50);          // ← Hold time: mantener EN HIGH después de flush
     digitalWrite(RS485_ENABLE_PIN, LOW);
 
     _rxCount++;  // reutilizamos como TX count — renombrar si hace falta

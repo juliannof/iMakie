@@ -207,40 +207,65 @@ void RS485Master::_handleResponse() {
         _ch[_currentId].encoderButton     = resp->encoderButton;
         _ch[_currentId].responded         = true;
 
+        // ════════════════════════════════════════════════════════════════════
+        // CALIBRACIÓN — DESACTIVADA TEMPORALMENTE
+        // ════════════════════════════════════════════════════════════════════
+        //
+        // RAZÓN: Los motores DRV8833 en los slaves S2 están desactivados en la
+        // PCB actual (líneas de control no conectadas/alimentadas). Sin motor,
+        // la calibración siempre falla → ERROR_CALIBRACION → retry automático.
+        // Los retries generan tráfico innecesario RS485 → timeouts artificiales.
+        //
+        // CUANDO REACTIVAR:
+        // - Una vez que los motores estén presentes en hardware
+        // - Cambiar _ch[_currentId].calibrated = true (abajo) a false
+        // - Descomentar bloque de lógica de calibración (ver comentario ANTIGUO)
+        // - Probar con Motor::init() funcionando en setup() S2
+        //
+        // ESTADO ACTUAL:
+        // - Se ignoran flags CALIB_DONE, CALIB_ERROR, NOT_CALIBRATED
+        // - Todos los slaves se marcan como calibrated=true (bypass)
+        // - Faders responden correctamente a targets del master
+        // - Botones/encoders funcionan sin depender de calibración
+        // ════════════════════════════════════════════════════════════════════
+
         bool calibDone     = resp->buttons & SLAVE_FLAG_CALIB_DONE;
         bool calibError    = resp->buttons & SLAVE_FLAG_CALIB_ERROR;
         bool notCalibrated = resp->buttons & SLAVE_FLAG_NOT_CALIBRATED;
 
-        if (calibDone) {
-            _ch[_currentId].calibrating = false;
-            if (!_ch[_currentId].calibrated) {
-                _ch[_currentId].calibrated = true;
-                _ch[_currentId].dirty      = true;
-                log_i("[RS485] Slave %d calibrado OK", _currentId);
-            }
-        }
+        // [ANTIGUO] Lógica de calibración — comentada por desactivación hardware
+        // if (calibDone) {
+        //     _ch[_currentId].calibrating = false;
+        //     if (!_ch[_currentId].calibrated) {
+        //         _ch[_currentId].calibrated = true;
+        //         _ch[_currentId].dirty      = true;
+        //         log_i("[RS485] Slave %d calibrado OK", _currentId);
+        //     }
+        // }
+        // if (calibError) {
+        //     _ch[_currentId].calibrating  = false;
+        //     _ch[_currentId].calibRetries++;
+        //     log_w("[RS485] Slave %d ERROR calibracion (intento %d)",
+        //           _currentId, _ch[_currentId].calibRetries);
+        // }
+        // if (notCalibrated && !_ch[_currentId].calibrating) {
+        //     _ch[_currentId].calibrated   = false;
+        //     _ch[_currentId].calibRetries = 0;
+        // }
+        // if (!_ch[_currentId].calibrated &&
+        //     !_ch[_currentId].calibrating &&
+        //     _ch[_currentId].calibRetries < 3) {
+        //     _ch[_currentId].calibrate   = true;
+        //     _ch[_currentId].dirty       = true;
+        //     _ch[_currentId].calibrating = true;
+        //     log_i("[RS485] Slave %d sin calibrar — disparando (intento %d)",
+        //           _currentId, _ch[_currentId].calibRetries + 1);
+        // }
 
-        if (calibError) {
-            _ch[_currentId].calibrating  = false;
-            _ch[_currentId].calibRetries++;
-            log_w("[RS485] Slave %d ERROR calibracion (intento %d)",
-                  _currentId, _ch[_currentId].calibRetries);
-        }
-
-        if (notCalibrated && !_ch[_currentId].calibrating) {
-            _ch[_currentId].calibrated   = false;
-            _ch[_currentId].calibRetries = 0;
-        }
-
-        if (!_ch[_currentId].calibrated &&
-            !_ch[_currentId].calibrating &&
-            _ch[_currentId].calibRetries < 3) {
-            _ch[_currentId].calibrate   = true;
-            _ch[_currentId].dirty       = true;
-            _ch[_currentId].calibrating = true;
-            log_i("[RS485] Slave %d sin calibrar — disparando (intento %d)",
-                  _currentId, _ch[_currentId].calibRetries + 1);
-        }
+        // [ACTUAL] Bypass: marcar todo como calibrado (motor no disponible)
+        _ch[_currentId].calibrated   = true;
+        _ch[_currentId].calibrating  = false;
+        _ch[_currentId].calibRetries = 0;
 
         xSemaphoreGive(_mutex);
     }
