@@ -103,7 +103,7 @@ void RS485Master::runTask() {
                 if (micros() - _stateTimer >= RS485_GAP_US) {
                     rs485prof.markGapEnd();
                     _cycleCount++;
-                    rs485prof.reportIfNeeded(_cycleCount, 100);
+                    rs485prof.reportIfNeeded(_cycleCount, 100, true);  // verbose=true para debug
                     _nextSlave();
                     _busState = BusState::SEND;
                 }
@@ -185,11 +185,13 @@ void RS485Master::_handleResponse() {
     uint8_t crc = rs485_crc8(_rxBuf, sizeof(SlavePacket) - 1);
     if (crc != resp->crc) {
         _crcErrors++;
+        rs485prof.recordCrcError(_currentId);  // registrar en profiler
         log_e("[RS485] slave=%u CRC ERROR calc=0x%02X recv=0x%02X",
               _currentId, crc, resp->crc);
         return;
     }
     if (resp->id != _currentId) {
+        rs485prof.recordIdMismatch(_currentId, resp->id);  // registrar en profiler
         log_e("[RS485] ID MISMATCH esperado=%u recibido=%u",
               _currentId, resp->id);
         return;

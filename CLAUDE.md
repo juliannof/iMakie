@@ -585,9 +585,34 @@ WAIT_RESP (espera SlavePacket 9 bytes ≈ 144µs + margen)
 - Actual: TO% ≈ 79-85% → suggests esclavo 1 también está en problemas
 - **RX_WAIT avg 2785µs**: muy cerca del límite 3000µs → **vulnerable a ISR overhead**
 
+**Profiler extendido — Modo debugger (2026-04-27):**
+
+Ahora el Profiler reporta **por esclavo** cada 100 ciclos:
+```
+[PROF] Ciclo 100: RX_WAIT avg=2800µs min=400µs max=3050µs TO:85.0% (85/100)
+[PROF]   Slave 1: RX=30 TO=20 CRC=0 ID_MM=0 avg=2700µs min=400µs max=2950µs (TO:40%)
+[PROF]   Slave 2: RX=0 TO=50 CRC=0 ID_MM=5 avg=0µs min=0µs max=0µs (TO:100%)
+[PROF]   Slave 3: RX=0 TO=30 CRC=0 ID_MM=0 avg=0µs min=0µs max=0µs (TO:100%)
+```
+
+**Qué ver:**
+- **Slave 1 RX=30 TO=20**: responde 30 veces, falla 20 veces (40% timeout)
+- **Slave 2 ID_MM=5**: 5 veces recibió respuesta de otro slave (desincronización)
+- **Slave 3 RX=0**: nunca respondió (no conectado o muerto)
+
+**Patrones diagnósticos:**
+
+| Patrón | Causa |
+|--------|-------|
+| Slave 1 TO:40%, Slave 2 ID_MM=5, Slave 3 TO:100% | Slave 2 no conectado, desincroniza bus |
+| Slave 1 ID_MM=10, Slave 2 TO:100%, Slave 3 ID_MM=8 | Ruido en bus, probablemente cable RS485 |
+| Todos Slave X CRC=5+ | Noise o baudrate incorrecto |
+| Slave 1 avg=2950µs, Slave 2 avg=2940µs (sin TO) | Sistema limpio, timing correcto |
+
 **Próximo paso:** Conectar 2 encoders (slaves 2 y 3), compilar, y revisar Profiler:
-- Si TO% baja a ~33% (solo slave 1 falla ocasionalmente): problema de esclavo 1
-- Si TO% se mantiene alto: problema de timing master o bus RS485
+- Si **Slave 1 TO% baja** y **Slave 2/3 RX aumenta sin ID_MM**: excelente
+- Si **ID_MM alto**: problema de desincronización (revisar cable/terminación RS485)
+- Si **CRC errors**: ruido en bus
 
 ---
 
