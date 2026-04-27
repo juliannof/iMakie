@@ -547,6 +547,48 @@ WAIT_RESP (espera SlavePacket 9 bytes ≈ 144µs + margen)
 4. **No hay resincronización** si se pierde encabezado — estatua espera siguiente 0xBB
 5. **Race en `responded` flag:** Core 0 lee, Core 1 escribe — sin mutex protegiendo acceso
 
+### RS485Profiler — Diagnosticación sin overhead
+
+**¿Qué es?** Herramienta para medir tiempos de operación RS485 (TX, RX, GAP, ciclos completos) sin bloqueo. 
+
+**¿Por qué diferente de `log_i()`?**
+
+| Aspecto | `log_i()` por byte | RS485Profiler |
+|---------|-------------------|---|
+| **Cuando** | Cada byte RX | Cada 100 ciclos (agregado) |
+| **Overhead** | Alto: UART/Serial síncrono | Bajo: solo micros() |
+| **Bloquea Task** | SÍ (espera UART) | NO |
+| **Puede causar** | Timeouts por logging | Nada (mide, no bloquea) |
+| **Qué mide** | Eventos individuales | Estadísticas (min/max/avg/ratio) |
+
+**Estadísticas reportadas cada 100 ciclos:**
+```
+[PROF] Ciclo 637000: RX_WAIT avg=2801µs min=397µs max=3056µs TO:85.0% (85/100)
+```
+- **avg=2801µs**: tiempo promedio esperando respuesta
+- **min=397µs**: mejor respuesta (esclavo respondió rápido)
+- **max=3056µs**: peor respuesta (casi timeout a 3000µs)
+- **TO:85%**: tasa de timeout (85 de 100 intentos timeouted)
+
+**Cómo interpretarlo:**
+
+| Síntoma | Causa probable | Fix |
+|---------|---|---|
+| **avg ≈ TIMEOUT_US** | Timing muy ajustado | Aumentar RESP_TIMEOUT_US |
+| **TO > 50%** | Slaves no responden / no conectados | Verificar NUM_SLAVES vs físicos |
+| **min << avg << max** | Variabilidad alta (ISR, logging) | Reducir logging, aumentar timeout |
+| **TO = 0%, avg < 1000µs** | Sistema limpio | OK, mantener |
+
+**En el proyecto actual:**
+- NUM_SLAVES=3 pero solo 1 esclavo conectado
+- Esperado: TO% ≈ 67% (2 slaves no responden) + algunos timeouts del esclavo 1
+- Actual: TO% ≈ 79-85% → suggests esclavo 1 también está en problemas
+- **RX_WAIT avg 2785µs**: muy cerca del límite 3000µs → **vulnerable a ISR overhead**
+
+**Próximo paso:** Conectar 2 encoders (slaves 2 y 3), compilar, y revisar Profiler:
+- Si TO% baja a ~33% (solo slave 1 falla ocasionalmente): problema de esclavo 1
+- Si TO% se mantiene alto: problema de timing master o bus RS485
+
 ---
 
 ## Mackie MCU — comportamiento Logic
