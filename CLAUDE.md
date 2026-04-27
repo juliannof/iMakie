@@ -110,6 +110,212 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 ### NVS namespace S2
 `"ptxx"` — claves: `wifiSsid`, `wifiPass`, `otaPass`, `trackId`, `label`, `pwmMin`, `pwmMax`, `touchEn`, `motorDis`
 
+---
+
+## Arquitectura S2 — Flujo de datos
+
+### Loop principal (main.cpp)
+
+```
+loop() {
+  1. ButtonManager::update()        ← botones REC/SOLO/MUTE/SELECT → flags
+  2. RS485 receive (si hay data):
+     - RS485Handler::onMasterData() ← recibe faderTarget, nombre, flags
+     - buildResponse()              ← arma SlavePacket con estado actual
+     - sendResponse()               ← envía al master S3 o P4
+     - Encoder::reset()             ← limpia delta acumulado
+  3. faderADC.update()              ← lee ADC 13-bit: 0-8191
+  4. FaderTouch::update()           ← detección sostenimiento: >1.5% baseline × 120ms
+  5. Motor::update()                ← control PID hacia faderTarget
+  6. Encoder::update()              ← acumula deltas (-127..+127)
+  7. updateDisplay()                ← pantalla SPI3
+  8. updateAllNeopixels()           ← LEDs
+}
+```
+
+### Botones (4 contactos digitales)
+
+| Botón | GPIO | Lógica | Envío |
+|-------|------|--------|-------|
+| REC | 37 | Baja=presionado | Bit 0 en SlavePacket.buttons |
+| SOLO | 38 | Baja=presionado | Bit 1 en SlavePacket.buttons |
+| MUTE | 39 | Baja=presionado | Bit 2 en SlavePacket.buttons |
+| SELECT | 40 | Baja=presionado | Bit 3 en SlavePacket.buttons |
+
+**Ciclo botones:**
+1. `ButtonManager::update()` lee GPIO, debounce 20ms
+2. Detecta flanco ascendente (release) → flag `buttonPressed`
+3. `buildResponse()` encapsula bit en `SlavePacket.buttons` (bits 0-3)
+4. Master recibe, mapea a nota MIDI, envía a Logic
+5. **IMPORTANTE:** Logic es fuente única de verdad — S2 nunca hace toggle local
+
+**¿Por qué no funciona SELECT actualmente?**
+- Revisa `ButtonManager::update()` — ¿lee GPIO40?
+- Revisa debounce: ¿20ms es suficiente? (comparar con REC/SOLO/MUTE)
+- Revisa `buildResponse()` — ¿pasa bit 3 correctamente?
+- Revisa RS485 — ¿llega el paquete al master sin timeouts?
+
+### Fader (ADC GPIO10)
+
+**Hardware:**
+- ESP32-S2 ADC1_CH9 (GPIO10)
+- Resolución: 13-bit (0-8191)
+- Atenuación: 11dB (0-3.3V)
+- Ruido: ±30 cuentas típico (→ ADS1015 será fix futuro)
+
+**Firmware:**
+- `FaderADC::update()` lee crudo + EMA lowpass (alpha=0.20)
+- `FaderTouch::update()` detecta toque por sostenimiento:
+  - raw > (baseline × 1.015) sostenido > 6 frames (120ms) = TOQUE
+  - baseline actualizado siempre con IIR (alpha=1/16, NO congelado)
+  - Perfect sin plástico, validación pendiente con plástico
+
+**Salida:**
+- `SlavePacket.faderPos` = valor 13-bit actual
+- Master lee, interpola, envía `faderTarget` 14-bit vía RS485
+- Motor sigue `faderTarget` usando calibración (no PID)
+
+### Motor (DRV8833 H-bridge)
+
+**Control:**
+- IN1=GPIO14, IN2=GPIO16 (dirección via digitalWrite)
+- PWM=GPIO18 (analogWrite 0-255)
+- Sensor: faderADC feedback
+
+**Estados calibración (máquina de estado):**
+```
+IDLE
+  ↓ (detecta FLAG_CALIB)
+KICK_UP (max PWM, 500ms) → fuerza movimiento inicial
+  ↓
+GOING_UP (PWM mediano, hasta ADC máximo)
+  ↓
+SETTLE_UP (PWM bajo, estabiliza 200ms)
+  ↓
+KICK_DOWN → GOING_DOWN → SETTLE_DOWN (simétrico)
+  ↓
+CALIBRATED (marca SLAVE_FLAG_CALIB_DONE, responde bien a targets)
+```
+
+**Control normal (post-calibración):**
+- `Motor::setADC(currentPos)` — posición actual de fader
+- `Motor::setTarget(target)` — posición deseada del master
+- Dead zone: si |error| < 50 cuentas, motor apagado
+- Si tocado → motor para inmediatamente (evita conflicto)
+
+### Pantalla (ST7789V3 240×280)
+
+**Layout:**
+```
+[Header 40px]        ← nombre track + flags (REC/SOLO/MUTE/SELECT)
+[Main Area]          ← gráfico barras/fader + info
+[VU Meter 60px]      ← pico + decay exponencial
+[VPot Ring 60px]     ← anillo 15 posiciones (-7..+7) + encoder
+
+Total: 240×400 (offset_y=20 en ST7789 interno)
+```
+
+**Sprites PSRAM:**
+- `header` (240×40) — track name, flags
+- `mainArea` (180×240) — main display
+- `vuSprite` (60×240) — meter vertical
+- `vPotSprite` (240×60) — ring + encoder level
+
+**Actualización:**
+- `updateDisplay()` en loop, redraw si `needsTOTALRedraw` o `needsVPotRedraw`
+- SPI3_HOST, freq_write=5MHz, freq_read=8MHz
+- BL PWM 500Hz, GPIO3
+
+### Encoder (Rotario infinito)
+
+**Hardware:**
+- A=GPIO12, B=GPIO13 (rotatorio Gray code)
+- Push=GPIO21 (debounce 3ms)
+- Acciona VPot ring: -7 a +7
+
+**Firmware:**
+- Lógica única en `Encoder.cpp` (SAT no duplica)
+- Debounce 3ms, derecha=+1, izquierda=-1
+- Delta acumulado resetea tras `buildResponse()`
+- `Encoder::currentVPotLevel` rango 0-14 mapea pantalla
+
+### NeoPixels (12 LEDs)
+
+**Hardware:**
+- Adafruit NeoPixel GPIO36
+- 12 × WS2812B RGB 5050
+- Una sola instancia global en `Neopixel.cpp`
+
+**Estados LED:**
+- **0-3:** Botón corresponding (REC/SOLO/MUTE/SELECT)
+  - Color según Logic feedback vía MIDI
+  - Parpadea si estado "semi-active"
+- **4-10:** VU meter visual (correlaciona `vuLevel`)
+  - Rojo > 24, amarillo 12-23, verde 0-11
+- **11:** Status (verde=OK, naranja=timeout RS485, rojo=error)
+
+### Ciclo de comunicación RS485
+
+```
+1. Master envía MasterPacket (16B)
+   - trackName, faderTarget, vuLevel, flags, etc.
+   
+2. S2 recibe → RS485Handler::onMasterData()
+   - Actualiza: trackName, faderTarget, botones esperados, etc.
+   - Marca lastRxTime
+
+3. S2 construye SlavePacket (9B)
+   - faderPos, touchState, buttons (REC/SOLO/MUTE/SELECT)
+   - encoderDelta, encoderButton, flags de calibración
+   
+4. S2 envía respuesta inmediatamente
+   - ANTES de display/motor/neopixel update
+   - **CRÍTICO:** si esto tarda >150µs, master timeout
+   
+5. RS485Handler::checkTimeout(lastRxTime)
+   - Si ms > 1000 sin recibir → LED11=rojo, suspende motor
+   - Si vuelve → LED11=verde, reanuda
+
+6. Master timeout → reintenta 3 veces con FLAG_CALIB
+   - Si error persiste, marca `NOT_CALIBRATED`
+```
+
+### Órdenes de init crítico
+
+```c
+setup() {
+  1. Motor::init()           ← ANTES de Serial.begin() (silencia motor)
+  2. Serial.begin()
+  3. initNeopixels()
+  4. initDisplay()
+  5. faderADC.begin()
+  6. initHardware()          ← botones + otros GPIO
+  7. FaderTouch::init()
+  8. Encoder::begin()
+  9. ButtonManager::begin()
+  10. Motor::begin()         ← habilita control
+  11. rs485.begin(trackId)   ← ÚLTIMO (ya todo funcional)
+}
+```
+
+**¿Por qué importa el orden?**
+- Motor::init() silencia antes de Serial debug output
+- RS485 debe iniciar cuando todo está listo (si falla, no bloquea boot)
+- Display + NeoPixels comparten SPI, timing crítico
+
+### SAT (Sistema de Auto-Test)
+
+Menú en display (Encoder push > 3s):
+- **Motor Off/On** — deshabilita motor
+- **Motor Drive** — manual PWM test
+- **Brightness** — test backlight
+- **RS485 On/Off** — simula desconexión
+- **LEDs Test** — secuencia RGB por índice
+- **WiFi OTA** — carga firmware via WiFi
+- **Reboot** — reinicia
+
+**Nota:** SAT suspende PSRAM y sprites → libera RAM para diagnósticos
+
 ### Build S2
 - Platform: pioarduino 55.03.37 / IDF5 — unificado con P4 (requiere P4)
 - LovyanGFX 1.2.19, Adafruit NeoPixel (cambio desde NeoPixelBus)
@@ -228,11 +434,118 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 
 ---
 
-## Protocolo RS485
+## Protocolo RS485 — Especificación exacta
 
-Structs `MasterPacket` / `SlavePacket` en `protocol.h`. CRC8. 500kbaud.
+**Bus físico:** 500 kbaud, 8N1. CRC8 `x^8 + x^2 + x^1 + 1` (polinomio 0x07).
 
-Flags slave → master incluyen `SLAVE_FLAG_NOT_CALIBRATED`. Master detecta y dispara `FLAG_CALIB` con hasta 3 reintentos.
+### Master → Slave (MasterPacket, 16 bytes)
+
+```c
+struct MasterPacket {
+    uint8_t  header;        // 0xAA (byte de inicio)
+    uint8_t  id;            // ID esclavo: 1-17 (broadcast: 0)
+    char     trackName[7];  // Mackie Scribble Strip (7 chars ASCII, sin null)
+    uint8_t  flags;         // bits 0-3: REC|SOLO|MUTE|SELECT
+                            // bits 5-7: autoMode (AUTO_OFF..AUTO_LATCH)
+                            // bit 4: FLAG_CALIB (one-shot, master lo limpia)
+    uint16_t faderTarget;   // Posición objetivo fader: 0-16383 (14-bit, little-endian)
+    uint8_t  vuLevel;       // Medidor VU: 0-127
+    uint8_t  vpotValue;     // VPot ring (CC raw): bits 6=center, 5-4=modo, 3-0=pos
+    uint8_t  connected;     // 1=CONNECTED, 0=DISCONNECTED
+    uint8_t  crc;           // CRC8 de bytes [0..14]
+};
+```
+
+### Slave → Master (SlavePacket, 9 bytes)
+
+```c
+struct SlavePacket {
+    uint8_t  header;        // 0xBB (byte de inicio)
+    uint8_t  id;            // Echo del ID enviado
+    uint16_t faderPos;      // Posición actual fader (ADC 13-bit): 0-8191 (little-endian)
+    uint8_t  touchState;    // 0=libre, 1=tocado
+    uint8_t  buttons;       // bits 0-3: REC|SOLO|MUTE|SELECT (estado actual)
+                            // bit 4: SLAVE_FLAG_CALIB_DONE (calibración completada)
+                            // bit 5: SLAVE_FLAG_CALIB_ERROR (error en calibración)
+                            // bit 6: SLAVE_FLAG_NOT_CALIBRATED (fader sin calibrar)
+    int8_t   encoderDelta;  // Rotación acumulada: -127..+127 (se resetea a 0 tras lectura)
+    uint8_t  encoderButton; // 0=liberado, 1=presionado
+    uint8_t  crc;           // CRC8 de bytes [0..7]
+};
+```
+
+### Flags de automatización (bits 5-7 de flags)
+
+| Valor | Nombre | Descripción |
+|-------|--------|-------------|
+| 0 | AUTO_OFF | Sin automatización |
+| 1 | AUTO_READ | Lectura de automatización |
+| 2 | AUTO_WRITE | Grabación de automatización |
+| 3 | AUTO_TRIM | Trim (ajuste fino) |
+| 4 | AUTO_TOUCH | Toque (activa escritura) |
+| 5 | AUTO_LATCH | Latch (mantiene valor al soltar) |
+
+### Máquina de estados bus (Core 1, tarea RS485)
+
+```
+SEND (envía paquete a slave[id])
+  ↓ (TX_ENABLE_US=10µs + 16 bytes ÷ 500kbaud ÷ 8 bits/byte ≈ 256µs + TX_DONE_US=10µs)
+WAIT_RESP (espera SlavePacket 9 bytes ≈ 144µs + margen)
+  ├─ TIMEOUT (micros() > 1500µs) → GAP + TIMEOUT++
+  └─ RX completo (9 bytes) → procesa + GAP
+      ↓
+    GAP (espera 300µs mínimo antes de siguiente slave)
+      ↓
+    _nextSlave() (id++, si id > NUM_SLAVES → reset a 1, delay(POLL_CYCLE_MS - elapsed))
+      ↓ (vuelta a SEND)
+```
+
+### Timing crítico (S3 Extender actual)
+
+| Parámetro | Valor | Notas |
+|-----------|-------|-------|
+| TX_ENABLE_US | 30µs | Tiempo para que transceiver habilitado transmita (↑ desde 10µs) |
+| TX_DONE_US | 30µs | Tiempo para que transceiver deshabilitado deje de conducir (↑ desde 10µs) |
+| RESP_TIMEOUT_US | 3000µs | Máximo tiempo esperando SlavePacket (↑ desde 1500µs) |
+| GAP_US | 300µs | Tiempo mínimo entre fin GAP y siguiente SEND |
+| POLL_CYCLE_MS | 20ms | Ciclo total: ~3 slaves × 3ms = 9ms + margen |
+| RS485_BAUD | 500000 | Bits/segundo |
+
+**Mejoras aplicadas (2026-04-27):**
+- TX_ENABLE_US/TX_DONE_US: 10µs → 30µs (dar tiempo a transceiver 30-50µs típico)
+- RESP_TIMEOUT_US: 1500µs → 3000µs (más margen para ISR overhead, logging)
+- Logging: removido log_i() por byte RX, solo eventos/errores
+- Estadísticas: contador de timeouts consecutivos, reportaje mejorado en printStats()
+
+**Problema anterior:** timeout 1500µs era muy estrecho:
+- SlavePacket = 9 bytes × 10 bits/byte ÷ 500k = 180µs
+- Master overhead (ISR, context switch) puede causar 10-20 timeouts consecutivos
+- Solución propuesta: aumentar a 3000µs, validar con hardware real
+
+### Protocolo de calibración (one-shot)
+
+1. Master detecta bit `SLAVE_FLAG_NOT_CALIBRATED` en respuesta
+2. Master establece `calibrate=true` y envía paquete con `FLAG_CALIB` (bit 4)
+3. Slave inicia máquina de calibración (motor sube/baja)
+4. Slave responde con `SLAVE_FLAG_CALIB_DONE` (bit 4) o `SLAVE_FLAG_CALIB_ERROR` (bit 5)
+5. Master limpia `calibrate=false` para no retransmitir
+6. Master reintenta hasta 3 veces si error
+7. Master marca `calibrated=true` y envía sin FLAG_CALIB en futuras transacciones
+
+### Sincronización RS485
+
+- **Lectura:** `_readResponse()` busca header `0xBB`, luego acumula 9 bytes (sin timeout inter-byte)
+- **Limpieza RX:** antes de TX, limpia Serial1 buffer (puede perder bytes en tránsito)
+- **No hay handshake ACK:** Master solo espera SlavePacket, sin protocolo de confirmación
+- **CRC solo validación:** CRC error = packet rechazado, no reenvío automático
+
+### Puntos débiles identificados
+
+1. **Buffer RX pequeño:** 256 bytes para 8 slaves × 9 bytes = 72 bytes útiles + ISR overhead
+2. **Logging verbose en RX:** `log_i("RX byte: 0x%02X")` para cada byte → bloquea Task RS485
+3. **TX timing:** 10µs podría ser insuficiente para transceiver RS485 típicos (30-50µs needed)
+4. **No hay resincronización** si se pierde encabezado — estatua espera siguiente 0xBB
+5. **Race en `responded` flag:** Core 0 lee, Core 1 escribe — sin mutex protegiendo acceso
 
 ---
 

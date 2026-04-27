@@ -1,7 +1,8 @@
 // ============================================================
-//  RS485.cpp  –  Master P4 (integrado en iMakie)
+//  RS485.cpp  –  Master S3 (integrado en iMakie)
 // ============================================================
 #include "RS485.h"
+#include "Profiler.h"
 
 RS485Master rs485;
 
@@ -61,25 +62,34 @@ void RS485Master::taskEntry(void* param) {
 
 void RS485Master::runTask() {
     _stateTimer = micros();
+    uint32_t _cycleCount = 0;
     for (;;) {
         switch (_busState) {
 
             case BusState::SEND:
+                rs485prof.markTxStart(_currentId);
                 _sendPacket(_currentId);
                 _rxGot    = 0;
                 _rxHeader = false;
                 _busState = BusState::WAIT_RESP;
                 _stateTimer = micros();
+                rs485prof.markRxWaitStart();
                 break;
 
             case BusState::WAIT_RESP:
                 if (_readResponse()) {
+                    rs485prof.markRxSuccess();
                     _handleResponse();
+                    _consecutiveTimeouts = 0;
                     _busState   = BusState::GAP;
                     _stateTimer = micros();
                 } else if (micros() - _stateTimer > RS485_RESP_TIMEOUT_US) {
+                    rs485prof.markTimeout();
                     _timeouts++;
-                    log_i("[RS485] TIMEOUT slave %d (rx bytes=%d)", _currentId, Serial1.available());
+                    _consecutiveTimeouts++;
+                    if (_consecutiveTimeouts <= 3 || _consecutiveTimeouts % 10 == 0)
+                        log_w("[RS485] TIMEOUT slave %d (#%u consecuciones)",
+                              _currentId, _consecutiveTimeouts);
                     if (xSemaphoreTake(_mutex, 0) == pdTRUE) {
                         _ch[_currentId].responded = false;
                         xSemaphoreGive(_mutex);
@@ -91,6 +101,9 @@ void RS485Master::runTask() {
 
             case BusState::GAP:
                 if (micros() - _stateTimer >= RS485_GAP_US) {
+                    rs485prof.markGapEnd();
+                    _cycleCount++;
+                    rs485prof.reportIfNeeded(_cycleCount, 100);
                     _nextSlave();
                     _busState = BusState::SEND;
                 }
@@ -102,7 +115,6 @@ void RS485Master::runTask() {
 
 void RS485Master::_sendPacket(uint8_t id) {
     MasterPacket pkt = {};
-    log_i("[RS485] → slave %d", id);
 
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(2)) == pdTRUE) {
         pkt.header      = RS485_START_BYTE;
@@ -146,7 +158,6 @@ void RS485Master::_sendPacket(uint8_t id) {
 bool RS485Master::_readResponse() {
     while (Serial1.available()) {
         uint8_t b = (uint8_t)Serial1.read();
-        log_i("RX byte: 0x%02X", b);
 
         if (!_rxHeader) {
             if (b == RS485_RESP_BYTE) {
@@ -315,8 +326,17 @@ const ChannelData& RS485Master::getChannel(uint8_t id) {
 
 void RS485Master::printStats() const {
     float rate = _txCount > 0 ? (float)_rxCount / _txCount * 100.0f : 0.0f;
-    log_i("[RS485] TX:%u RX:%u TO:%u CRC_ERR:%u Exito:%.1f%%",
-          _txCount, _rxCount, _timeouts, _crcErrors, rate);
+    log_i("[RS485] ═════════════════════════════════════");
+    log_i("[RS485] TX:%u  RX:%u  TIMEOUT:%u  CRC_ERR:%u", _txCount, _rxCount, _timeouts, _crcErrors);
+    log_i("[RS485] Tasa éxito: %.1f%%  (RX/TX)", rate);
+    for (uint8_t i = 1; i <= _numSlaves; i++) {
+        if (xSemaphoreTake((SemaphoreHandle_t)_mutex, pdMS_TO_TICKS(2)) == pdTRUE) {
+            const char* status = _ch[i].calibrated ? "OK" : _ch[i].calibrating ? "CAL" : "---";
+            log_i("[RS485] Slave %d: %-3s  responded:%s", i, status, _ch[i].responded ? "Y" : "N");
+            xSemaphoreGive((SemaphoreHandle_t)_mutex);
+        }
+    }
+    log_i("[RS485] ═════════════════════════════════════");
 }
 
 void RS485Master::resetStats() {

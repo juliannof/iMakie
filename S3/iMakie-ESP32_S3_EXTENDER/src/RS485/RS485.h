@@ -86,6 +86,8 @@ private:
     uint32_t _rxCount   = 0;
     uint32_t _timeouts  = 0;
     uint32_t _crcErrors = 0;
+    uint32_t _lastStatsTime = 0;
+    uint32_t _consecutiveTimeouts = 0;
 
     void _sendPacket   (uint8_t id);
     bool _readResponse ();
