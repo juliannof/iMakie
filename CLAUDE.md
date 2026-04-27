@@ -434,185 +434,41 @@ Menú en display (Encoder push > 3s):
 
 ---
 
-## Protocolo RS485 — Especificación exacta
+## Protocolo RS485
 
-**Bus físico:** 500 kbaud, 8N1. CRC8 `x^8 + x^2 + x^1 + 1` (polinomio 0x07).
+**→ [Ver documentación completa en `docs/RS485_PROTOCOL.md`](docs/RS485_PROTOCOL.md)**
 
-### Master → Slave (MasterPacket, 16 bytes)
+RS485 es el bus serial que conecta master (P4 o S3) con slaves (S2):
+- **Baudrate:** 500 kbaud, 8N1
+- **Protocolo:** Binario custom, CRC8, topología star
+- **Timing:** Ciclo ~20ms para 8 slaves, timeouts críticos en microsegundos
+- **Bus A (P4):** 9 slaves, TX=GPIO50, RX=GPIO51, EN=GPIO52
+- **Bus B (S3):** 8 slaves, TX=GPIO15, RX=GPIO16, EN=GPIO1
+- **Slaves (S2):** TX=GPIO8, RX=GPIO9, EN=GPIO35
 
-```c
-struct MasterPacket {
-    uint8_t  header;        // 0xAA (byte de inicio)
-    uint8_t  id;            // ID esclavo: 1-17 (broadcast: 0)
-    char     trackName[7];  // Mackie Scribble Strip (7 chars ASCII, sin null)
-    uint8_t  flags;         // bits 0-3: REC|SOLO|MUTE|SELECT
-                            // bits 5-7: autoMode (AUTO_OFF..AUTO_LATCH)
-                            // bit 4: FLAG_CALIB (one-shot, master lo limpia)
-    uint16_t faderTarget;   // Posición objetivo fader: 0-16383 (14-bit, little-endian)
-    uint8_t  vuLevel;       // Medidor VU: 0-127
-    uint8_t  vpotValue;     // VPot ring (CC raw): bits 6=center, 5-4=modo, 3-0=pos
-    uint8_t  connected;     // 1=CONNECTED, 0=DISCONNECTED
-    uint8_t  crc;           // CRC8 de bytes [0..14]
-};
-```
+Toda la especificación de paquetes (MasterPacket, SlavePacket), máquina de estados, timing, CRC, troubleshooting y optimizaciones históricas está en [`docs/RS485_PROTOCOL.md`](docs/RS485_PROTOCOL.md).
 
-### Slave → Master (SlavePacket, 9 bytes)
+---
 
-```c
-struct SlavePacket {
-    uint8_t  header;        // 0xBB (byte de inicio)
-    uint8_t  id;            // Echo del ID enviado
-    uint16_t faderPos;      // Posición actual fader (ADC 13-bit): 0-8191 (little-endian)
-    uint8_t  touchState;    // 0=libre, 1=tocado
-    uint8_t  buttons;       // bits 0-3: REC|SOLO|MUTE|SELECT (estado actual)
-                            // bit 4: SLAVE_FLAG_CALIB_DONE (calibración completada)
-                            // bit 5: SLAVE_FLAG_CALIB_ERROR (error en calibración)
-                            // bit 6: SLAVE_FLAG_NOT_CALIBRATED (fader sin calibrar)
-    int8_t   encoderDelta;  // Rotación acumulada: -127..+127 (se resetea a 0 tras lectura)
-    uint8_t  encoderButton; // 0=liberado, 1=presionado
-    uint8_t  crc;           // CRC8 de bytes [0..7]
-};
-```
+### Auditoría RS485 (2026-04-27)
 
-### Flags de automatización (bits 5-7 de flags)
+**Hallazgo:** Código RS485 está **bien optimizado**. Neopixel bloqueante (15-30ms) ya fue removido de ruta crítica en optimización anterior.
 
-| Valor | Nombre | Descripción |
-|-------|--------|-------------|
-| 0 | AUTO_OFF | Sin automatización |
-| 1 | AUTO_READ | Lectura de automatización |
-| 2 | AUTO_WRITE | Grabación de automatización |
-| 3 | AUTO_TRIM | Trim (ajuste fino) |
-| 4 | AUTO_TOUCH | Toque (activa escritura) |
-| 5 | AUTO_LATCH | Latch (mantiene valor al soltar) |
+**Documentos de auditoría:**
 
-### Máquina de estados bus (Core 1, tarea RS485)
+| Documento | Contenido |
+|---|---|
+| [`RS485_TIMING_AUDIT.md`](docs/RS485_TIMING_AUDIT.md) | Análisis línea-por-línea de timing en onMasterData(), sendResponse(), updateDisplay(), updateAllNeopixels(). Identifica bottlenecks residuales y propone mediciones. |
+| [`RS485_COMMENTING_GUIDE.md`](docs/RS485_COMMENTING_GUIDE.md) | Patrones de comentarios para documentar restricciones de timing. Usa cuando edites RS485Handler.cpp, RS485.cpp o main.cpp. |
+| [`RS485_NEXT_ACTIONS.md`](docs/RS485_NEXT_ACTIONS.md) | Plan de 6 tareas para próximas sesiones: instrumentación de timing (30min), comentar código (45min), validar con hardware (1h), proponer mejoras (opt). |
 
-```
-SEND (envía paquete a slave[id])
-  ↓ (TX_ENABLE_US=10µs + 16 bytes ÷ 500kbaud ÷ 8 bits/byte ≈ 256µs + TX_DONE_US=10µs)
-WAIT_RESP (espera SlavePacket 9 bytes ≈ 144µs + margen)
-  ├─ TIMEOUT (micros() > 1500µs) → GAP + TIMEOUT++
-  └─ RX completo (9 bytes) → procesa + GAP
-      ↓
-    GAP (espera 300µs mínimo antes de siguiente slave)
-      ↓
-    _nextSlave() (id++, si id > NUM_SLAVES → reset a 1, delay(POLL_CYCLE_MS - elapsed))
-      ↓ (vuelta a SEND)
-```
+**Resumen:**
+- ✅ RS485Handler::onMasterData() — 200-400µs (correcto, sin bloqueos)
+- ✅ RS485Slave::sendResponse() — 360µs (timing setup/hold correcto)
+- ⚠️ updateDisplay() — 10-100ms variable (post-RS485, no crítico)
+- ⚠️ updateAllNeopixels() — 15-30ms bloqueante (post-sendResponse, pero medir varianza)
 
-### Timing crítico (S3 Extender actual)
-
-| Parámetro | Valor | Notas |
-|-----------|-------|-------|
-| TX_ENABLE_US | 30µs | Tiempo para que transceiver habilitado transmita (↑ desde 10µs) |
-| TX_DONE_US | 30µs | Tiempo para que transceiver deshabilitado deje de conducir (↑ desde 10µs) |
-| RESP_TIMEOUT_US | 3000µs | Máximo tiempo esperando SlavePacket (↑ desde 1500µs) |
-| GAP_US | 300µs | Tiempo mínimo entre fin GAP y siguiente SEND |
-| POLL_CYCLE_MS | 20ms | Ciclo total: ~3 slaves × 3ms = 9ms + margen |
-| RS485_BAUD | 500000 | Bits/segundo |
-
-**Mejoras aplicadas (2026-04-27):**
-- TX_ENABLE_US/TX_DONE_US: 10µs → 30µs (dar tiempo a transceiver 30-50µs típico)
-- RESP_TIMEOUT_US: 1500µs → 3000µs (más margen para ISR overhead, logging)
-- Logging: removido log_i() por byte RX, solo eventos/errores
-- Estadísticas: contador de timeouts consecutivos, reportaje mejorado en printStats()
-
-**Problema anterior:** timeout 1500µs era muy estrecho:
-- SlavePacket = 9 bytes × 10 bits/byte ÷ 500k = 180µs
-- Master overhead (ISR, context switch) puede causar 10-20 timeouts consecutivos
-- Solución propuesta: aumentar a 3000µs, validar con hardware real
-
-### Protocolo de calibración (one-shot)
-
-1. Master detecta bit `SLAVE_FLAG_NOT_CALIBRATED` en respuesta
-2. Master establece `calibrate=true` y envía paquete con `FLAG_CALIB` (bit 4)
-3. Slave inicia máquina de calibración (motor sube/baja)
-4. Slave responde con `SLAVE_FLAG_CALIB_DONE` (bit 4) o `SLAVE_FLAG_CALIB_ERROR` (bit 5)
-5. Master limpia `calibrate=false` para no retransmitir
-6. Master reintenta hasta 3 veces si error
-7. Master marca `calibrated=true` y envía sin FLAG_CALIB en futuras transacciones
-
-### Sincronización RS485
-
-- **Lectura:** `_readResponse()` busca header `0xBB`, luego acumula 9 bytes (sin timeout inter-byte)
-- **Limpieza RX:** antes de TX, limpia Serial1 buffer (puede perder bytes en tránsito)
-- **No hay handshake ACK:** Master solo espera SlavePacket, sin protocolo de confirmación
-- **CRC solo validación:** CRC error = packet rechazado, no reenvío automático
-
-### Puntos débiles identificados
-
-1. **Buffer RX pequeño:** 256 bytes para 8 slaves × 9 bytes = 72 bytes útiles + ISR overhead
-2. **Logging verbose en RX:** `log_i("RX byte: 0x%02X")` para cada byte → bloquea Task RS485
-3. **TX timing:** 10µs podría ser insuficiente para transceiver RS485 típicos (30-50µs needed)
-4. **No hay resincronización** si se pierde encabezado — estatua espera siguiente 0xBB
-5. **Race en `responded` flag:** Core 0 lee, Core 1 escribe — sin mutex protegiendo acceso
-
-### RS485Profiler — Diagnosticación sin overhead
-
-**¿Qué es?** Herramienta para medir tiempos de operación RS485 (TX, RX, GAP, ciclos completos) sin bloqueo. 
-
-**¿Por qué diferente de `log_i()`?**
-
-| Aspecto | `log_i()` por byte | RS485Profiler |
-|---------|-------------------|---|
-| **Cuando** | Cada byte RX | Cada 100 ciclos (agregado) |
-| **Overhead** | Alto: UART/Serial síncrono | Bajo: solo micros() |
-| **Bloquea Task** | SÍ (espera UART) | NO |
-| **Puede causar** | Timeouts por logging | Nada (mide, no bloquea) |
-| **Qué mide** | Eventos individuales | Estadísticas (min/max/avg/ratio) |
-
-**Estadísticas reportadas cada 100 ciclos:**
-```
-[PROF] Ciclo 637000: RX_WAIT avg=2801µs min=397µs max=3056µs TO:85.0% (85/100)
-```
-- **avg=2801µs**: tiempo promedio esperando respuesta
-- **min=397µs**: mejor respuesta (esclavo respondió rápido)
-- **max=3056µs**: peor respuesta (casi timeout a 3000µs)
-- **TO:85%**: tasa de timeout (85 de 100 intentos timeouted)
-
-**Cómo interpretarlo:**
-
-| Síntoma | Causa probable | Fix |
-|---------|---|---|
-| **avg ≈ TIMEOUT_US** | Timing muy ajustado | Aumentar RESP_TIMEOUT_US |
-| **TO > 50%** | Slaves no responden / no conectados | Verificar NUM_SLAVES vs físicos |
-| **min << avg << max** | Variabilidad alta (ISR, logging) | Reducir logging, aumentar timeout |
-| **TO = 0%, avg < 1000µs** | Sistema limpio | OK, mantener |
-
-**En el proyecto actual:**
-- NUM_SLAVES=3 pero solo 1 esclavo conectado
-- Esperado: TO% ≈ 67% (2 slaves no responden) + algunos timeouts del esclavo 1
-- Actual: TO% ≈ 79-85% → suggests esclavo 1 también está en problemas
-- **RX_WAIT avg 2785µs**: muy cerca del límite 3000µs → **vulnerable a ISR overhead**
-
-**Profiler extendido — Modo debugger (2026-04-27):**
-
-Ahora el Profiler reporta **por esclavo** cada 100 ciclos:
-```
-[PROF] Ciclo 100: RX_WAIT avg=2800µs min=400µs max=3050µs TO:85.0% (85/100)
-[PROF]   Slave 1: RX=30 TO=20 CRC=0 ID_MM=0 avg=2700µs min=400µs max=2950µs (TO:40%)
-[PROF]   Slave 2: RX=0 TO=50 CRC=0 ID_MM=5 avg=0µs min=0µs max=0µs (TO:100%)
-[PROF]   Slave 3: RX=0 TO=30 CRC=0 ID_MM=0 avg=0µs min=0µs max=0µs (TO:100%)
-```
-
-**Qué ver:**
-- **Slave 1 RX=30 TO=20**: responde 30 veces, falla 20 veces (40% timeout)
-- **Slave 2 ID_MM=5**: 5 veces recibió respuesta de otro slave (desincronización)
-- **Slave 3 RX=0**: nunca respondió (no conectado o muerto)
-
-**Patrones diagnósticos:**
-
-| Patrón | Causa |
-|--------|-------|
-| Slave 1 TO:40%, Slave 2 ID_MM=5, Slave 3 TO:100% | Slave 2 no conectado, desincroniza bus |
-| Slave 1 ID_MM=10, Slave 2 TO:100%, Slave 3 ID_MM=8 | Ruido en bus, probablemente cable RS485 |
-| Todos Slave X CRC=5+ | Noise o baudrate incorrecto |
-| Slave 1 avg=2950µs, Slave 2 avg=2940µs (sin TO) | Sistema limpio, timing correcto |
-
-**Próximo paso:** Conectar 2 encoders (slaves 2 y 3), compilar, y revisar Profiler:
-- Si **Slave 1 TO% baja** y **Slave 2/3 RX aumenta sin ID_MM**: excelente
-- Si **ID_MM alto**: problema de desincronización (revisar cable/terminación RS485)
-- Si **CRC errors**: ruido en bus
+**Próximo:** Ejecutar instrumentación de timing para confirmar métricas reales vs. teóricas.
 
 ---
 
