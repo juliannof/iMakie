@@ -42,9 +42,9 @@ extern volatile ConnectionState logicConnectionState;
 #define NUM_SLAVES           3
 
 // --- Timing (µs) ---
-#define RS485_TX_ENABLE_US   10
-#define RS485_TX_DONE_US     10
-#define RS485_RESP_TIMEOUT_US 1500
+#define RS485_TX_ENABLE_US   30      // ← aumentado: transceiver setup típico 30-50µs
+#define RS485_TX_DONE_US     30      // ← aumentado: esperar a transceiver deshabilitar
+#define RS485_RESP_TIMEOUT_US 3000   // ← aumentado: margen más generoso para ISR overhead
 #define RS485_GAP_US         300
 #define POLL_CYCLE_MS        20
 
