@@ -63,6 +63,9 @@ public:
     bool               hasNewSlaveData(uint8_t id);
     const ChannelData& getChannel     (uint8_t id);
 
+    // Secuencia de desconexión
+    void beginDisconnectSequence();     // Inicia envío de DISCONNECTED a todos
+    bool isDisconnectComplete() const;  // Retorna true cuando todos recibieron
 
     void printStats() const;
     void resetStats();
@@ -88,6 +91,12 @@ private:
     uint32_t _crcErrors = 0;
     uint32_t _lastStatsTime = 0;
     uint32_t _consecutiveTimeouts = 0;
+
+    // Secuencia de desconexión
+    bool     _disconnecting = false;       // En proceso de apagar todos los slaves
+    uint8_t  _disconnectStartId = 1;       // Primer slave a notificar
+    uint8_t  _disconnectLastId = 0;        // Último slave a notificar (NUM_SLAVES)
+    uint32_t _disconnectStartTime = 0;     // Para timeout de seguridad (~5s)
 
     void _sendPacket   (uint8_t id);
     bool _readResponse ();

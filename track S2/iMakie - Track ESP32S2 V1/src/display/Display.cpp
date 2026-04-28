@@ -142,14 +142,17 @@ void drawSplashScreen() {
 //  updateDisplay  —  redraw total + redraws incrementales
 // ════════════════════════════════════════════════════════════
 void updateDisplay() {
+    // Detectar transición CONNECTED → DISCONNECTED
+    static ConnectionState lastState = ConnectionState::DISCONNECTED;
+    if (logicConnectionState == ConnectionState::DISCONNECTED &&
+        lastState == ConnectionState::CONNECTED) {
+        tft.fillScreen(TFT_BG_COLOR);
+        drawOfflineScreen();
+    }
+    lastState = logicConnectionState;
+
     // Sin conexión RS485: pantalla offline
     if (logicConnectionState != ConnectionState::CONNECTED) {
-        static ConnectionState lastState = ConnectionState::CONNECTED;
-        if (logicConnectionState != lastState) {
-            tft.fillScreen(TFT_BG_COLOR);
-            drawOfflineScreen();
-            lastState = logicConnectionState;
-        }
         return;
     }
 

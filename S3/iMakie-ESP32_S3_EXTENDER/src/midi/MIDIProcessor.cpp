@@ -331,11 +331,17 @@ void processMackieSysEx(byte* payload, int len) {
 
         case 0x0F: {
             logicConnectionState = ConnectionState::DISCONNECTED;
-            g_logicConnected     = 0;
+            g_logicConnected     = 0;   // Todos los slaves recibirán connected=0
             fadersAtMinMask      = 0;
             firstFaderMinTime    = 0;
+
+            // Inicia secuencia de notificación a slaves
+            rs485.beginDisconnectSequence();
+
+            // UI cambio será permitido SOLO cuando isDisconnectComplete() retorne true
+            // (ver main.cpp — no cambiar a offline hasta que todos reciban DISCONNECTED)
             g_switchToOffline    = true;
-            log_i("[MCU] GoOffline recibido");
+            log_i("[MCU] GoOffline recibido — iniciando DISCONNECT SEQUENCE");
             break;
         }
 

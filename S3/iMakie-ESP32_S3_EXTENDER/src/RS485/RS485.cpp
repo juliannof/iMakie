@@ -270,6 +270,12 @@ void RS485Master::_handleResponse() {
         xSemaphoreGive(_mutex);
     }
 
+    // Si estamos en desconexión y este era el último slave, limpiar flag
+    if (_disconnecting && _currentId == _disconnectLastId) {
+        _disconnecting = false;
+        log_i("[RS485] DISCONNECT SEQUENCE completada — todos los slaves notificados");
+    }
+
     _rxCount++;
 }
 
@@ -278,6 +284,15 @@ void RS485Master::_handleResponse() {
 
 void RS485Master::_nextSlave() {
     _currentId++;
+
+    // Durante desconexión: NO reiniciar, dejar que currentId siga > numSlaves
+    // para que isDisconnectComplete() retorne true cuando se complete el ciclo
+    if (_disconnecting) {
+        // currentId seguirá incrementando hasta pasar numSlaves
+        // sin esperar cycle time (prioridad: apagar rápido)
+        return;
+    }
+
     if (_currentId > _numSlaves) {
         _currentId = 1;
         uint32_t elapsed = millis() - _cycleStart;
@@ -368,4 +383,40 @@ void RS485Master::printStats() const {
 
 void RS485Master::resetStats() {
     _txCount = _rxCount = _timeouts = _crcErrors = 0;
+}
+
+// ═════════════════════════════════════════════════════════════════════
+//  beginDisconnectSequence() — Inicia envío de DISCONNECTED a todos
+// ═════════════════════════════════════════════════════════════════════
+// Cuando Logic se desconecta (GoOffline), este método garantiza que
+// TODOS los slaves reciban connected=0 antes de cambiar a offline.
+// Itera sobre slave 1..numSlaves, esperando respuesta de cada uno.
+// ═════════════════════════════════════════════════════════════════════
+void RS485Master::beginDisconnectSequence() {
+    _disconnecting = true;
+    _disconnectStartId = 1;
+    _disconnectLastId = _numSlaves;
+    _disconnectStartTime = millis();
+    _currentId = _disconnectStartId;  // Reinicia al primer slave
+    log_i("[RS485] DISCONNECT SEQUENCE iniciada para slaves 1..%d", _numSlaves);
+}
+
+// ═════════════════════════════════════════════════════════════════════
+//  isDisconnectComplete() — Comprueba si ya se notificó a todos
+// ═════════════════════════════════════════════════════════════════════
+// Retorna true si:
+// - Se completó el ciclo (currentId pasó el último)
+// - O timeout de seguridad se alcanzó (5s máx)
+// ═════════════════════════════════════════════════════════════════════
+bool RS485Master::isDisconnectComplete() const {
+    if (!_disconnecting) return true;  // Si no está en modo desconexión, está completo
+
+    // Timeout de seguridad: si tarda >5s, fuerza completación
+    if (millis() - _disconnectStartTime > 5000) {
+        log_w("[RS485] Timeout desconexión (5s) — forzando completación");
+        return true;
+    }
+
+    // Completado cuando currentId ha pasado el último slave
+    return _currentId > _disconnectLastId;
 }

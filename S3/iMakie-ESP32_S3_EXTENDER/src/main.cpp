@@ -123,6 +123,13 @@ void taskCore0(void* pvParameters) {
             }
         }
 
+        // Esperar a que DISCONNECT SEQUENCE se complete antes de cambiar a offline
+        if (g_switchToOffline && rs485.isDisconnectComplete()) {
+            g_switchToOffline = false;
+            log_i("[MAIN] Desconexión completada — todos los slaves en DISCONNECTED");
+            // Aquí iría el cambio de UI a offline (cuando se implemente pantalla)
+        }
+
         tickCalibracion();
 
         // ← LOG DE ESTADO (DENTRO DEL LOOP):
