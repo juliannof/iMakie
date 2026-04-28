@@ -167,9 +167,30 @@ void SatMenu::update() {
 SatMenu::Btn SatMenu::_readBtn() {
     // Leer encoder si SAT está consumiendo
     if (_encoderConsumed) {
+        static int pendingEvents = 0;
+        static int encoderDir = 0;  // 1=DOWN, -1=UP
+
+        // Emitir eventos pendientes por aceleración
+        if (pendingEvents > 0) {
+            pendingEvents--;
+            return (encoderDir > 0) ? Btn::DOWN : Btn::UP;
+        }
+
+        // Leer nuevo delta
         int delta = Encoder::getCount();
-        if (delta > 0) { Encoder::reset(); return Btn::DOWN;  }
-        if (delta < 0) { Encoder::reset(); return Btn::UP;    }
+        if (delta > 0) {
+            pendingEvents = delta / 4;  // aceleración: cada 4 unidades = evento extra
+            encoderDir = 1;
+            Encoder::reset();
+            return Btn::DOWN;
+        }
+        if (delta < 0) {
+            pendingEvents = (-delta) / 4;
+            encoderDir = -1;
+            Encoder::reset();
+            return Btn::UP;
+        }
+
         // Botón encoder = ENTER (como SELECT)
         if (digitalRead(ENCODER_SW_PIN) == LOW) { _debT=millis(); return Btn::ENTER; }
     }
