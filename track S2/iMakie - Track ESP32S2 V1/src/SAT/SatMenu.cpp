@@ -170,6 +170,8 @@ SatMenu::Btn SatMenu::_readBtn() {
         int delta = Encoder::getCount();
         if (delta > 0) { Encoder::reset(); return Btn::DOWN;  }
         if (delta < 0) { Encoder::reset(); return Btn::UP;    }
+        // Botón encoder = ENTER (como SELECT)
+        if (digitalRead(ENCODER_SW_PIN) == LOW) { _debT=millis(); return Btn::ENTER; }
     }
 
     unsigned long n = millis();
