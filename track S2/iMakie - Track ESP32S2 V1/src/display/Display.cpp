@@ -25,7 +25,7 @@ void drawHeaderSprite();
 void drawOfflineScreen();
 void drawInitializingScreen();
 void drawVPotDisplay();
-void drawButton(LGFX_Sprite &sprite, uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char* label, bool active, uint16_t activeColor);
+void drawButton(LGFX_Sprite &sprite, uint16_t x, uint16_t y, uint16_t w, uint16_t h, const char* label, bool active, uint16_t activeColor, uint16_t inactiveColor = TFT_MCU_DARKGRAY);
 void drawMeter(LGFX_Sprite &sprite, uint16_t x, uint16_t y, uint16_t w, uint16_t h, float level, float peakLevel, bool isClipping);
 void setTrackId(uint8_t id) { _trackId = id; }
 
@@ -274,8 +274,8 @@ void drawHeaderSprite() {
 // ════════════════════════════════════════════════════════════
 void drawButton(LGFX_Sprite &sprite, uint16_t x, uint16_t y,
                 uint16_t w, uint16_t h,
-                const char* label, bool active, uint16_t activeColor) {
-    uint16_t btnColor  = active ? activeColor : TFT_MCU_DARKGRAY;
+                const char* label, bool active, uint16_t activeColor, uint16_t inactiveColor = TFT_MCU_DARKGRAY) {
+    uint16_t btnColor  = active ? activeColor : inactiveColor;
     uint16_t textColor = active ? TFT_BLACK   : TFT_WHITE;
     sprite.fillRoundRect(x, y, w, h, 5, btnColor);
     sprite.setTextFont(2);
@@ -291,9 +291,9 @@ void drawButton(LGFX_Sprite &sprite, uint16_t x, uint16_t y,
 void drawMainArea() {
     mainArea.fillSprite(TFT_BG_COLOR);
 
-    drawButton(mainArea, 10,                        7, BUTTON_WIDTH, BUTTON_HEIGHT, "REC",  recStates,  TFT_REC_COLOR);
-    drawButton(mainArea, 10 + BUTTON_WIDTH + 2,     7, BUTTON_WIDTH, BUTTON_HEIGHT, "SOLO", soloStates, TFT_SOLO_COLOR);
-    drawButton(mainArea, 10 + BUTTON_WIDTH * 2 + 4, 7, BUTTON_WIDTH, BUTTON_HEIGHT, "MUTE", muteStates, TFT_MUTE_COLOR);
+    drawButton(mainArea, 10,                        7, BUTTON_WIDTH, BUTTON_HEIGHT, "REC",  recStates,  TFT_REC_COLOR, TFT_REC_COLOR_DIM);
+    drawButton(mainArea, 10 + BUTTON_WIDTH + 2,     7, BUTTON_WIDTH, BUTTON_HEIGHT, "SOLO", soloStates, TFT_SOLO_COLOR, TFT_SOLO_COLOR_DIM);
+    drawButton(mainArea, 10 + BUTTON_WIDTH * 2 + 4, 7, BUTTON_WIDTH, BUTTON_HEIGHT, "MUTE", muteStates, TFT_MUTE_COLOR, TFT_MUTE_COLOR_DIM);
 
 
     // --- Track name ---

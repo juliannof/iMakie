@@ -263,6 +263,11 @@ static constexpr uint8_t  TOUCH_BASELINE_SAMPS     = 16;      // muestras para b
 #define TFT_MUTE_COLOR TFT_RED
 #define TFT_BUTTON_TEXT TFT_WHITE
 
+// Colores tenues para botones inactivos (visible en oscuridad)
+#define TFT_REC_COLOR_DIM 0x6000      // Rojo muy oscuro
+#define TFT_SOLO_COLOR_DIM 0x5A00    // Naranja muy oscuro
+#define TFT_MUTE_COLOR_DIM 0x6000    // Rojo muy oscuro
+
 // Colores MCU para Neopixels o TFT, sin depender de 'tft'
 #define TFT_MCU_BLUE     0x025D    // Azul oscuro MCU
 #define TFT_MCU_GREEN    0x3F20   // Verde MCU 
