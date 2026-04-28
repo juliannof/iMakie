@@ -140,7 +140,7 @@ void drawSplashScreen() {
     const char* hwNames[] = {"Motor", "RS485", "Display", "ADC", "Fader",
                              "TouchFdr", "NeoPixel", "Touch", "Encoder", "Buttons"};
     int x = 20, y = 235;
-    tft.setFont(&fonts::FreeSans9pt7b);
+    tft.setFont(&fonts::FreeSans12pt7b);
     for (int i = 0; i < 10; i++) {
         uint16_t color = (hwStatus[i] == '2') ? TFT_WHITE :
                         (hwStatus[i] == '1') ? TFT_ORANGE : TFT_RED;
