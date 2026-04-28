@@ -134,6 +134,21 @@ void drawSplashScreen() {
     tft.drawString(verBuf, TFT_WIDTH / 2, 170);
     tft.setFont(&fonts::FreeSans9pt7b);
     tft.drawString(FW_BUILD_ID, TFT_WIDTH / 2, 200);
+
+    // Hardware Status (0=Rojo, 1=Naranja, 2=Blanco)
+    const char* hwStatus = HW_STATUS;
+    const char* hwNames[] = {"Motor", "RS485", "Display", "ADC", "Fader",
+                             "TouchFdr", "NeoPixel", "Touch", "Encoder", "Buttons"};
+    int x = 20, y = 235;
+    tft.setFont(&fonts::FreeSans7pt7b);
+    for (int i = 0; i < 10; i++) {
+        uint16_t color = (hwStatus[i] == '2') ? TFT_WHITE :
+                        (hwStatus[i] == '1') ? TFT_ORANGE : TFT_RED;
+        tft.setTextColor(color);
+        tft.drawString(hwNames[i], x, y);
+        x += 48;
+        if (i == 4) { x = 20; y += 20; }  // nueva línea después de 5 componentes
+    }
 }
 
 
