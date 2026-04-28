@@ -7,6 +7,7 @@ Adafruit_NeoPixel neopixels(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 static uint8_t  neoBrightness  = NEOPIXEL_DEFAULT_BRIGHTNESS;
 bool neoWaitingHandshake = true;
+bool needsNeoPixelUpdate = false;
 
 void initNeopixels() {
     neopixels.begin();
@@ -17,6 +18,7 @@ void initNeopixels() {
     }
     neopixels.show();
     neoWaitingHandshake = true;
+    needsNeoPixelUpdate = false;  // ya estamos mostrados
     log_i("[NEO] Adafruit NeoPixel OK — %d pixels GPIO%d", NEOPIXEL_COUNT, NEOPIXEL_PIN);
 }
 
@@ -46,21 +48,10 @@ void showNeopixels() {
 }
 
 void updateAllNeopixels() {
-    if (neoWaitingHandshake) return;
-    static bool lastRec    = false;
-    static bool lastSolo   = false;
-    static bool lastMute   = false;
-    static bool lastSelect = false;
+    // Actualizar si: (1) cambió neoWaitingHandshake o (2) cambió algún botón
+    if (!needsNeoPixelUpdate) return;
 
-    if (recStates    == lastRec    &&
-        soloStates   == lastSolo   &&
-        muteStates   == lastMute   &&
-        selectStates == lastSelect) return;
-
-    lastRec    = recStates;
-    lastSolo   = soloStates;
-    lastMute   = muteStates;
-    lastSelect = selectStates;
+    needsNeoPixelUpdate = false;  // consumir el flag
 
     handleButtonLedState(ButtonId::REC);
     handleButtonLedState(ButtonId::SOLO);

@@ -36,6 +36,7 @@ void onMasterData(const MasterPacket& pkt) {
 
     if (newState == ConnectionState::CONNECTED) {
         neoWaitingHandshake = false;
+        needsNeoPixelUpdate = true;  // Cambio de azul a colores tenues
         // ¡CRÍTICO! NO llamar updateAllNeopixels() aquí — retarda RS485 response
         // Neopixels se actualizan en main.cpp DESPUÉS de sendResponse()
     } else {
@@ -46,6 +47,7 @@ void onMasterData(const MasterPacket& pkt) {
         vuLevels = vuPeakLevels = 0.0f;
         //setScreenBrightness(0);
         neoWaitingHandshake = true;
+        needsNeoPixelUpdate = true;  // Cambio a azul
         // ¡CRÍTICO! NO llamar updateAllNeopixels() aquí — retarda RS485 response
         // Neopixels se actualizan en main.cpp DESPUÉS de sendResponse()
     }
@@ -67,9 +69,9 @@ void onMasterData(const MasterPacket& pkt) {
     bool nm = (pkt.flags & FLAG_MUTE)   != 0;
     bool nq = (pkt.flags & FLAG_SELECT) != 0;
 
-    if (recStates    != nr) { recStates    = nr; handleButtonLedState(ButtonId::REC);    needsMainAreaRedraw = true; }
-    if (soloStates   != ns) { soloStates   = ns; handleButtonLedState(ButtonId::SOLO);   needsMainAreaRedraw = true; }
-    if (muteStates   != nm) { muteStates   = nm; handleButtonLedState(ButtonId::MUTE);   needsMainAreaRedraw = true; }
+    if (recStates    != nr) { recStates    = nr; handleButtonLedState(ButtonId::REC);    needsMainAreaRedraw = true; needsNeoPixelUpdate = true; }
+    if (soloStates   != ns) { soloStates   = ns; handleButtonLedState(ButtonId::SOLO);   needsMainAreaRedraw = true; needsNeoPixelUpdate = true; }
+    if (muteStates   != nm) { muteStates   = nm; handleButtonLedState(ButtonId::MUTE);   needsMainAreaRedraw = true; needsNeoPixelUpdate = true; }
     if (selectStates != nq) {
         selectStates = nq;
         handleButtonLedState(ButtonId::SELECT);
@@ -78,6 +80,7 @@ void onMasterData(const MasterPacket& pkt) {
         handleButtonLedState(ButtonId::MUTE);
         //showNeopixels();
         needsHeaderRedraw = true;
+        needsNeoPixelUpdate = true;
     }
 
     // ── VU meter ──────────────────────────────────────────────
@@ -152,6 +155,7 @@ void checkTimeout(unsigned long lastRxTime) {
         recStates = soloStates = muteStates = selectStates = false;
         setScreenBrightness(0);
         neoWaitingHandshake = true;
+        needsNeoPixelUpdate = true;  // Volver a azul en timeout
         // ¡CRÍTICO! NO actualizar neopixels aquí — timeout podría estar en path RS485
         // Los neopixels se actualizarán en el siguiente ciclo main.cpp
         needsTOTALRedraw = true;
