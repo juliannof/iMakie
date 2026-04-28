@@ -151,7 +151,7 @@ static constexpr uint8_t  TOUCH_BASELINE_SAMPS     = 16;      // muestras para b
 // --- NEOPixel ---
 #define NEOPIXEL_PIN        36  // Pin GPIO donde están conectados los Neopixels
 #define NEOPIXEL_COUNT      4   // Número total de Neopixels
-#define NEOPIXEL_DEFAULT_BRIGHTNESS 20 // Brillo cuando botón está activo (0-255)
+#define NEOPIXEL_DEFAULT_BRIGHTNESS 30 // Brillo cuando botón está activo (0-255)
 #define NEOPIXEL_DIM_BRIGHTNESS 5   // brillo atenuado (reservado, no usado actualmente)
 #define NEOPIXEL_ULTRA_DIM 1    // "tenue de morir" — botones inactivos, casi apagado pero visible
 
@@ -175,9 +175,9 @@ static constexpr uint8_t  TOUCH_BASELINE_SAMPS     = 16;      // muestras para b
 #define BUTTON_MUTE_LED_COLOR_B 0 // -> Rojo
 
 // Neopixel 3 (asociado a SELECT)
-#define BUTTON_SELECT_LED_COLOR_R 100
-#define BUTTON_SELECT_LED_COLOR_G 100
-#define BUTTON_SELECT_LED_COLOR_B 100 // -> Blanco tenue
+#define BUTTON_SELECT_LED_COLOR_R 150
+#define BUTTON_SELECT_LED_COLOR_G 150
+#define BUTTON_SELECT_LED_COLOR_B 150 // -> Blanco tenue
 
 // --- COLORES PARA OTROS BOTONES (QUE NO TIENEN NEOPIXEL DEDICADO) ---
 // Estos colores se usarán si ENCODER_SELECT o FADER_TOUCH activan un Neopixel
