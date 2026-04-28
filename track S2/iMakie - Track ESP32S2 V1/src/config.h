@@ -151,8 +151,9 @@ static constexpr uint8_t  TOUCH_BASELINE_SAMPS     = 16;      // muestras para b
 // --- NEOPixel ---
 #define NEOPIXEL_PIN        36  // Pin GPIO donde están conectados los Neopixels
 #define NEOPIXEL_COUNT      4   // Número total de Neopixels
-#define NEOPIXEL_DEFAULT_BRIGHTNESS 20 // Brillo inicial por defecto (0-255)
-#define NEOPIXEL_DIM_BRIGHTNESS 5   // brillo atenuado cuando estado = OFF (0-255)
+#define NEOPIXEL_DEFAULT_BRIGHTNESS 20 // Brillo cuando botón está activo (0-255)
+#define NEOPIXEL_DIM_BRIGHTNESS 5   // brillo atenuado (reservado, no usado actualmente)
+#define NEOPIXEL_ULTRA_DIM 1    // "tenue de morir" — botones inactivos, casi apagado pero visible
 
 
 // --- COLORES PREDETERMINADOS DE LOS BOTONES (PARA CADA NEOPixel) ---

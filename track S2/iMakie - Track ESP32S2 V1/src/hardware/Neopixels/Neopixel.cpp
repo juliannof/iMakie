@@ -109,25 +109,11 @@ void handleButtonLedState(ButtonId id) {
 
     if (neopixelIndex == -1) return;
 
-    uint8_t fr, fg, fb;
-    if (id == ButtonId::SELECT) {
-        uint8_t s = shouldBeOn ? NEOPIXEL_DEFAULT_BRIGHTNESS : 0;
-        fr = (r * s) / 255;
-        fg = (g * s) / 255;
-        fb = (b * s) / 255;
-    } else {
-        if (selectStates) {
-            uint8_t s = shouldBeOn ? NEOPIXEL_DEFAULT_BRIGHTNESS : 0;
-            fr = (r * s) / 255;
-            fg = (g * s) / 255;
-            fb = (b * s) / 255;
-        } else {
-            uint8_t s = shouldBeOn ? NEOPIXEL_DIM_BRIGHTNESS : 0;
-            fr = (r * s) / 255;
-            fg = (g * s) / 255;
-            fb = (b * s) / 255;
-        }
-    }
+    // O encendido (DEFAULT_BRIGHTNESS) o tenue de morir (ULTRA_DIM)
+    uint8_t brightness = shouldBeOn ? NEOPIXEL_DEFAULT_BRIGHTNESS : NEOPIXEL_ULTRA_DIM;
+    uint8_t fr = (r * brightness) / 255;
+    uint8_t fg = (g * brightness) / 255;
+    uint8_t fb = (b * brightness) / 255;
 
     setNeopixelState(neopixelIndex, fr, fg, fb);
 }
