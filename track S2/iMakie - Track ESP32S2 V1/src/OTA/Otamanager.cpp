@@ -111,8 +111,12 @@ void OtaManager::enableForUpload() {
     _status("Conectando WiFi...");
 
     log_i("[OTA] WiFi.begin()...");
-    // antes de WiFi.begin()
+    // antes de WiFi.begin() — deshabilitar RS485 con drenaje seguro de TX
+    delay(100);                                       // esperar fin de ciclo RS485
+    Serial1.flush();                                  // drenar buffers
+    delay(50);
     Serial1.end();                                    // liberar el UART
+    delay(50);
     pinMode(RS485_TX_PIN, OUTPUT);
     digitalWrite(RS485_TX_PIN, LOW);                  // cortar el back-feed
     digitalWrite(RS485_ENABLE_PIN, HIGH);             // deshabilitar transceiver
@@ -135,7 +139,9 @@ void OtaManager::enableForUpload() {
         log_e("[OTA] No conectado");
         _status("WiFi: no conectado.");
         // ── Restaurar RS485 ──
+        delay(50);
         digitalWrite(RS485_ENABLE_PIN, LOW);
+        delay(50);
         Serial1.begin(RS485_BAUD, SERIAL_8N1, RS485_RX_PIN, RS485_TX_PIN);
         log_i("[OTA] RS485 restaurado");
         return;
@@ -200,6 +206,15 @@ void OtaManager::disable() {
     // NO llamar WiFi.mode(WIFI_OFF) — bug GDMA
     WiFi.disconnect(true);
     _status("WiFi apagado.");
+}
+
+// ─────────────────────────────────────────────────────────────
+void OtaManager::enableSerialMode() {
+    _status("Conecta USB y ejecuta:");
+    delay(400);
+    _status("pio run -e serial --target upload");
+    delay(1200);
+    esp_restart();
 }
 
 // ─────────────────────────────────────────────────────────────

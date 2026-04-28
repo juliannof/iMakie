@@ -54,6 +54,7 @@ public:
     void onLedsOff        (CbVoid     cb) { _cbLedsOff    = cb; }
     void onReboot         (CbVoid     cb) { _cbReboot     = cb; }
     void onWiFiOta        (CbVoid     cb) { _cbWiFiOta    = cb; }
+    void onSerialOta      (CbVoid     cb) { _cbSerialOta  = cb; }
     void onConfigSaved    (CbConfig   cb) { _cbSaved      = cb; }
     void onSuspendSprites (CbVoid     cb) { _cbSuspend    = cb; }
     void onRestoreSprites (CbVoid     cb) { _cbRestore    = cb; }
@@ -71,7 +72,7 @@ public:
 private:
     enum class Scr {
         MAIN, MOTOR, TOUCH, DIAG,
-        OTA, REINICIAR,
+        OTA, SERIAL_OTA, REINICIAR,
         EDIT_TRACKID,
         EDIT_PWMMIN, EDIT_PWMMAX,
         CONFIRM, TOAST,
@@ -106,7 +107,7 @@ private:
     Preferences   _prefs;
 
     CbVoid     _cbMotorOff, _cbMotorOn, _cbRS485Off, _cbRS485On, _cbReboot, _cbLedsOff;
-    CbVoid     _cbWiFiOta, _cbSuspend, _cbRestore;
+    CbVoid     _cbWiFiOta, _cbSerialOta, _cbSuspend, _cbRestore;
     CbMotor    _cbMotorDrv;
     CbConfig   _cbSaved;
     CbLedsTest _cbLedsTest;

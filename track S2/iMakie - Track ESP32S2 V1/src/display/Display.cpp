@@ -118,40 +118,54 @@ void drawSplashScreen() {
 
     tft.setFont(&fonts::FreeSans24pt7b);
     tft.setTextColor(TFT_WHITE);
-    tft.drawString("iMakie", TFT_WIDTH / 2, 80);
+    tft.drawString("iMakie", TFT_WIDTH / 2, 40);
 
     tft.setFont(&fonts::FreeSans12pt7b);
     tft.setTextColor(TFT_MCU_GRAY);
     char buf[16];
-    snprintf(buf, sizeof(buf), "iMakie Track %d", trackId);  // ← trackId, no _trackId
-    tft.drawString(buf, TFT_WIDTH / 2, 120);
+    snprintf(buf, sizeof(buf), "Track %d", trackId);
+    tft.drawString(buf, TFT_WIDTH / 2, 70);
 
-    
-    tft.setTextColor(TFT_WHITE);
-    char verBuf[40];
-    snprintf(verBuf, sizeof(verBuf), "FW %s", FW_VERSION);
-    tft.setFont(&fonts::FreeSans12pt7b);
-    tft.drawString(verBuf, TFT_WIDTH / 2, 170);
     tft.setFont(&fonts::FreeSans9pt7b);
-    tft.drawString(FW_BUILD_ID, TFT_WIDTH / 2, 200);
+    tft.setTextColor(TFT_WHITE);
+    char verBuf[32];
+    snprintf(verBuf, sizeof(verBuf), "FW %s", FW_VERSION);
+    tft.drawString(verBuf, TFT_WIDTH / 2, 95);
+    tft.drawString(FW_BUILD_ID, TFT_WIDTH / 2, 110);
 
     // Hardware Status (0=Rojo, 1=Naranja, 2=Blanco)
-    const char* hwStatus = HW_STATUS;
-    const char* hwNames[] = {"Motor", "RS485", "Display", "ADC", "Fader",
-                             "TouchFdr", "NeoPixel", "Touch", "Encoder", "Buttons"};
-    int x = 20, y = 235;
-                                                      
-    tft.setFont(nullptr);  // Desactivar fuente de vector   
+    tft.setFont(nullptr);
     tft.setTextFont(1);
     tft.setTextSize(0);
+
+    const char* hwStatus = HW_STATUS;
+    const char* hwLabels[] = {
+        "Motor",
+        "RS485",
+        "Display",
+        "ADC",
+        "Fader",
+        "TouchFader",
+        "NeoPixels",
+        "Touch",
+        "Encoder",
+        "Buttons"
+    };
+
+    int y = 128;
     for (int i = 0; i < 10; i++) {
         uint16_t color = (hwStatus[i] == '2') ? TFT_WHITE :
                         (hwStatus[i] == '1') ? TFT_ORANGE : TFT_RED;
         tft.setTextColor(color);
-        tft.drawString(hwNames[i], x, y);
-        x += 48;
-        if (i == 4) { x = 20; y += 20; }  // nueva línea después de 5 componentes
+
+        char line[48];
+        snprintf(line, sizeof(line), "%s=%c", hwLabels[i], hwStatus[i]);
+        tft.drawString(line, TFT_WIDTH / 2, y);
+        y += 13;
     }
+
+    // Círculo verde al pie si NVS pasó test
+    tft.fillCircle(TFT_WIDTH / 2, TFT_HEIGHT - 15, 6, TFT_GREEN);
 }
 
 

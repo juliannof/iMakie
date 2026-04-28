@@ -18,6 +18,7 @@
 #include "hardware/button/ButtonManager.h"
 #include "SAT/SatMenu.h"
 #include "display/SpriteUtils.h"
+#include "nvs/NVSValidator.h"
 #include <driver/dac_oneshot.h>
 
 
@@ -54,6 +55,7 @@ static void _satReboot()    { ESP.restart(); }
 static void _satMotorDrive(int pwm) { Motor::driveRaw(pwm); }
 static void _satConfigSaved(const SatConfig& cfg) { rs485.begin(cfg.trackId); }
 static void _satWiFiOta()   { otaManager.enableForUpload(); }
+static void _satSerialOta() { otaManager.enableSerialMode(); }
 static void _satLedsOff() {
     clearAllNeopixels();
     showNeopixels();
@@ -114,8 +116,15 @@ void setup() {
     log_i("NeoPixels OK");
     
     initDisplay();
-    drawSplashScreen();
     log_i("Display OK");
+
+    // Validar NVS antes de cualquier cosa
+    if (NVSValidator::validate() == NVSStatus::CORRUPTED) {
+        NVSValidator::reset();  // Repara y reinicia
+        return;  // Nunca llegará aquí
+    }
+
+    drawSplashScreen();
     
     otaManager.begin();
     
@@ -151,6 +160,7 @@ void setup() {
     satMenu->onReboot        (_satReboot);
     satMenu->onConfigSaved   (_satConfigSaved);
     satMenu->onWiFiOta       (_satWiFiOta);
+    satMenu->onSerialOta     (_satSerialOta);
     satMenu->onLedsTest      (_satLedsTest);
     satMenu->onLedsOff       (_satLedsOff);
     satMenu->onSuspendSprites(_satSuspendSprites);

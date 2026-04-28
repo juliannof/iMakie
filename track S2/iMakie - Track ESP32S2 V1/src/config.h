@@ -23,16 +23,17 @@ enum class ConnectionState {
 // --- HARDWARE STATUS (para pre_build.py) ---
 // ===================================
 // Escala: 0=No implementado (Rojo), 1=En Progreso (Naranja), 2=Implementado (Blanco)
-// HW_STATUS: Motor=2
-// HW_STATUS: RS485=2
+// HW_STATUS: Motor=0
+// HW_STATUS: RS485=1
 // HW_STATUS: Display=2
-// HW_STATUS: ADC=2
-// HW_STATUS: Fader=2
+// HW_STATUS: ADC=0
+// HW_STATUS: Fader=0
 // HW_STATUS: TouchFader=1
 // HW_STATUS: NeoPixels=2
-// HW_STATUS: Touch=2
+// HW_STATUS: Touch=1
 // HW_STATUS: Encoder=2
 // HW_STATUS: Buttons=2
+
 
 // ===================================
 // --- 1. DEFINICIONES (Macros y Constantes) ---

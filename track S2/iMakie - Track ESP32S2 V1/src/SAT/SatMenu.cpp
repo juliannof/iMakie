@@ -17,6 +17,7 @@ extern FaderADC faderADC;                  // ← añadir
 const SatMenu::Item SatMenu::_mainItems[] = {
     {"ID","Track ID (1-9)",   Scr::EDIT_TRACKID },
     {"OT","Activar OTA", Scr::OTA       },
+    {"SR","Serial OTA",  Scr::SERIAL_OTA},
     {"MT","Motor",       Scr::MOTOR     },
     {"TC","Touch",       Scr::TOUCH     },
     {"DG","Diagnostico", Scr::DIAG      },
@@ -40,8 +41,8 @@ const SatMenu::Item SatMenu::_diagItems[] = {
     {"NP","Test Botones",  Scr::TEST_NEOPIXEL },
     {"TC","Test Touch",    Scr::TEST_TOUCH    },
 };
-const int SatMenu::_mainN  = 6;
-const int SatMenu::_motorN = 5;   
+const int SatMenu::_mainN  = 7;
+const int SatMenu::_motorN = 5;
 const int SatMenu::_touchN = 2;
 const int SatMenu::_diagN  = 5;
 
@@ -592,6 +593,10 @@ void SatMenu::_hMain(Btn b) {
             case Scr::OTA:
                 if (_cbWiFiOta) _cbWiFiOta();
                 _toast("Activando OTA...", Scr::MAIN);
+                break;
+            case Scr::SERIAL_OTA:
+                if (_cbSerialOta) _cbSerialOta();
+                _toast("Reiniciando...", Scr::MAIN);
                 break;
             case Scr::MOTOR:     _goto(Scr::MOTOR);     break;
             case Scr::TOUCH:     _goto(Scr::TOUCH);     break;
