@@ -1,5 +1,19 @@
 # iMakie — Contexto para Claude Code
 
+---
+
+## ⚠️ DIRECTIVA OBLIGATORIA
+
+**NUNCA modificar código sin explicar PRIMERO con detalle qué vas a hacer.**
+
+- Antes de tocar cualquier archivo: describe el cambio (qué líneas, por qué, qué efecto tiene)
+- Espera aprobación explícita del usuario
+- Si el usuario dice "hazlo" o "proceed", ENTONCES ejecuta los cambios
+- No importa si es un cambio "pequeño" o "obvio" — SIEMPRE explica primero
+- Esta regla es VINCULANTE en cada nuevo chat
+
+---
+
 ## Qué es esto
 Controlador DAW compatible Mackie Control Universal (MCU) para Logic Pro, construido sobre ESP32. Tres subproyectos en PlatformIO, todos en este repo.
 
