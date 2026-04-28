@@ -437,7 +437,7 @@ Menú en display (Encoder push > 3s):
 9. NeoTrellis sin implementar — atención a pines I2C nuevos (SDA=GPIO33, SCL=GPIO31)
 
 ### S2
-10. **Encoder — PROBLEMA EN LOGIC, FUNCIONA EN SAT** — **CAUSA IDENTIFICADA 2026-04-27**: Fuente única es `src/hardware/encoder/Encoder.cpp` (OK). PERO `main.cpp` resetea encoder ANTES de recalcular nivel para pantalla → contador reseteado antes de que Logic lo lea nuevamente → newLevel casi siempre 0 → VPot ring NO CAMBIA en Logic. SAT funciona porque no resetea entre lectura y cálculo. **FIX PRÓXIMA SESIÓN**: Mover `Encoder::reset()` a DESPUÉS de actualizar pantalla, no antes. Ver sección "Encoder — Arquitectura y sequenciamiento" abajo.
+10. **Encoder — RESUELTO (2026-04-28)** — Problema de sequenciamiento: `Encoder::reset()` estaba en línea 214 (inmediatamente post-RS485), antes de procesar VPot. Esto causaba contador=0 al leer para VPot → VPot ring nunca cambiaba en Logic. SAT funcionaba porque procesaba sin ese reset intermedio. Fix: mover `reset()` a línea 242 (post-VPot, pre-updateDisplay) asegura que RS485 y pantalla usan el mismo delta.
 11. **FaderTouch — EN DESARROLLO** — Detección por sostenimiento (tiempo). Perfecto sin plástico, necesita ajuste con plástico. Lógica actual: raw debe sostenerse > baseline×1.015 durante 6 frames (120ms) para detectar toque. Baseline actualizado siempre con IIR (alpha=1/16, no congelado). TEST_TOUCH en SAT testea correctamente. Próximos pasos: validar con plástico real, ajustar thresholds si es necesario.
 12. revisar FaderADC tras reescritura — validar lecturas actuales con hardware real
 13. ADS1015 pedido — cuando llegue, reemplazar lectura ADC nativa por I2C ADS1015 para resolver ruido en fader
@@ -498,59 +498,40 @@ Toda la especificación de paquetes (MasterPacket, SlavePacket), máquina de est
 - `RS485Handler::buildResponse()` → captura delta para enviar al master
 - `main.cpp` → calcula nivel VPot (-7..+7) y redibuja pantalla
 
-**PROBLEMA IDENTIFICADO — Sequenciamiento incorrecto en main.cpp:**
+**RESUELTO (2026-04-28) — Sequenciamiento corregido:**
+
+Problema: `Encoder::reset()` estaba en la línea 214 de main.cpp (post-RS485, antes de procesar VPot), causando que el contador fuera 0 al leer para VPot → VPot ring nunca cambiaba en Logic. SAT funcionaba porque procesaba el contador sin ese reset intermedio.
+
+Solución implementada: Mover `Encoder::reset()` a línea 242 (post-VPot, pre-updateDisplay). Ahora el flujo es:
 
 ```cpp
-// ❌ ORDEN ACTUAL (INCORRECTO)
+// ✓ ORDEN IMPLEMENTADO (main.cpp línea 205-246)
 if (rs485.hasNewData()) {
-    SlavePacket resp = RS485Handler::buildResponse(...);  // ← captura Encoder::getCount()
-    rs485.sendResponse(resp);
-    Encoder::reset();  // ← RESET AQUÍ (demasiado temprano)
-}
-
-Encoder::update();  // ← no hace nada
-if (Encoder::hasChanged()) {
-    int newLevel = constrain((int)(Encoder::getCount() / 4), -7, 7);  // ← LEE 0
-    if (newLevel != Encoder::currentVPotLevel) {
-        Encoder::currentVPotLevel = newLevel;
-        needsVPotRedraw = true;
-    }
-}
-```
-
-**Por qué funciona en SAT pero no en Logic:**
-- **SAT:** `_encCnt = Encoder::getCount()` → directamente, sin reset intermedio
-- **Logic:** Encoder es reseteado (línea 5), luego leído nuevamente (línea 9) → contador casi siempre 0
-
-**Consecuencia:**
-- VPot ring nivel NO CAMBIA en Logic
-- SAT TEST_ENCODER muestra cambios correctamente
-- Causa: el contador se resetea antes de que el mainloop lo recalcule
-
-**FIX PROPUESTO:**
-```cpp
-// ✓ ORDEN CORRECTO (PRÓXIMA SESIÓN)
-if (rs485.hasNewData()) {
-    SlavePacket resp = RS485Handler::buildResponse(...);
+    SlavePacket resp = RS485Handler::buildResponse(...);  // captura delta
     rs485.sendResponse(resp);
     // NO resetear aquí
 }
 
-Encoder::update();
-if (Encoder::hasChanged()) {
-    int newLevel = constrain((int)(Encoder::getCount() / 4), -7, 7);
-    if (newLevel != Encoder::currentVPotLevel) {
-        Encoder::currentVPotLevel = newLevel;
-        needsVPotRedraw = true;
+// ... fader, motor, ...
+
+if (!satMenu->isEncoderConsumed()) {
+    Encoder::update();
+    if (Encoder::hasChanged()) {
+        int newLevel = constrain((int)(Encoder::getCount() / 4), -7, 7);
+        if (newLevel != Encoder::currentVPotLevel) {
+            Encoder::currentVPotLevel = newLevel;
+            needsVPotRedraw = true;
+        }
     }
 }
 
-// Resetear DESPUÉS de procesar el nivel
-Encoder::reset();  // ← RESET AL FINAL
+Encoder::reset();  // RESET al final, post-VPot, pre-updateDisplay
+
+updateButtons();
+updateDisplay();  // redibuja con nuevos niveles
 ```
 
-**Alternativa más limpia:**
-El delta debería acumularse en RS485Handler, no en Encoder.cpp. Encoder.cpp debería solo manejar ISR + getCount(). El reset debería ocurrir en RS485Handler después de enviar, no en main.cpp.
+Resultado: RS485 y pantalla ahora usan el mismo delta, VPot ring responde correctamente en Logic.
 
 ---
 
