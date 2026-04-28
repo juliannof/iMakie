@@ -228,12 +228,15 @@ void loop() {
         Motor::update();
     }
 
-    Encoder::update();
-    if (Encoder::hasChanged()) {
-        int newLevel = constrain((int)(Encoder::getCount() / 4), -7, 7);
-        if (newLevel != Encoder::currentVPotLevel) {
-            Encoder::currentVPotLevel = newLevel;
-            needsVPotRedraw = true;
+    // Solo procesar encoder para VPot si SAT no lo está consumiendo
+    if (!satMenu->isEncoderConsumed()) {
+        Encoder::update();
+        if (Encoder::hasChanged()) {
+            int newLevel = constrain((int)(Encoder::getCount() / 4), -7, 7);
+            if (newLevel != Encoder::currentVPotLevel) {
+                Encoder::currentVPotLevel = newLevel;
+                needsVPotRedraw = true;
+            }
         }
     }
 

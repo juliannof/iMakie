@@ -73,6 +73,7 @@ SatMenu::SatMenu(LovyanGFX* tft)
 void SatMenu::open() {
     if (_open) return;
     _open = true;
+    _encoderConsumed = true;
     _scr = Scr::MAIN; _cur = 0; _scrl = 0; _dirty = true; _tmp = _cfg;
 
     if (_cbMotorOff)   _cbMotorOff();
@@ -94,6 +95,7 @@ void SatMenu::close() {
     if (!_open) return;
     if (_cfg.trackId == 0) return;
     _open = false;
+    _encoderConsumed = false;
 
     _motorStop();
     _spr.deleteSprite();
@@ -163,6 +165,13 @@ void SatMenu::update() {
 //  Lectura botones
 // ─────────────────────────────────────────────────────────────
 SatMenu::Btn SatMenu::_readBtn() {
+    // Leer encoder si SAT está consumiendo
+    if (_encoderConsumed) {
+        int delta = Encoder::getCount();
+        if (delta > 0) { Encoder::reset(); return Btn::DOWN;  }
+        if (delta < 0) { Encoder::reset(); return Btn::UP;    }
+    }
+
     unsigned long n = millis();
     if (n - _debT < SAT_DEB_MS) return Btn::NONE;
     if (digitalRead(BUTTON_PIN_REC)    == LOW) { _debT=n; return Btn::UP;    }

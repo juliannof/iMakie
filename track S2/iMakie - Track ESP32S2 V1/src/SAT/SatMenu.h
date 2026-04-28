@@ -65,6 +65,7 @@ public:
     void close();
     void showStatus(const char* msg);
     bool isOpen() const { return _open; }
+    bool isEncoderConsumed() const { return _encoderConsumed; }
     const SatConfig& getConfig() const { return _cfg; }
 
 private:
@@ -84,6 +85,7 @@ private:
     LovyanGFX*   _tft;
     LGFX_Sprite  _spr;
     bool         _open  = false;
+    bool         _encoderConsumed = false;
     Scr          _scr   = Scr::MAIN;
     Scr          _prev  = Scr::MAIN;
     int          _cur   = 0;
