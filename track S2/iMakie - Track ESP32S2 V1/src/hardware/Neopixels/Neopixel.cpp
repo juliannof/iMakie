@@ -7,7 +7,11 @@ Adafruit_NeoPixel neopixels(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 static uint8_t  neoBrightness  = NEOPIXEL_DEFAULT_BRIGHTNESS;
 bool neoWaitingHandshake = true;
-bool needsNeoPixelUpdate = false;
+static bool lastNeoWaiting = true;
+static bool lastRec    = false;
+static bool lastSolo   = false;
+static bool lastMute   = false;
+static bool lastSelect = false;
 
 void initNeopixels() {
     neopixels.begin();
@@ -18,7 +22,7 @@ void initNeopixels() {
     }
     neopixels.show();
     neoWaitingHandshake = true;
-    needsNeoPixelUpdate = false;  // ya estamos mostrados
+    lastNeoWaiting = true;
     log_i("[NEO] Adafruit NeoPixel OK — %d pixels GPIO%d", NEOPIXEL_COUNT, NEOPIXEL_PIN);
 }
 
@@ -48,11 +52,21 @@ void showNeopixels() {
 }
 
 void updateAllNeopixels() {
-    // Actualizar si: (1) cambió neoWaitingHandshake o (2) cambió algún botón
-    if (!needsNeoPixelUpdate) return;
+    // Detectar cambios: neoWaitingHandshake o estados de botones
+    if (neoWaitingHandshake == lastNeoWaiting &&
+        recStates == lastRec && soloStates == lastSolo &&
+        muteStates == lastMute && selectStates == lastSelect) {
+        return;  // Sin cambios, no actualizar
+    }
 
-    needsNeoPixelUpdate = false;  // consumir el flag
+    // Guardar estado actual
+    lastNeoWaiting = neoWaitingHandshake;
+    lastRec = recStates;
+    lastSolo = soloStates;
+    lastMute = muteStates;
+    lastSelect = selectStates;
 
+    // Actualizar colores
     handleButtonLedState(ButtonId::REC);
     handleButtonLedState(ButtonId::SOLO);
     handleButtonLedState(ButtonId::MUTE);

@@ -36,7 +36,7 @@ void onMasterData(const MasterPacket& pkt) {
 
     if (newState == ConnectionState::CONNECTED) {
         neoWaitingHandshake = false;
-        needsNeoPixelUpdate = true;  // Cambio de azul a colores tenues
+        // Cambio de azul a colores tenues
         // ¡CRÍTICO! NO llamar updateAllNeopixels() aquí — retarda RS485 response
         // Neopixels se actualizan en main.cpp DESPUÉS de sendResponse()
     } else {
@@ -47,7 +47,7 @@ void onMasterData(const MasterPacket& pkt) {
         vuLevels = vuPeakLevels = 0.0f;
         //setScreenBrightness(0);
         neoWaitingHandshake = true;
-        needsNeoPixelUpdate = true;  // Cambio a azul
+        // Cambio a azul
         // ¡CRÍTICO! NO llamar updateAllNeopixels() aquí — retarda RS485 response
         // Neopixels se actualizan en main.cpp DESPUÉS de sendResponse()
     }
@@ -155,7 +155,7 @@ void checkTimeout(unsigned long lastRxTime) {
         recStates = soloStates = muteStates = selectStates = false;
         setScreenBrightness(0);
         neoWaitingHandshake = true;
-        needsNeoPixelUpdate = true;  // Volver a azul en timeout
+        // Volver a azul en timeout
         // ¡CRÍTICO! NO actualizar neopixels aquí — timeout podría estar en path RS485
         // Los neopixels se actualizarán en el siguiente ciclo main.cpp
         needsTOTALRedraw = true;

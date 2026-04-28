@@ -17,7 +17,6 @@ void setNeopixelGlobalBrightness(uint8_t brightness);
 uint8_t getNeopixelBrightness();
 
 extern bool neoWaitingHandshake;
-extern bool needsNeoPixelUpdate;
 
 void handleButtonLedState(ButtonId id);
 void updateAllNeopixels();
