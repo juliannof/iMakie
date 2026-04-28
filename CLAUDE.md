@@ -442,9 +442,22 @@ Menú en display (Encoder push > 3s):
 12. revisar FaderADC tras reescritura — validar lecturas actuales con hardware real
 13. ADS1015 pedido — cuando llegue, reemplazar lectura ADC nativa por I2C ADS1015 para resolver ruido en fader
 
+### S2 — NeoPixel (continuación)
+**NeoPixel secuencia de brillo (2026-04-28) — IMPLEMENTADO:**
+- Azul tenue (NEOPIXEL_DIM_BRIGHTNESS=5) al inicio/reposo
+- Colores muy tenues (NEOPIXEL_ULTRA_DIM=1) cuando Logic conecta primera vez
+- O encendido (NEOPIXEL_DEFAULT_BRIGHTNESS=30) o tenue de morir (NEOPIXEL_ULTRA_DIM=1)
+- Optimización monocore: detección de cambios interna sin flags innecesarios
+- Comparación de estado (neoWaitingHandshake + 4 botones) en updateAllNeopixels()
+
+**HW_STATUS display en boot screen (2026-04-28) — IMPLEMENTADO:**
+- 10 componentes hardware con estado color-coded (Rojo=0, Naranja=1, Blanco=2)
+- Fuente bitmap pequeña (setTextFont(1)) consistente con SAT
+- Inyección automática vía pre_build.py desde config.h markers
+
 ### Cross-system
 14. RS485: verificar pines en S3 (legacy) y P4 (TX=50, RX=51, EN=52) — confirmar que ambos compilan y funcionan correctamente
-15. LEDs NeoPixel: implementar control de brillo centralizado — estudiar si viable vía MIDI (CC o SysEx dedicado) para controlar brillo de todos los slaves desde Logic/P4
+15. LEDs NeoPixel master: implementar control de brillo centralizado — estudiar si viable vía MIDI (CC o SysEx dedicado) para controlar brillo de todos los slaves desde Logic/P4
 
 ---
 
