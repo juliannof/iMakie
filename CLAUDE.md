@@ -121,6 +121,34 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 - OTA password: `9821` | WiFi SSID: `Julianno-WiFi`
 - Provisioning via sketch USB que cachea credenciales en NVS namespace `"ptxx"`
 
+**Serial/USB OTA — alternativa para unidades con problemas de hardware (2026-04-28)**
+- Nuevo entorno PlatformIO: `[env:lolin_s2_mini_serial]`
+- Upload protocol: `esptool` (no WiFi, directo por USB a 460800 baud)
+- Seleccionar en SAT menu: "Serial OTA" (7ma opción)
+- `OtaManager::enableSerialMode()` muestra "Reiniciando en modo serial..." y reinicia
+- Tras reinicio, ejecutar: `pio run -e lolin_s2_mini_serial --target upload`
+- **Seguridad RS485 → WiFi:** TX buffer drenado antes de deshabilitar transceiver
+  - Secuencia: 100ms wait → `Serial1.flush()` → 50ms → `Serial1.end()` → 50ms → GPIO manipulation
+  - Previene brownout/reset durante escritura NVS en unidades marginal-powered
+
+**NVS Validation — detección y reparación automática en boot (2026-04-28)**
+- Nuevo validador: `NVSValidator.h/cpp` — estático, sin instancias
+- `validate()` — retorna `NVSStatus::VALID` o `CORRUPTED`
+  - Verifica namespace `ptxx` existe y no está corrupto
+  - Valida `trackId` (0-9 o 255=sin asignar)
+  - Detecta garbage en strings (0xFF repetido)
+- `reset()` — si corrupto:
+  - Muestra "NVS CORRUPTO\nReparando..." en display (si inicializado)
+  - Borra namespace, reescribe con defaults, reinicia
+- **Integración en setup()** (después de `initDisplay()`):
+  ```cpp
+  if (NVSValidator::validate() == NVSStatus::CORRUPTED) {
+      NVSValidator::reset();  // No regresa (reinicia)
+      return;
+  }
+  ```
+- **Indicador en splash screen:** círculo verde al pie si NVS válido, ausente si falla
+
 ### NVS namespace S2
 `"ptxx"` — claves: `wifiSsid`, `wifiPass`, `otaPass`, `trackId`, `label`, `pwmMin`, `pwmMax`, `touchEn`, `motorDis`
 
@@ -325,7 +353,8 @@ Menú en display (Encoder push > 3s):
 - **Brightness** — test backlight
 - **RS485 On/Off** — simula desconexión
 - **LEDs Test** — secuencia RGB por índice
-- **WiFi OTA** — carga firmware via WiFi
+- **WiFi OTA** — carga firmware via WiFi (para unidades con conectividad OK)
+- **Serial OTA** — carga firmware por USB (para unidades con problemas de hardware)
 - **Reboot** — reinicia
 
 **Nota:** SAT suspende PSRAM y sprites → libera RAM para diagnósticos
@@ -417,7 +446,8 @@ Menú en display (Encoder push > 3s):
 - **RS485 intermitente** — **FUNCIONANDO CON TIMEOUTS** — Sistema comunica: LEDs actualizan, pantalla muestra datos. Timeouts ocasionales e impredecibles (~10-20 consecutivos, luego OK, repite). Comunicación física funciona a 500kbaud. NO se debe modificar arquitectura actual de lectura sin probar compilación first.
 
 ### S2
-- **OTA WiFi no conecta en CIERTAS unidades — PROBLEMA DE HARDWARE** — En `OtaManager::enableForUpload()`, WiFi falla a conectarse (timeout 10s, error "No response from device" en cliente OTA). RS485 se deshabilita correctamente (EN=HIGH, GPIO8=LOW, Serial1.end()). **Causa:** problema de alimentación específico en esas unidades (regulador dañado, capacitor muerto, o soldadura mala en PCB). Afecta solo a ciertos S2, no todos. **Fix:** (a) desconectar cables RS485 antes de OTA, (b) alimentar con PSU de 5V @ 1A+ en lugar de USB, (c) si persiste, revisar físicamente PCB (soldaduras, regulador 3.3V, capacitores). Verificar brownout: `[BROWNOUT]` o `[RST]` en logs durante OTA.
+- **OTA WiFi no conecta en CIERTAS unidades — PROBLEMA DE HARDWARE — MITIGADO (2026-04-28)** — En `OtaManager::enableForUpload()`, WiFi falla a conectarse (timeout 10s, error "No response from device" en cliente OTA). RS485 se deshabilita correctamente (EN=HIGH, GPIO8=LOW, Serial1.end()). **Causa:** problema de alimentación específico en esas unidades (regulador dañado, capacitor muerto, o soldadura mala en PCB). Afecta solo a ciertos S2, no todos. **Mitigación (nueva):** Nuevo entorno PlatformIO `lolin_s2_mini_serial` con esptool + USB, no requiere WiFi. Accesible vía SAT menu "Serial OTA". **Fix anterior:** (a) desconectar cables RS485 antes de OTA, (b) alimentar con PSU de 5V @ 1A+ en lugar de USB, (c) si persiste, revisar físicamente PCB (soldaduras, regulador 3.3V, capacitores). Verificar brownout: `[BROWNOUT]` o `[RST]` en logs durante OTA.
+- **NVS corrupto en boot — PROBLEMA DETECTADO Y RESUELTO (2026-04-28)** — Algunas unidades boot-loopaban por NVS namespace corrupto (garbage en strings, trackId fuera de rango, namespace no legible). **Solución:** NVSValidator estático integrado en setup() detecta corrupción automáticamente. Si corrupto: muestra "NVS CORRUPTO\nReparando..." en display, reseta a defaults, reinicia limpio. Boot subsecuente funciona normal con indicador verde en splash screen. Sin intervención manual necesaria.
 
 ---
 
