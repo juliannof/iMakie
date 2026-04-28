@@ -69,9 +69,9 @@ void onMasterData(const MasterPacket& pkt) {
     bool nm = (pkt.flags & FLAG_MUTE)   != 0;
     bool nq = (pkt.flags & FLAG_SELECT) != 0;
 
-    if (recStates    != nr) { recStates    = nr; handleButtonLedState(ButtonId::REC);    needsMainAreaRedraw = true; needsNeoPixelUpdate = true; }
-    if (soloStates   != ns) { soloStates   = ns; handleButtonLedState(ButtonId::SOLO);   needsMainAreaRedraw = true; needsNeoPixelUpdate = true; }
-    if (muteStates   != nm) { muteStates   = nm; handleButtonLedState(ButtonId::MUTE);   needsMainAreaRedraw = true; needsNeoPixelUpdate = true; }
+    if (recStates    != nr) { recStates    = nr; handleButtonLedState(ButtonId::REC);    needsMainAreaRedraw = true; }
+    if (soloStates   != ns) { soloStates   = ns; handleButtonLedState(ButtonId::SOLO);   needsMainAreaRedraw = true; }
+    if (muteStates   != nm) { muteStates   = nm; handleButtonLedState(ButtonId::MUTE);   needsMainAreaRedraw = true; }
     if (selectStates != nq) {
         selectStates = nq;
         handleButtonLedState(ButtonId::SELECT);
@@ -80,8 +80,7 @@ void onMasterData(const MasterPacket& pkt) {
         handleButtonLedState(ButtonId::MUTE);
         //showNeopixels();
         needsHeaderRedraw = true;
-        needsNeoPixelUpdate = true;
-    }
+           }
 
     // ── VU meter ──────────────────────────────────────────────
     float newVu = pkt.vuLevel / 127.0f;
