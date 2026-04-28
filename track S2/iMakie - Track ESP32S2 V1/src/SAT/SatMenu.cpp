@@ -24,7 +24,6 @@ const SatMenu::Item SatMenu::_mainItems[] = {
 };
 const SatMenu::Item SatMenu::_identItems[] = {
     {"ID","Track ID (1-9)",   Scr::EDIT_TRACKID},
-    {"LB","Etiqueta (6 chr)", Scr::EDIT_LABEL  },
 };
 const SatMenu::Item SatMenu::_motorItems[] = {
     {"DI","Motor ON/OFF",  Scr::MOTOR     },
@@ -152,7 +151,6 @@ void SatMenu::update() {
         case Scr::EDIT_TRACKID:
         case Scr::EDIT_PWMMIN:
         case Scr::EDIT_PWMMAX:   _hEditVal(b);         break;
-        case Scr::EDIT_LABEL:    _hEditLbl(b);         break;
         case Scr::CONFIRM:       _hConfirm(b);         break;
         case Scr::TOAST:         _hToast(b);           break;
         case Scr::TEST_DISPLAY:  _tickTestDisplay(b);  break;
@@ -246,11 +244,6 @@ void SatMenu::_render() {
         case Scr::EDIT_PWMMIN:
         case Scr::EDIT_PWMMAX:
             _drawValEdit(_eTitle, _eVal, _eMin, _eMax, "");
-            break;
-        case Scr::EDIT_LABEL:
-            _drawHdr("Etiqueta");
-            _drawLblEdit();
-            _drawHints("Car+","Car-","Pos<","Pos>");
             break;
         case Scr::CONFIRM: _drawConfirm(_confMsg); break;
         case Scr::TOAST:   _drawToast(_toastMsg);  break;
@@ -591,8 +584,7 @@ void SatMenu::_hIdent(Btn b) {
     if (b == Btn::DOWN) { if (_cur<_identN-1) { _cur++; _dirty=true; } }
     if (b == Btn::BACK) _goto(Scr::MAIN);
     if (b == Btn::ENTER) {
-        if (_cur==0) { _eTitle="Track ID"; _eVal=max((int)_tmp.trackId,1); _eMin=1; _eMax=9; _goto(Scr::EDIT_TRACKID); }
-        else         { _lblIdx=0; _goto(Scr::EDIT_LABEL); }
+        _eTitle="Track ID"; _eVal=max((int)_tmp.trackId,1); _eMin=1; _eMax=9; _goto(Scr::EDIT_TRACKID);
     }
 }
 void SatMenu::_hMotor(Btn b) {
@@ -667,26 +659,6 @@ void SatMenu::_hEditVal(Btn b) {
         }
         _save(); if (_cbSaved) _cbSaved(_cfg);
         _toast("Guardado!", _prev);
-    }
-}
-void SatMenu::_hEditLbl(Btn b) {
-    if (b == Btn::UP) {
-        char& c=_tmp.label[_lblIdx];
-        c=(c>='A'&&c<'Z')?c+1:(c=='Z')?'a':(c>='a'&&c<'z')?c+1:(c=='z')?'0':(c>='0'&&c<'9')?c+1:(c=='9')?' ':' ';
-        _dirty=true;
-    }
-    if (b == Btn::DOWN) {
-        char& c=_tmp.label[_lblIdx];
-        c=(c=='A')?' ':(c==' ')?'9':(c=='0')?'z':(c=='a')?'Z':(c>'a')?c-1:(c>'0')?c-1:(c>'A')?c-1:c;
-        _dirty=true;
-    }
-    if (b == Btn::BACK) {
-        if (_lblIdx>0) { _lblIdx--; _dirty=true; }
-        else { memcpy(_tmp.label,_cfg.label,7); _goto(Scr::IDENTIDAD); }
-    }
-    if (b == Btn::ENTER) {
-        if (_lblIdx<5) { _lblIdx++; _dirty=true; }
-        else { memcpy(_cfg.label,_tmp.label,7); _save(); if (_cbSaved) _cbSaved(_cfg); _toast("Etiqueta guardada!",Scr::IDENTIDAD); }
     }
 }
 void SatMenu::_hConfirm(Btn b) {
@@ -771,24 +743,6 @@ void SatMenu::_drawValEdit(const char* t,int v,int mn,int mx,const char* u) {
     _spr.drawString(rb,cx,cy+28);
     _drawHints("","","Cancel","Guardar");
 }
-void SatMenu::_drawLblEdit() {
-    int W=_spr.width(),H=_spr.height();
-    int cx=W/2,cy=H/2,charW=32,startX=cx-3*charW;
-    _spr.setTextColor(C_TEXT,C_BG); _spr.setTextSize(1);
-    _spr.setTextDatum(textdatum_t::middle_center);
-    _spr.drawString("Navega con MUT/SEL, cambia con REC/SOL",cx,SAT_HDR_H+18);
-    for (int i=0;i<6;i++) {
-        int x=startX+i*charW; bool active=(i==_lblIdx);
-        _spr.fillRoundRect(x,cy-18,charW-2,34,4,active?C_ACCENT:C_DARK);
-        char c[2]={_tmp.label[i],0};
-        _spr.setTextColor(active?C_WHITE:C_TEXT,active?C_ACCENT:C_DARK);
-        _spr.setTextSize(2); _spr.setTextDatum(textdatum_t::middle_center);
-        _spr.drawString(c,x+(charW-2)/2,cy);
-    }
-    _spr.setTextColor(C_ACCENT,C_BG); _spr.setTextSize(1);
-    _spr.setTextDatum(textdatum_t::middle_center);
-    _spr.drawString("^",startX+_lblIdx*charW+(charW-2)/2,cy+24);
-}
 void SatMenu::_drawConfirm(const char* msg) {
     int W=_spr.width(),H=_spr.height();
     _drawHdr("Confirmar");
@@ -851,8 +805,6 @@ void SatMenu::_load() {
     _cfg.pwmMax         = _prefs.getUChar("pwmMax", 220);
     _cfg.touchEnabled   = _prefs.getBool ("touchEn",true);
     _cfg.motorDisabled = _prefs.getBool("motorDis", false);
-    String lbl=_prefs.getString("label","CH-01 ");
-    strncpy(_cfg.label,lbl.c_str(),6); _cfg.label[6]='\0';
     _prefs.end();
 }
 void SatMenu::_save() {
@@ -861,7 +813,6 @@ void SatMenu::_save() {
     _prefs.putUChar("pwmMin",  _cfg.pwmMin);
     _prefs.putUChar("pwmMax",  _cfg.pwmMax);
     _prefs.putBool ("touchEn", _cfg.touchEnabled);
-    _prefs.putString("label",  String(_cfg.label).substring(0,6));
     _prefs.putBool("motorDis", _cfg.motorDisabled);
     _prefs.end();
 }

@@ -71,7 +71,7 @@ private:
     enum class Scr {
         MAIN, IDENTIDAD, MOTOR, TOUCH, DIAG,
         OTA, REINICIAR,
-        EDIT_TRACKID, EDIT_LABEL,
+        EDIT_TRACKID,
         EDIT_PWMMIN, EDIT_PWMMAX,
         CONFIRM, TOAST,
         TEST_DISPLAY, TEST_ENCODER, TEST_FADER, TEST_NEOPIXEL, TEST_TOUCH,
@@ -93,7 +93,6 @@ private:
 
     int         _eVal=0, _eMin=0, _eMax=255;
     const char* _eTitle="";
-    int         _lblIdx = 0;
 
     unsigned long _toastT   = 0;
     const char*   _toastMsg = "";
