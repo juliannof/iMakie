@@ -211,7 +211,6 @@ void loop() {
 
             ButtonManager::clearButtonFlags();
             ButtonManager::clearEncoderButton();
-            Encoder::reset();
         }
 
         RS485Handler::checkTimeout(lastRxTime);
@@ -239,6 +238,8 @@ void loop() {
             }
         }
     }
+
+    Encoder::reset();  // Resetear DESPUÉS de procesar VPot
 
     updateButtons();
     updateDisplay();
