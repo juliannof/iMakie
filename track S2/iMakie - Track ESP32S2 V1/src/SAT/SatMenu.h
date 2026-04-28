@@ -69,7 +69,7 @@ public:
 
 private:
     enum class Scr {
-        MAIN, IDENTIDAD, MOTOR, TOUCH, DIAG,
+        MAIN, MOTOR, TOUCH, DIAG,
         OTA, REINICIAR,
         EDIT_TRACKID,
         EDIT_PWMMIN, EDIT_PWMMAX,

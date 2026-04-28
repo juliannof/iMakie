@@ -15,15 +15,12 @@ extern FaderADC faderADC;                  // ← añadir
 //  Tablas de menú
 // ─────────────────────────────────────────────────────────────
 const SatMenu::Item SatMenu::_mainItems[] = {
-    {"ID","Identidad",   Scr::IDENTIDAD },
+    {"ID","Track ID (1-9)",   Scr::EDIT_TRACKID },
     {"OT","Activar OTA", Scr::OTA       },
     {"MT","Motor",       Scr::MOTOR     },
     {"TC","Touch",       Scr::TOUCH     },
     {"DG","Diagnostico", Scr::DIAG      },
     {"RB","Reiniciar",   Scr::REINICIAR },
-};
-const SatMenu::Item SatMenu::_identItems[] = {
-    {"ID","Track ID (1-9)",   Scr::EDIT_TRACKID},
 };
 const SatMenu::Item SatMenu::_motorItems[] = {
     {"DI","Motor ON/OFF",  Scr::MOTOR     },
@@ -44,7 +41,6 @@ const SatMenu::Item SatMenu::_diagItems[] = {
     {"TC","Test Touch",    Scr::TEST_TOUCH    },
 };
 const int SatMenu::_mainN  = 6;
-const int SatMenu::_identN = 2;
 const int SatMenu::_motorN = 5;   
 const int SatMenu::_touchN = 2;
 const int SatMenu::_diagN  = 5;
@@ -142,7 +138,6 @@ void SatMenu::update() {
 
     switch (_scr) {
         case Scr::MAIN:          _hMain(b);            break;
-        case Scr::IDENTIDAD:     _hIdent(b);           break;
         case Scr::MOTOR:         _hMotor(b);           break;
         case Scr::MOTOR_CALIB:   _tickMotorCalib(b); break;
         case Scr::MOTOR_POS:     _tickMotorPos(b);   break;
@@ -207,11 +202,6 @@ void SatMenu::_render() {
                 _spr.setTextDatum(textdatum_t::middle_center);
                 _spr.drawString("Configura Track ID antes de usar", W/2, SAT_HDR_H+10);
             }
-            break;
-        case Scr::IDENTIDAD:
-            _drawHdr("Identidad");
-            _drawList(_identItems, _identN);
-            _drawHints("","","Atras","Entrar");
             break;
         case Scr::MOTOR:
             _drawHdr("Motor");
@@ -566,7 +556,7 @@ void SatMenu::_hMain(Btn b) {
     if (b == Btn::BACK) { close(); return; }
     if (b == Btn::ENTER) {
         switch (_mainItems[_cur].target) {
-            case Scr::IDENTIDAD: _goto(Scr::IDENTIDAD); break;
+            case Scr::EDIT_TRACKID: _eTitle="Track ID"; _eVal=max((int)_tmp.trackId,1); _eMin=1; _eMax=9; _goto(Scr::EDIT_TRACKID); break;
             case Scr::OTA:
                 if (_cbWiFiOta) _cbWiFiOta();
                 _toast("Activando OTA...", Scr::MAIN);
@@ -577,14 +567,6 @@ void SatMenu::_hMain(Btn b) {
             case Scr::REINICIAR: _confirm("Reiniciar el dispositivo?", Scr::REINICIAR); break;
             default: break;
         }
-    }
-}
-void SatMenu::_hIdent(Btn b) {
-    if (b == Btn::UP)   { if (_cur>0)         { _cur--; _dirty=true; } }
-    if (b == Btn::DOWN) { if (_cur<_identN-1) { _cur++; _dirty=true; } }
-    if (b == Btn::BACK) _goto(Scr::MAIN);
-    if (b == Btn::ENTER) {
-        _eTitle="Track ID"; _eVal=max((int)_tmp.trackId,1); _eMin=1; _eMax=9; _goto(Scr::EDIT_TRACKID);
     }
 }
 void SatMenu::_hMotor(Btn b) {
