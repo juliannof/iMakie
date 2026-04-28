@@ -60,8 +60,8 @@ static int      _ultimoValorEstable      = 0;
 static uint16_t _posicionMaximaADC       = 0;
 
 // ─── ButtonManager — SAT long press ──────────────────────────
-#define SAT_HOLD_MS      1500   // tiempo para abrir SAT
-#define SAT_BAR_SHOW_MS  1000   // tiempo antes de mostrar barra
+#define SAT_HOLD_MS      3000   // tiempo para abrir SAT
+#define SAT_BAR_SHOW_MS  2500   // tiempo antes de mostrar barra
 #define SAT_BAR_W        180
 #define SAT_BAR_H          8
 #define SAT_BAR_CX       120
