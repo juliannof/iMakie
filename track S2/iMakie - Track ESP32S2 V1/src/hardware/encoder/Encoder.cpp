@@ -1,45 +1,37 @@
 #include "Encoder.h"
 #include "../../config.h"
 
-volatile long        Encoder::_counter      = 0;
-long                 Encoder::_lastReported = 0;
-int                  Encoder::currentVPotLevel = 0;
+volatile long    Encoder::_counter      = 0;
+long             Encoder::_lastReported = 0;
+volatile uint8_t Encoder::_state        = 0;
+int              Encoder::currentVPotLevel = 0;
 
-// Estado para lógica SAT (la única fuente de verdad)
-static volatile unsigned long _lastDebounceTime = 0;
-static volatile int           _lastA            = 0;
-static volatile int           _lastB            = 0;
+// Tabla Gray code — índice: (prevA<<3)|(prevB<<2)|(currA<<1)|(currB)
+// Devuelve: -1, 0, +1
+static const int8_t ENC_TABLE[16] = {
+     0, -1, +1,  0,
+    +1,  0,  0, -1,
+    -1,  0,  0, +1,
+     0, +1, -1,  0
+};
 
 void IRAM_ATTR Encoder::_isr() {
-    // Lógica idéntica a SAT _tickTestEncoder
-    unsigned long now = millis();
-    
-    int A = (GPIO.in >> ENCODER_PIN_A) & 1;
-    int B = (GPIO.in >> ENCODER_PIN_B) & 1;
-    
-    if (A != _lastA) {
-        if (now - _lastDebounceTime > 3) {
-            _lastDebounceTime = now;
-            _lastA = A;
-            if (A == 0) {  // A LOW
-                Encoder::_counter += (B == 1) ? -1 : 1;
-            }
-        }
-    }
-    if (B != _lastB) _lastB = B;
+    // Lectura directa de registro — segura en ISR
+    uint32_t reg = GPIO.in;  // lee los 32 GPIOs de una vez
+    uint8_t curr = ((reg >> ENCODER_PIN_A) & 1) << 1
+                 | ((reg >> ENCODER_PIN_B) & 1);
+    int8_t  step = ENC_TABLE[(_state << 2) | curr];
+    _counter    += step;
+    _state       = curr;
 }
 
 void Encoder::begin() {
-    pinMode(ENCODER_PIN_A, INPUT);
+    pinMode(ENCODER_PIN_A, INPUT);   // pull-ups externos
     pinMode(ENCODER_PIN_B, INPUT);
 
-    // Leer estado inicial
-    uint32_t reg = GPIO.in;
-    _lastA = (reg >> ENCODER_PIN_A) & 1;
-    _lastB = (reg >> ENCODER_PIN_B) & 1;
-    _lastDebounceTime = millis();
+    _state = ((uint8_t)digitalRead(ENCODER_PIN_A) << 1)
+           |  (uint8_t)digitalRead(ENCODER_PIN_B);
 
-    // Interrupts on both pins (SAT reacciona a cambios en A, pero lee B constantemente)
     attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_A), _isr, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_B), _isr, CHANGE);
 }
