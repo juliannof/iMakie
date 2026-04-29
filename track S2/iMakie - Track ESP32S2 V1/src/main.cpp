@@ -249,7 +249,7 @@ void loop() {
         }
     }
 
-    Encoder::reset();  // Resetear DESPUÉS de procesar VPot
+    Encoder::reset();
 
     updateButtons();
     updateDisplay();

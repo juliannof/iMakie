@@ -95,7 +95,16 @@ static void processSlaveResponse(uint8_t slaveId) {
     // --- Encoder → CC ---
     if (ch.encoderDelta != 0) {
         uint8_t cc  = 16 + midiCh;
-        uint8_t val = (ch.encoderDelta > 0) ? 65 : 63;
+        uint8_t val;
+
+        if (ch.encoderDelta > 0) {
+            // CW: valores 1-62
+            val = constrain((uint8_t)ch.encoderDelta, 1, 62);
+        } else {
+            // CCW: valores 64-127 (64 + ticks)
+            val = 64 + constrain((uint8_t)(-ch.encoderDelta), 1, 64);
+        }
+
         byte msg[3] = { (byte)(0xB0 | midiCh), cc, val };
         sendMIDIBytes(msg, 3);
     }
