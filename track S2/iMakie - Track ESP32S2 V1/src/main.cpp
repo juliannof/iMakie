@@ -234,12 +234,12 @@ void loop() {
 
             ButtonManager::clearButtonFlags();
             ButtonManager::clearEncoderButton();
+
+            Encoder::reset();
         }
 
         RS485Handler::checkTimeout(lastRxTime);
     }
-
-    Encoder::reset();
 
     faderADC.update();
     FaderTouch::update();
