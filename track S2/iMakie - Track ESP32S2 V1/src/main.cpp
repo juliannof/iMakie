@@ -208,6 +208,19 @@ void loop() {
     ButtonManager::update();
     if (satMenu && satMenu->isOpen()) return;
 
+    // ┌─ Procesar encoder ANTES de RS485 para capturar delta actualizado
+    if (!satMenu->isEncoderConsumed()) {
+        Encoder::update();
+        if (Encoder::hasChanged()) {
+            int newLevel = constrain((int)(Encoder::getCount() / 4), -7, 7);
+            if (newLevel != Encoder::currentVPotLevel) {
+                Encoder::currentVPotLevel = newLevel;
+                needsVPotRedraw = true;
+            }
+        }
+    }
+    // └─
+
     if (!_suspended) {
         rs485.update();
         static unsigned long lastRxTime = millis();
@@ -226,6 +239,8 @@ void loop() {
         RS485Handler::checkTimeout(lastRxTime);
     }
 
+    Encoder::reset();
+
     faderADC.update();
     FaderTouch::update();
 
@@ -236,20 +251,6 @@ void loop() {
     } else {
         Motor::update();
     }
-
-    // Solo procesar encoder para VPot si SAT no lo está consumiendo
-    if (!satMenu->isEncoderConsumed()) {
-        Encoder::update();
-        if (Encoder::hasChanged()) {
-            int newLevel = constrain((int)(Encoder::getCount() / 4), -7, 7);
-            if (newLevel != Encoder::currentVPotLevel) {
-                Encoder::currentVPotLevel = newLevel;
-                needsVPotRedraw = true;
-            }
-        }
-    }
-
-    Encoder::reset();
 
     updateButtons();
     updateDisplay();
