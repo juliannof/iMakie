@@ -29,11 +29,13 @@ void Encoder::begin() {
     pinMode(ENCODER_PIN_A, INPUT);   // pull-ups externos
     pinMode(ENCODER_PIN_B, INPUT);
 
+    noInterrupts();
+    _counter = 0;  // fuerza init a 0
     _state = ((uint8_t)digitalRead(ENCODER_PIN_A) << 1)
            |  (uint8_t)digitalRead(ENCODER_PIN_B);
-
     attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_A), _isr, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_B), _isr, CHANGE);
+    interrupts();
 }
 
 void Encoder::update() { /* ISR lo maneja */ }
