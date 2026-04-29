@@ -2,6 +2,15 @@
 
 ---
 
+## 📋 ARQUITECTURA (Consulta directa)
+
+**→ [`docs/ARQUITECTURA_DEFINITIVA.md`](docs/ARQUITECTURA_DEFINITIVA.md)**
+
+Referencia única de componentes, flujos MIDI, RS485, y puntos críticos.  
+**No preguntar sobre arquitectura. Consultar este documento.**
+
+---
+
 ## ⚠️ DIRECTIVA OBLIGATORIA
 
 **NUNCA modificar código sin explicar PRIMERO con detalle qué vas a hacer.**
