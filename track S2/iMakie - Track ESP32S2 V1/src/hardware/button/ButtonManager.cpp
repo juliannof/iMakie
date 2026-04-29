@@ -120,7 +120,6 @@ static void _onButtonEvent(ButtonId id) {
             break;
         case ButtonId::ENCODER_SELECT:
             _encoderBtnCount++;
-            Encoder::reset();
             needsVPotRedraw = true;
             break;
         default: break;
