@@ -1,12 +1,14 @@
 #!/bin/bash
 # ============================================================
 #  ota_upload.sh — iMakie PTxx Track S2
-#  Uso: ./ota_upload.sh [ip] [password]
-#  Defaults: ip=192.168.1.15  password=9821
+#  Uso: ./ota_upload.sh [numero_ip] [password]
+#  Ejemplos: ./ota_upload.sh 62        → 192.168.1.62
+#            ./ota_upload.sh 62 9821
 # ============================================================
 
-IP="${1:-192.168.1.15}"
+NUM="${1:-62}"
 PASSWORD="${2:-9821}"
+IP="192.168.1.$NUM"
 ESPOTA="$HOME/.platformio/packages/framework-arduinoespressif32/tools/espota.py"
 
 # Buscar el firmware más reciente

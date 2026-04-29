@@ -92,6 +92,12 @@ void OtaManager::launchPortal() {
 
 // ─────────────────────────────────────────────────────────────
 void OtaManager::enableForUpload() {
+    extern void setScreenBrightness(uint8_t brightness);
+
+    // Apagar display completamente para liberar heap
+    setScreenBrightness(0);
+    delay(100);
+
     char ssid[64]    = {};
     char pass[64]    = {};
     char otaPass[33] = {};
@@ -149,6 +155,8 @@ void OtaManager::enableForUpload() {
 
     log_i("[OTA] Conectado  IP=%s  RSSI=%d",
           WiFi.localIP().toString().c_str(), WiFi.RSSI());
+
+    setScreenBrightness(20);  // Restaurar brillo 8% para ver IP durante OTA
 
     ArduinoOTA.setPort(OTA_PORT);
     ArduinoOTA.setHostname(PORTAL_SSID);
