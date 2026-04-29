@@ -20,11 +20,11 @@ void IRAM_ATTR Encoder::_isr() {
     if (A != _lastA) {
         if (now - _lastDebounceTime > 3) {
             _lastDebounceTime = now;
-            _lastA = A;  // actualizar solo si debounce pasó
             if (A == 0) {  // A LOW
-                Encoder::_counter += (B == 1) ? -1 : 1;  // B HIGH -> -1, else +1
+                Encoder::_counter += (B == 1) ? -1 : 1;  // B HIGH -> +1, else -1
             }
         }
+        _lastA = A;
     }
     if (B != _lastB) _lastB = B;
 }

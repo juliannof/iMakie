@@ -182,13 +182,13 @@ SatMenu::Btn SatMenu::_readBtn() {
         if (delta > 0) {
             pendingEvents = delta / 4;  // aceleración: cada 4 unidades = evento extra
             encoderDir = 1;
-            // ¡NO resetear aquí! main.cpp maneja reset post-RS485
+            Encoder::reset();
             return Btn::DOWN;
         }
         if (delta < 0) {
             pendingEvents = (-delta) / 4;
             encoderDir = -1;
-            // ¡NO resetear aquí! main.cpp maneja reset post-RS485
+            Encoder::reset();
             return Btn::UP;
         }
 
