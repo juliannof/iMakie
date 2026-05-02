@@ -101,57 +101,77 @@ void OtaManager::enableForUpload() {
     Serial.printf("[OTA] enableForUpload() — inicio\n");
     Serial.flush();
 
-    // Liberar máximo heap posible ANTES de WiFi
+    // ┌─ LIMPIEZA RADICAL Y PROFUNDA ─────────────────────────────────
+    Serial.printf("[OTA] === LIMPIEZA RADICAL DEL SISTEMA ===\n");
+    Serial.flush();
+
+    // 1. APAGAR DISPLAY COMPLETAMENTE
     setScreenBrightness(0);
     Serial.flush();
+    delay(50);
+    pinMode(33, OUTPUT);  // Display RST
+    digitalWrite(33, LOW);
     delay(100);
-
-    clearAllNeopixels();
-    showNeopixels();
-    Serial.printf("[OTA] NeoPixels apagados\n");
+    Serial.printf("[OTA] Display apagado (RST LOW)\n");
     Serial.flush();
 
+    // 2. BORRAR TODOS LOS SPRITES DE PSRAM
+    extern LGFX tft;
+    extern LGFX_Sprite header, mainArea, vuSprite, vPotSprite;
+    header.deleteSprite();
+    mainArea.deleteSprite();
+    vuSprite.deleteSprite();
+    vPotSprite.deleteSprite();
+    Serial.printf("[OTA] Sprites borrados (PSRAM liberado)\n");
+    Serial.flush();
+
+    // 3. APAGAR PERIFÉRICOS
+    clearAllNeopixels();
+    showNeopixels();
     Motor::stop();
-    Serial.printf("[OTA] Motor apagado\n");
+    Serial.printf("[OTA] NeoPixels + Motor apagados\n");
     Serial.flush();
     delay(50);
 
-    // ┌─ LIMPIAR SISTEMA COMPLETAMENTE ANTES DE WIFI ────────────
-    Serial.printf("[OTA] Limpiando sistema antes de WiFi...\n");
-    Serial.flush();
-
-    // Deshabilitar ENCODER ISRs
-    detachInterrupt(digitalPinToInterrupt(12));
-    detachInterrupt(digitalPinToInterrupt(13));
-    Serial.printf("[OTA]   - Encoder ISRs deshabilitadas\n");
-    Serial.flush();
-
-    // Deshabilitar BUTTON ISRs
+    // 4. DESHABILITAR TODAS LAS ISRs DE USUARIO
+    detachInterrupt(digitalPinToInterrupt(12));  // Encoder A
+    detachInterrupt(digitalPinToInterrupt(13));  // Encoder B
+    detachInterrupt(digitalPinToInterrupt(21));  // Encoder BTN (si existe)
     for (uint8_t pin : {37, 38, 39, 40}) {
-        detachInterrupt(digitalPinToInterrupt(pin));
+        detachInterrupt(digitalPinToInterrupt(pin));  // Buttons
     }
-    Serial.printf("[OTA]   - Button ISRs deshabilitadas\n");
+    Serial.printf("[OTA] Encoder + Button ISRs deshabilitadas\n");
     Serial.flush();
 
-    // Deshabilitar RS485 con drenaje seguro
+    // 5. DESABILITAR RS485 CON DRENAJE PROFUNDO
     Serial.printf("[OTA] Deshabilitando RS485...\n");
     Serial.flush();
     delay(100);
     Serial1.flush();
+    delay(100);
+    Serial1.onReceive(nullptr);  // ← CRÍTICO: Desregistrar ISR ANTES de end()
     delay(50);
     Serial1.end();
-    delay(50);
+    delay(100);
     pinMode(RS485_TX_PIN, OUTPUT);
     digitalWrite(RS485_TX_PIN, LOW);
+    pinMode(RS485_RX_PIN, INPUT);
     digitalWrite(RS485_ENABLE_PIN, HIGH);
-    Serial.printf("[OTA]   - RS485 deshabilitado\n");
+    Serial.printf("[OTA] RS485 deshabilitado (drenaje profundo)\n");
     Serial.flush();
 
-    // Dejar que FreeRTOS complete tareas pendientes
-    for (int i = 0; i < 10; i++) {
-        vTaskDelay(pdMS_TO_TICKS(10));
+    // 6. YIELD MASIVO PARA QUE FreeRTOS LIMPIE
+    Serial.printf("[OTA] Liberando FreeRTOS...\n");
+    Serial.flush();
+    for (int i = 0; i < 50; i++) {
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
-    Serial.printf("[OTA] Sistema limpio - listo para WiFi\n");
+
+    // 7. VERIFICAR HEAP RECUPERADO
+    uint32_t heapBefore = ESP.getFreeHeap();
+    Serial.printf("[OTA] Heap post-limpieza: %lu bytes\n", heapBefore);
+    Serial.flush();
+    Serial.printf("[OTA] === LIMPIEZA COMPLETA ===\n");
     Serial.flush();
     // └─
 
