@@ -1,5 +1,5 @@
 // ============================================================
-//  OtaManager.cpp  —  iMakie PTxx Track S2
+//  OtaManager.cpp  —  iMakie PTxx Track S2 (SINGLE-CORE)
 // ============================================================
 #include "OtaManager.h"
 #include "../config.h"
@@ -25,7 +25,6 @@ OtaManager otaManager;
 
 // ─────────────────────────────────────────────────────────────
 void OtaManager::begin() {
-    // NO llamar WiFi.mode() aquí — bug GDMA en ESP32-S2 + IDF5
     _otaActive = false;
 }
 
@@ -38,9 +37,8 @@ void OtaManager::tick() {
 
 // ─────────────────────────────────────────────────────────────
 void OtaManager::launchPortal() {
-    // NO llamar WiFi.mode() — WiFiManager gestiona el modo internamente
     log_i("[OTA] launchPortal() — inicio");
-    log_i("[OTA] Heap: %d  PSRAM: %d", ESP.getFreeHeap(), ESP.getFreePsram());   
+    log_i("[OTA] Heap: %d  PSRAM: %d", ESP.getFreeHeap(), ESP.getFreePsram());
     _status("AP: iMakie-PTxx");
     delay(50);
     _status("Conecta y abre 192.168.4.1");
@@ -90,7 +88,6 @@ void OtaManager::launchPortal() {
         _status(buf);
     }
 
-    // NO llamar WiFi.mode(WIFI_OFF) — bug GDMA
     _otaActive = false;
 }
 
@@ -166,8 +163,8 @@ void OtaManager::enableForUpload() {
 
     uint32_t t0 = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - t0 < 10000) {
-        vTaskDelay(pdMS_TO_TICKS(250));  // Ceder CPU a WiFi
-        if ((millis() - t0) % 1000 < 250) {  // Log cada ~1s
+        vTaskDelay(pdMS_TO_TICKS(250));
+        if ((millis() - t0) % 1000 < 250) {
             Serial.printf("[OTA] WiFi status=%d | elapsed=%lums | heap=%d\n",
                           WiFi.status(), millis() - t0, ESP.getFreeHeap());
             Serial.flush();
@@ -195,7 +192,7 @@ void OtaManager::enableForUpload() {
                   WiFi.localIP().toString().c_str(), WiFi.RSSI());
     Serial.flush();
 
-    // Esperar a que WiFi se estabilice completamente — crucial para upload estable
+    // Esperar a que WiFi se estabilice completamente
     Serial.printf("[OTA] Estabilizando WiFi (1s)...\n");
     Serial.flush();
     for (int i = 0; i < 20; i++) {
@@ -216,7 +213,7 @@ void OtaManager::enableForUpload() {
     // Configurar ArduinoOTA CON CALLBACKS ANTES de begin()
     ArduinoOTA.setPort(OTA_PORT);
     ArduinoOTA.setHostname(PORTAL_SSID);
-    ArduinoOTA.setRebootOnSuccess(true);
+    ArduinoOTA.setRebootOnSuccess(false);  // CRÍTICO: reboot manual después de ACK final
     Serial.printf("[OTA] ArduinoOTA config | port=%d | host=%s\n", OTA_PORT, PORTAL_SSID);
     Serial.flush();
 
@@ -227,58 +224,39 @@ void OtaManager::enableForUpload() {
     }
 
     ArduinoOTA.onStart([this]() {
-        Serial.end();
-        _status("OTA: iniciando...");
+        Serial.printf("[OTA] === UPLOAD INICIANDO ===\n");
+        Serial.flush();
+        // CRÍTICO: Deshabilitar logging de Arduino/IDF durante upload
+        // CORE_DEBUG_LEVEL=3 imprime MILES de logs que bloquean Serial
+        Serial.setDebugOutput(false);
     });
+
     ArduinoOTA.onEnd([this]() {
-        Serial.printf("[OTA] Upload completado, reiniciando en 2s...\n");
+        Serial.printf("[OTA] ← onEnd() INVOCADO\n");
         Serial.flush();
-        _status("OTA: completado. Reiniciando...");
-        delay(2000);  // Dar tiempo a ver el mensaje
+        Serial.setDebugOutput(true);
+        Serial.printf("[OTA] === UPLOAD COMPLETADO === esperando ACK final...\n");
+        Serial.flush();
+        vTaskDelay(pdMS_TO_TICKS(500));  // CRÍTICO: 500ms para ACK del cliente antes de reboot
+        Serial.printf("[OTA] Reiniciando...\n");
+        Serial.flush();
+        esp_restart();
     });
-    ArduinoOTA.onProgress([this](unsigned int prog, unsigned int total) {
-        static uint8_t lastPct = 255;
-        static uint32_t lastMs = 0;
-        uint8_t pct = (prog * 100) / total;
-        uint32_t nowMs = millis();
 
-        if (pct / 10 != lastPct / 10 || (nowMs - lastMs > 5000)) {
-            lastPct = pct;
-            lastMs = nowMs;
+    // NO usar onProgress() — cada callback suma latencia
+    // ArduinoOTA.onProgress(...) deliberadamente NO configurado
 
-            uint32_t speed = (prog / 1024) / ((nowMs - 100) / 1000 + 1);  // KB/s aproximado
-            static char buf[48];
-            snprintf(buf, sizeof(buf), "OTA: %u%% | %u KB/s", pct, speed);
-            Serial.printf("[OTA-PROGRESS] %s\n", buf);
-            Serial.flush();
-            _status(buf);
-        }
-    });
     ArduinoOTA.onError([this](ota_error_t err) {
-        Serial.printf("[OTA] ArduinoOTA ERROR: %u\n", err);
+        Serial.printf("[OTA] ← onError() INVOCADO - code=%u\n", err);
         Serial.flush();
-        const char* errMsg = "Unknown";
-        switch(err) {
-            case OTA_AUTH_ERROR: errMsg = "Auth failed"; break;
-            case OTA_BEGIN_ERROR: errMsg = "Begin failed"; break;
-            case OTA_CONNECT_ERROR: errMsg = "Connect error"; break;
-            case OTA_RECEIVE_ERROR: errMsg = "Receive error"; break;
-            case OTA_END_ERROR: errMsg = "End error"; break;
-            default: break;
-        }
-        Serial.printf("[OTA] Error type: %s\n", errMsg);
+        Serial.setDebugOutput(true);
+        Serial.printf("[OTA] ERROR: %u\n", err);
         Serial.flush();
-
-        // Restaurar ISRs tras error
         _restoreAllInterrupts();
-
-        static char buf[48];
-        snprintf(buf, sizeof(buf), "OTA error: %s (%u)", errMsg, err);
-        _status(buf);
         _otaActive = false;
     });
 
-    // ArduinoOTA.begin() con TIMEOUT
+    // ArduinoOTA.begin()
     Serial.printf("[OTA] Llamando ArduinoOTA.begin()...\n");
     Serial.flush();
     uint32_t t1 = millis();
@@ -292,11 +270,7 @@ void OtaManager::enableForUpload() {
         Serial.flush();
     }
 
-    vTaskDelay(pdMS_TO_TICKS(100));  // Dar tiempo a que socket UDP se estabilice
-
-    _showOtaScreen();
-    Serial.printf("[OTA] Pantalla OTA mostrada\n");
-    Serial.flush();
+    vTaskDelay(pdMS_TO_TICKS(100));
 
     _otaActive = true;
 
@@ -305,7 +279,6 @@ void OtaManager::enableForUpload() {
              WiFi.localIP().toString().c_str(), OTA_PORT);
     Serial.printf("[OTA] %s\n", buf);
     Serial.flush();
-    _status(buf);
 
     Serial.printf("[OTA] === ESPERANDO conexión de cliente OTA ===\n");
     Serial.flush();
@@ -313,13 +286,16 @@ void OtaManager::enableForUpload() {
 
 // ─────────────────────────────────────────────────────────────
 void OtaManager::disable() {
+    Serial.printf("[OTA] disable() — desconectando WiFi\n");
+    Serial.flush();
     if (_otaActive) {
         ArduinoOTA.end();
         _otaActive = false;
     }
-    // NO llamar WiFi.mode(WIFI_OFF) — bug GDMA
     WiFi.disconnect(true);
-    _status("WiFi apagado.");
+    Serial.printf("[OTA] WiFi desconectado\n");
+    Serial.flush();
+    if (_cbStatus) _cbStatus("WiFi apagado.");
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -329,14 +305,14 @@ void OtaManager::_showOtaScreen() {
 
     uint8_t lastOctet = WiFi.localIP()[3];
 
-    tft.setTextFont(0);  // Fuente de sistema (mínima, no bloquea)
+    tft.setTextFont(0);
     tft.setTextColor(TFT_WHITE);
 
     char buf[4];
     snprintf(buf, sizeof(buf), ".%u", lastOctet);
     tft.drawString(buf, tft.width() / 2, tft.height() / 2);
 
-    setScreenBrightness(5);  // Brillo mínimo (~2%)
+    setScreenBrightness(5);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -393,25 +369,19 @@ void OtaManager::_status(const char* msg) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Deshabilitar TODAS las interrupciones durante OTA
-// ─────────────────────────────────────────────────────────────
 void OtaManager::_disableAllInterrupts() {
     Serial.printf("[OTA] Deshabilitando todas las ISRs...\n");
     Serial.flush();
 
-    // Serial1 ISR (RS485)
     Serial1.onReceive(nullptr);
     Serial.printf("[OTA]   - RS485 Serial1 ISR deshabilitada\n");
     Serial.flush();
 
-    // Encoder ISRs (GPIO12 y GPIO13)
-    detachInterrupt(digitalPinToInterrupt(12));  // ENCODER_PIN_A
-    detachInterrupt(digitalPinToInterrupt(13));  // ENCODER_PIN_B
+    detachInterrupt(digitalPinToInterrupt(12));
+    detachInterrupt(digitalPinToInterrupt(13));
     Serial.printf("[OTA]   - Encoder ISRs deshabilitadas\n");
     Serial.flush();
 
-    // ButtonManager ISRs (GPIO37, 38, 39, 40)
-    // Asumiendo que ButtonManager usa attachInterrupt internamente
     for (uint8_t pin : {37, 38, 39, 40}) {
         detachInterrupt(digitalPinToInterrupt(pin));
     }
@@ -423,14 +393,10 @@ void OtaManager::_disableAllInterrupts() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Restaurar interrupciones críticas después de OTA (si falla)
-// ─────────────────────────────────────────────────────────────
 void OtaManager::_restoreAllInterrupts() {
     Serial.printf("[OTA] Restaurando RS485 ISR...\n");
     Serial.flush();
 
-    // Solo restauramos RS485 porque es crítico
-    // Encoder y Buttons se requieren reinicio manual vía SAT si OTA falla
     Serial1.onReceive([](){ rs485._onReceiveISR(); });
     Serial.printf("[OTA]   - RS485 restaurada\n");
     Serial.flush();

@@ -83,7 +83,7 @@ void FaderADC::update() {
 
     // 5. Log solo cuando hay actividad
     if (diff > threshMicro || trending) {
-        log_i("[ADC] med=%.0f ema=%d span=%.0f diff=%.0f tMov=%.0f tr=%d",
+        log_v("[ADC] med=%.0f ema=%d span=%.0f diff=%.0f tMov=%.0f tr=%d",
               median, _faderPos, _noiseSpan, diff, threshMove, (int)trending);
     }
 }

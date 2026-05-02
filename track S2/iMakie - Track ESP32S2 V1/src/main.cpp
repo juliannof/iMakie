@@ -115,7 +115,9 @@ void setup() {
     Serial.setDebugOutput(true);
     delay(500);          // 2 segundos visible
 
-    
+    Serial.printf("\n[BOOT] FW_VERSION=%s FW_BUILD_ID=%d\n", FW_VERSION, FW_BUILD_ID);
+    Serial.flush();
+
     initNeopixels();
     log_i("NeoPixels OK");
     
