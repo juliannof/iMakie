@@ -116,6 +116,45 @@ void OtaManager::enableForUpload() {
     Serial.flush();
     delay(50);
 
+    // ┌─ LIMPIAR SISTEMA COMPLETAMENTE ANTES DE WIFI ────────────
+    Serial.printf("[OTA] Limpiando sistema antes de WiFi...\n");
+    Serial.flush();
+
+    // Deshabilitar ENCODER ISRs
+    detachInterrupt(digitalPinToInterrupt(12));
+    detachInterrupt(digitalPinToInterrupt(13));
+    Serial.printf("[OTA]   - Encoder ISRs deshabilitadas\n");
+    Serial.flush();
+
+    // Deshabilitar BUTTON ISRs
+    for (uint8_t pin : {37, 38, 39, 40}) {
+        detachInterrupt(digitalPinToInterrupt(pin));
+    }
+    Serial.printf("[OTA]   - Button ISRs deshabilitadas\n");
+    Serial.flush();
+
+    // Deshabilitar RS485 con drenaje seguro
+    Serial.printf("[OTA] Deshabilitando RS485...\n");
+    Serial.flush();
+    delay(100);
+    Serial1.flush();
+    delay(50);
+    Serial1.end();
+    delay(50);
+    pinMode(RS485_TX_PIN, OUTPUT);
+    digitalWrite(RS485_TX_PIN, LOW);
+    digitalWrite(RS485_ENABLE_PIN, HIGH);
+    Serial.printf("[OTA]   - RS485 deshabilitado\n");
+    Serial.flush();
+
+    // Dejar que FreeRTOS complete tareas pendientes
+    for (int i = 0; i < 10; i++) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    Serial.printf("[OTA] Sistema limpio - listo para WiFi\n");
+    Serial.flush();
+    // └─
+
     char ssid[64]    = {};
     char pass[64]    = {};
     char otaPass[33] = {};
@@ -136,20 +175,6 @@ void OtaManager::enableForUpload() {
     Serial.flush();
 
     _status("Conectando WiFi...");
-
-    // Deshabilitar RS485 con drenaje seguro
-    Serial.printf("[OTA] Deshabilitando RS485...\n");
-    Serial.flush();
-    delay(100);
-    Serial1.flush();
-    delay(50);
-    Serial1.end();
-    delay(50);
-    pinMode(RS485_TX_PIN, OUTPUT);
-    digitalWrite(RS485_TX_PIN, LOW);
-    digitalWrite(RS485_ENABLE_PIN, HIGH);
-    Serial.printf("[OTA] RS485 deshabilitado\n");
-    Serial.flush();
 
     Serial.printf("[OTA] HEAP: free=%d | minFree=%d | maxBlock=%d\n",
                   ESP.getFreeHeap(), ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
@@ -206,10 +231,7 @@ void OtaManager::enableForUpload() {
     Serial.printf("[OTA] WiFi estable | Iniciando ArduinoOTA server\n");
     Serial.flush();
 
-    // ┌─ CRÍTICO: Deshabilitar TODAS las ISRs ANTES de ArduinoOTA
-    _disableAllInterrupts();
-    // └─
-
+    // Sistema ya está limpio — NO deshabilitar más
     // Configurar ArduinoOTA CON CALLBACKS ANTES de begin()
     ArduinoOTA.setPort(OTA_PORT);
     ArduinoOTA.setHostname(PORTAL_SSID);
@@ -252,7 +274,6 @@ void OtaManager::enableForUpload() {
         Serial.setDebugOutput(true);
         Serial.printf("[OTA] ERROR: %u\n", err);
         Serial.flush();
-        _restoreAllInterrupts();
         _otaActive = false;
     });
 
@@ -366,40 +387,4 @@ void OtaManager::_saveCredentials(const char* ssid, const char* pass, const char
 void OtaManager::_status(const char* msg) {
     Serial.printf("[OTA] %s\n", msg);
     if (_cbStatus) _cbStatus(msg);
-}
-
-// ─────────────────────────────────────────────────────────────
-void OtaManager::_disableAllInterrupts() {
-    Serial.printf("[OTA] Deshabilitando todas las ISRs...\n");
-    Serial.flush();
-
-    Serial1.onReceive(nullptr);
-    Serial.printf("[OTA]   - RS485 Serial1 ISR deshabilitada\n");
-    Serial.flush();
-
-    detachInterrupt(digitalPinToInterrupt(12));
-    detachInterrupt(digitalPinToInterrupt(13));
-    Serial.printf("[OTA]   - Encoder ISRs deshabilitadas\n");
-    Serial.flush();
-
-    for (uint8_t pin : {37, 38, 39, 40}) {
-        detachInterrupt(digitalPinToInterrupt(pin));
-    }
-    Serial.printf("[OTA]   - Button ISRs deshabilitadas\n");
-    Serial.flush();
-
-    Serial.printf("[OTA] Todas las ISRs deshabilitadas\n");
-    Serial.flush();
-}
-
-// ─────────────────────────────────────────────────────────────
-void OtaManager::_restoreAllInterrupts() {
-    Serial.printf("[OTA] Restaurando RS485 ISR...\n");
-    Serial.flush();
-
-    Serial1.onReceive([](){ rs485._onReceiveISR(); });
-    Serial.printf("[OTA]   - RS485 restaurada\n");
-    Serial.flush();
-    Serial.printf("[OTA] NOTA: Si OTA falló, presiona Encoder para abrir SAT y reinicia\n");
-    Serial.flush();
 }

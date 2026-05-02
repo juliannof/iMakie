@@ -44,9 +44,6 @@ private:
     void _showOtaScreen();
     bool _loadCredentials(char* ssid, char* pass, char* otaPass);
     void _saveCredentials(const char* ssid, const char* pass, const char* otaPass);
-
-    void _disableAllInterrupts();
-    void _restoreAllInterrupts();
 };
 
 extern OtaManager otaManager;
