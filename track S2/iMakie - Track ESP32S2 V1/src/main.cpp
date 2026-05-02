@@ -54,7 +54,11 @@ static void _satRS485On()   { _suspended = false; needsTOTALRedraw = true; }
 static void _satReboot()    { ESP.restart(); }
 static void _satMotorDrive(int pwm) { Motor::driveRaw(pwm); }
 static void _satConfigSaved(const SatConfig& cfg) { rs485.begin(cfg.trackId); }
-static void _satWiFiOta()   { otaManager.enableForUpload(); }
+static void _satWiFiOta() {
+    satMenu->close();
+    setScreenBrightness(0);  // Apagar pantalla
+    otaManager.enableForUpload();
+}
 static void _satSerialOta() { otaManager.enableSerialMode(); }
 static void _satLedsOff() {
     clearAllNeopixels();
@@ -196,9 +200,12 @@ void setup() {
 //  loop
 // =============================================================
 void loop() {
-    otaManager.tick();
-
-    if (otaManager.isOtaActive()) return;
+    // OTA siempre tiene máxima prioridad, incluso si SAT está abierto
+    if (otaManager.isOtaActive()) {
+        otaManager.tick();
+        yield();  // Ceder CPU a WiFi sin delay
+        return;
+    }
 
     if (satMenu && satMenu->isOpen()) {
         satMenu->update();
