@@ -203,7 +203,7 @@ void loop() {
     // OTA siempre tiene máxima prioridad, incluso si SAT está abierto
     if (otaManager.isOtaActive()) {
         otaManager.tick();
-        yield();  // Ceder CPU a WiFi sin delay
+        vTaskDelay(pdMS_TO_TICKS(10));  // Dar tiempo real a WiFi para procesar chunks
         return;
     }
 
