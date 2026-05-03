@@ -277,11 +277,19 @@ void OtaManager::enableForUpload() {
         Serial.printf("[OTA] ← onEnd() INVOCADO\n");
         Serial.flush();
         Serial.setDebugOutput(true);
-        Serial.printf("[OTA] === UPLOAD COMPLETADO === esperando ACK final...\n");
+        Serial.printf("[OTA] === UPLOAD COMPLETADO ===\n");
         Serial.flush();
-        vTaskDelay(pdMS_TO_TICKS(500));  // CRÍTICO: 500ms para ACK del cliente antes de reboot
-        Serial.printf("[OTA] Reiniciando...\n");
+        
+        // Múltiples confirmaciones + delays para asegurar que logs se envíen
+        for (int i = 0; i < 5; i++) {
+            Serial.printf("[OTA] ACK %d/5 - esperando...\n", i+1);
+            Serial.flush();
+            delay(200);
+        }
+        
+        Serial.printf("[OTA] === REBOOT INICIADO ===\n");
         Serial.flush();
+        delay(500);  // 500ms final de buffer flush
         esp_restart();
     });
 
