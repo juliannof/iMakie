@@ -201,12 +201,6 @@ void setup() {
 // =============================================================
 void loop() {
     // OTA siempre tiene máxima prioridad, incluso si SAT está abierto
-    if (otaManager.isOtaActive()) {
-        otaManager.tick();
-        vTaskDelay(pdMS_TO_TICKS(10));  // Dar tiempo real a WiFi para procesar chunks
-        return;
-    }
-
     if (satMenu && satMenu->isOpen()) {
         satMenu->update();
         return;
