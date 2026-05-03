@@ -334,7 +334,7 @@ void OtaManager::enableForUpload() {
 
     // Loop bloqueante dedicado SOLO a OTA — no regresa hasta reiniciar
     while (_otaActive) {
-        ArduinoOTA.handle();
+        Serial.printf("[OTA] handle() → entrada\n"); Serial.flush(); ArduinoOTA.handle(); Serial.printf("[OTA] handle() ← salida\n"); Serial.flush();
         delay(1);  // Permite que WiFi se ejecute en background
     }
 }
