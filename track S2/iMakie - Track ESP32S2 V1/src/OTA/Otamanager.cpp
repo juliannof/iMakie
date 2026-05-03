@@ -264,7 +264,7 @@ void OtaManager::enableForUpload() {
         Serial.printf("[OTA] OTA password establecida\n");
         Serial.flush();
     }
-
+    ArduinoOTA.setTimeout(30000);  // Timeout 30s para WiFi lento
     ArduinoOTA.onStart([this]() {
         Serial.printf("[OTA] === UPLOAD INICIANDO ===\n");
         Serial.flush();
