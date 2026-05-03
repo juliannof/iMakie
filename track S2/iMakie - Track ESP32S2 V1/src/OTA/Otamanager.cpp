@@ -357,14 +357,6 @@ void OtaManager::_showOtaScreen() {
 }
 
 // ─────────────────────────────────────────────────────────────
-void OtaManager::enableSerialMode() {
-    _status("Conecta USB y ejecuta:");
-    delay(400);
-    _status("pio run -e serial --target upload");
-    delay(1200);
-    esp_restart();
-}
-
 // ─────────────────────────────────────────────────────────────
 bool OtaManager::isConnected() const {
     return WiFi.status() == WL_CONNECTED;

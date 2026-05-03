@@ -25,7 +25,6 @@ public:
     // ── Acciones desde SAT ────────────────────────────────────
     void launchPortal();            // Abre AP + portal captive (bloqueante ~120 s)
     void enableForUpload();         // Conecta red + inicia ArduinoOTA (no bloqueante)
-    void enableSerialMode();        // Reinicia en modo DFU para subida por USB
     void disable();                 // Desconecta y apaga WiFi
 
     // ── Callback de estado → display ─────────────────────────

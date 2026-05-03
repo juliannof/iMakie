@@ -59,7 +59,6 @@ static void _satWiFiOta() {
     setScreenBrightness(0);  // Apagar pantalla
     otaManager.enableForUpload();
 }
-static void _satSerialOta() { otaManager.enableSerialMode(); }
 static void _satLedsOff() {
     clearAllNeopixels();
     showNeopixels();
@@ -166,7 +165,6 @@ void setup() {
     satMenu->onReboot        (_satReboot);
     satMenu->onConfigSaved   (_satConfigSaved);
     satMenu->onWiFiOta       (_satWiFiOta);
-    satMenu->onSerialOta     (_satSerialOta);
     satMenu->onLedsTest      (_satLedsTest);
     satMenu->onLedsOff       (_satLedsOff);
     satMenu->onSuspendSprites(_satSuspendSprites);
