@@ -6,13 +6,14 @@
 //
 //  MODOS DE USO (desde SAT menu):
 //   1. launchPortal()     → AP captive portal para guardar SSID/pass/OTA-pass
-//   2. enableForUpload()  → conecta red guardada + ArduinoOTA activo
+//   2. enableForUpload()  → conecta red guardada + ElegantOTA activo
 //
 //  WiFi permanece APAGADO en operación normal.
 //  NVS namespace: "ptxx"  (mismo que el resto del proyecto)
 // ============================================================
 #include <Arduino.h>
 #include <functional>
+#include <WebServer.h>
 
 using CbStatus = std::function<void(const char* msg)>;  // feedback al display
 
@@ -24,7 +25,7 @@ public:
 
     // ── Acciones desde SAT ────────────────────────────────────
     void launchPortal();            // Abre AP + portal captive (bloqueante ~120 s)
-    void enableForUpload();         // Conecta red + inicia ArduinoOTA (no bloqueante)
+    void enableForUpload(bool otaOnlyMode = false);  // Conecta red + inicia ElegantOTA
     void disable();                 // Desconecta y apaga WiFi
 
     // ── Callback de estado → display ─────────────────────────

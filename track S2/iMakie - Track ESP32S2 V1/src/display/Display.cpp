@@ -45,31 +45,34 @@ AutoMode currentAutoMode = AUTO_OFF;
 // ════════════════════════════════════════════════════════════
 //  initDisplay
 // ════════════════════════════════════════════════════════════
-void initDisplay() {
+void initDisplay(bool otaOnlyMode) {
     esp_reset_reason_t reason = esp_reset_reason();
     Serial.printf("Reset reason: %d\n", (int)reason);
 
-    
+
     tft.init();
     tft.setRotation(0);
     tft.setBrightness(screenBrightness);
     tft.fillScreen(TFT_BG_COLOR);
 
-    mainArea.setColorDepth(16);
-    mainArea.setPsram(true);          // ← añadir
-    mainArea.createSprite(MAINAREA_WIDTH, MAINAREA_HEIGHT);
+    // En OTA-only mode, NO crear sprites para liberar heap
+    if (!otaOnlyMode) {
+        mainArea.setColorDepth(16);
+        mainArea.setPsram(true);
+        mainArea.createSprite(MAINAREA_WIDTH, MAINAREA_HEIGHT);
 
-    header.setColorDepth(16);
-    header.setPsram(true);            // ← añadir
-    header.createSprite(TFT_WIDTH, HEADER_HEIGHT);
+        header.setColorDepth(16);
+        header.setPsram(true);
+        header.createSprite(TFT_WIDTH, HEADER_HEIGHT);
 
-    vuSprite.setColorDepth(16);
-    vuSprite.setPsram(true);          // ← añadir
-    vuSprite.createSprite(TFT_WIDTH - MAINAREA_WIDTH, MAINAREA_HEIGHT);
+        vuSprite.setColorDepth(16);
+        vuSprite.setPsram(true);
+        vuSprite.createSprite(TFT_WIDTH - MAINAREA_WIDTH, MAINAREA_HEIGHT);
 
-    vPotSprite.setColorDepth(16);
-    vPotSprite.setPsram(true);        // ← añadir
-    vPotSprite.createSprite(TFT_WIDTH, VPOT_HEIGHT);
+        vPotSprite.setColorDepth(16);
+        vPotSprite.setPsram(true);
+        vPotSprite.createSprite(TFT_WIDTH, VPOT_HEIGHT);
+    }
 
     Serial.printf("tft       : %d x %d\n", tft.width(), tft.height());
     Serial.printf("header    : %d x %d  → pushSprite(0, 0)\n",   header.width(),   header.height());

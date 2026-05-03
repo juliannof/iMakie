@@ -12,7 +12,7 @@ extern bool needsVPotRedraw;
 
 extern volatile ConnectionState logicConnectionState;
 
-void initDisplay();
+void initDisplay(bool otaOnlyMode = false);
 void updateDisplay();
 void setScreenBrightness(uint8_t brightness);
 void drawOfflineScreen();

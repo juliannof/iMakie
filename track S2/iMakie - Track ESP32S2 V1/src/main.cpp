@@ -56,8 +56,15 @@ static void _satMotorDrive(int pwm) { Motor::driveRaw(pwm); }
 static void _satConfigSaved(const SatConfig& cfg) { rs485.begin(cfg.trackId); }
 static void _satWiFiOta() {
     satMenu->close();
-    setScreenBrightness(0);  // Apagar pantalla
-    otaManager.enableForUpload();
+    setScreenBrightness(0);
+    Preferences prefs;
+    prefs.begin("ptxx", false);
+    prefs.putBool("otaMode", true);
+    prefs.end();
+    Serial.printf("[SAT] Guardado otaMode=1, reiniciando en OTA-only...\n");
+    Serial.flush();
+    delay(100);
+    ESP.restart();
 }
 static void _satLedsOff() {
     clearAllNeopixels();
@@ -112,14 +119,49 @@ void setup() {
     Motor::init();
     Serial.begin(115200);
     Serial.setDebugOutput(true);
-    delay(500);          // 2 segundos visible
+    delay(500);
 
     Serial.printf("\n[BOOT] FW_VERSION=%s FW_BUILD_ID=%d\n", FW_VERSION, FW_BUILD_ID);
     Serial.flush();
 
+    // Detectar OTA-only mode
+    Preferences prefs;
+    prefs.begin("ptxx", true);
+    bool otaMode = prefs.getBool("otaMode", false);
+    prefs.end();
+
+    if (otaMode) {
+        Serial.printf("[BOOT] === OTA-ONLY MODE ===\n");
+        Serial.flush();
+
+        // Limpiar flag INMEDIATAMENTE — una vez detectado, su propósito cumplió
+        Preferences prefs2;
+        prefs2.begin("ptxx", false);
+        prefs2.remove("otaMode");
+        prefs2.end();
+        Serial.printf("[BOOT] Flag otaMode limpiado\n");
+        Serial.flush();
+
+        // Mínimo necesario: display SIN sprites + WiFi OTA
+        initDisplay(true);  // true = otaOnlyMode, NO crea sprites
+        Serial.printf("[OTA-ONLY] Display iniciado (sin sprites)\n");
+        Serial.flush();
+
+        otaManager.begin();
+        otaManager.enableForUpload(true);  // true = otaOnlyMode
+
+        // Si llegamos aquí, WiFi falló en OTA-only mode
+        Serial.printf("[OTA-ONLY] WiFi falló, reiniciando...\n");
+        Serial.flush();
+        delay(100);
+        ESP.restart();
+        return;  // Nunca llega aquí
+    }
+
+    // MODO NORMAL: boot completo
     initNeopixels();
     log_i("NeoPixels OK");
-    
+
     initDisplay();
     log_i("Display OK");
 
