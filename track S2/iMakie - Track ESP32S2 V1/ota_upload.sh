@@ -33,6 +33,7 @@ python3 "$ESPOTA" \
     -p 3232 \
     --auth="$PASSWORD" \
     -f "$FIRMWARE" \
+    -t 60 \
     -d
 
 if [ $? -eq 0 ]; then
