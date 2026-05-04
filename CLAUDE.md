@@ -4,10 +4,8 @@
 
 ## 📋 ARQUITECTURA (Consulta directa)
 
-**→ [`docs/ARQUITECTURA_DEFINITIVA.md`](docs/ARQUITECTURA_DEFINITIVA.md)**
-
-Referencia única de componentes, flujos MIDI, RS485, y puntos críticos.  
-**No preguntar sobre arquitectura. Consultar este documento.**
+**→ [Ver en STATUS.md](STATUS.md)** — Referencia única de componentes, flujos MIDI, RS485, y puntos críticos.  
+**No preguntar sobre arquitectura. Consultar STATUS.md.**
 
 ---
 
@@ -31,6 +29,19 @@ Referencia única de componentes, flujos MIDI, RS485, y puntos críticos.
 **Commits a GitHub:**
 - Cuando el usuario dice **"commit"** o **"commitea"** = **git commit + git push** automático
 - No es solo guardar local — es guardar + subir a GitHub en una operación
+
+**Desarrollo de código:**
+- Cambios quirúrgicos, no rewrites completos salvo petición explícita
+- `Serial.printf` en S2, `log_i`/`log_w` en P4
+- SatMenu callbacks en `main.cpp`: funciones estáticas nombradas, no lambdas (ICE en xtensa)
+- Logic es la única fuente de verdad para estados de botones — S2 nunca hace toggle local
+- Un proyecto PlatformIO por variante MCU — `config.h` de S3/S2 son independientes
+- No tocar código sin ver primero los ficheros reales
+
+**Sincronización Código ↔ CLAUDE.md:**
+- Cuando cambies arquitectura de `loop()`, orden de `init()`, pines GPIO, o tiempos críticos → **actualiza CLAUDE.md con los diagramas/tablas correspondientes**
+- Cambios pequeños (bug fixes, optimizaciones locales) no requieren actualización
+- CLAUDE.md es fuente de verdad para decisiones de diseño
 
 ---
 
@@ -364,6 +375,50 @@ Menú en display (Encoder push > 3s):
 
 ---
 
+## Hardware S3 (Extender)
+
+**Chip:** ESP32-S3 | **Familia Mackie:** 0x14 | **Slaves:** 8 (IDs 1–8)
+
+### Pinout definitivo S3
+
+| Función | GPIO |
+|---|---|
+| RS485 TX | 15 |
+| RS485 RX | 16 |
+| RS485 EN | 1 |
+| LED REC | 12 |
+| BTN REC | 11 |
+| LED PLAY | 10 |
+| BTN PLAY | 9 |
+| LED FF | 8 |
+| BTN FF | 7 |
+| LED STOP | 6 |
+| BTN STOP | 5 |
+| LED RW | 4 |
+| BTN RW | 3 |
+
+### RS485 (bus B)
+- 500 kbaud, CRC8 (ver Pinout: TX=GPIO15, RX=GPIO16, EN=GPIO1)
+- Controla 8 slaves S2 (IDs 1–8)
+- Timing: TX_EN=30µs, TX_DONE=30µs, RESP_TIMEOUT=3000µs, GAP=300µs, POLL_CYCLE=20ms
+
+### Transporte — Botones y LEDs
+(Ver Pinout definitivo S3 para asignación GPIO de REC/PLAY/FF/STOP/RW)
+
+### Notas MIDI Transporte
+| Función | Nota (hex) | Decimal |
+|---------|-----------|---------|
+| RW | 0x5B | 91 |
+| FF | 0x5C | 92 |
+| STOP | 0x5D | 93 |
+| PLAY | 0x5E | 94 |
+| REC | 0x5F | 95 |
+
+- Recibe feedback de Logic vía MIDI handshake familia `0x14`
+- LEDs controlados por `Transporte::setLedByNote()` con velocidad 127 (on) / 0 (off)
+
+---
+
 ## Hardware P4 (master)
 
 **Placa:** GUITION JC4880P433C (ESP32-P4)
@@ -407,161 +462,11 @@ Menú en display (Encoder push > 3s):
 
 ---
 
-## Hardware S3 (Extender)
-
-**Chip:** ESP32-S3 | **Familia Mackie:** 0x14 | **Slaves:** 8 (IDs 1–8)
-
-### Pinout definitivo S3
-
-| Función | GPIO |
-|---|---|
-| RS485 TX | 15 |
-| RS485 RX | 16 |
-| RS485 EN | 1 |
-| LED REC | 12 |
-| BTN REC | 11 |
-| LED PLAY | 10 |
-| BTN PLAY | 9 |
-| LED FF | 8 |
-| BTN FF | 7 |
-| LED STOP | 6 |
-| BTN STOP | 5 |
-| LED RW | 4 |
-| BTN RW | 3 |
-
-### RS485 (bus B)
-- TX=GPIO15, RX=GPIO16, EN=GPIO1
-- 500 kbaud, CRC8
-- Controla 8 slaves S2 (IDs 1–8)
-- Timing: TX_EN=10µs, TX_DONE=10µs, RESP_TIMEOUT=1500µs, GAP=300µs, POLL_CYCLE=20ms
-
-### Transporte — Botones y LEDs
-| Función | LED GPIO | BTN GPIO |
-|---------|----------|----------|
-| REC | 12 | 11 |
-| PLAY | 10 | 9 |
-| FF | 8 | 7 |
-| STOP | 6 | 5 |
-| RW | 4 | 3 |
-
-### Notas MIDI Transporte
-| Función | Nota (hex) | Decimal |
-|---------|-----------|---------|
-| RW | 0x5B | 91 |
-| FF | 0x5C | 92 |
-| STOP | 0x5D | 93 |
-| PLAY | 0x5E | 94 |
-| REC | 0x5F | 95 |
-
-- Recibe feedback de Logic vía MIDI handshake familia `0x14`
-- LEDs controlados por `Transporte::setLedByNote()` con velocidad 127 (on) / 0 (off)
-
----
-
-## Bugs conocidos activos
-
-### P4
-1. **`uiOfflineCreate()` doble llamada en `setup()`** — ~~primera antes de `prefs.begin()`, segunda después. Leak de LVGL garantizado.~~ **RESUELTO** — solo existe una llamada, después de `prefs.begin()`.
-2. **Pantalla negra en boot** — Dos causas independientes: (a) ~~backlight off si `lastPage` era 1 o 2 (backlight solo se encendía vía `uiMenuInit()` → `uiPage3Create()`). Fix: `displaySetBrightness()` en `setup()` después de `initDisplay()`.~~ **RESUELTO**. (b) ~~`UIOffline` empieza con `s_blink_label` en HIDDEN y solo lo muestra cuando el logo termina de revelarse (~5-6 s); sin logo, Display negra permanente.~~ **RESUELTO** — label visible desde el inicio, parpadeo activo desde el primer tick independientemente del estado del logo.
-3. **Handshake MCU incorrecto** — ~~código antiguo implementaba un challenge/response propio; P4 actuaba como HOST generando challenges aleatorios.~~ **RESUELTO** — ver sección "Mackie MCU — handshake" abajo.
-
-### S3 Extender
-- **Note Off en botones de transporte** — **RESUELTO** — `onButtonReleased` envía `0x80 + note + 0x00`.
-- **Handshake MCU** — **RESUELTO** — protocolo completo implementado (ver sección handshake).
-- **Transport LEDs** — **RESUELTO** — notas 91–95 mapeadas a LEDs físicos en `setLedByNote()`.
-- **RS485 intermitente** — **FUNCIONANDO CON TIMEOUTS** — Sistema comunica: LEDs actualizan, Display muestra datos. Timeouts ocasionales e impredecibles (~10-20 consecutivos, luego OK, repite). Comunicación física funciona a 500kbaud. NO se debe modificar arquitectura actual de lectura sin probar compilación first.
-
-### S2
-- **OTA WiFi timeout durante upload — PROBLEMA DE HEAP — MEJORADO (2026-04-29 10:30)** — WiFi conecta OK pero ArduinoOTA.handle() falla con timeout a mitad del upload. **Causa:** heap muy bajo (~83KB) durante WiFi.begin() + ArduinoOTA buffering de chunks (1024B cada uno). Conversor 3.3V débil agrava el problema. **Mitigación (2026-04-29 10:30):** (1) Apagar display completamente (brillo 0) antes de WiFi.begin() → libera ~20-30KB heap, (2) Restaurar brillo a 8% (valor 20) una vez WiFi conecta → permite ver IP/progreso sin sobrecargar, (3) Motor y NeoPixels ya estaban OFF en SAT. **Resultado:** va mucho mejor pero sigue siendo marginal en unidades con regulador débil. **Alternativas si falla:** (a) alimentar con PSU externa 5V @ 2A (no USB), (b) revisar físicamente soldaduras/capacitores regulador 3.3V en PCB.
-- **ElegantOTA WiFi — RESUELTO (2026-05-04 09:45)** — **Causa raíz:** Patrón fail→fail→success sin reinicio equipo por `Update.abort()` missing. Partición OTA quedaba half-written tras fallos. **Fix implementado:** (1) `Update.abort(); delay(100);` marca partición limpia antes de `ElegantOTA.begin()`, (2) Handler "/" redirige a `/update` (patrón exacto demo oficial), (3) WebServer estática para acceso lambda. **Validación:** 5 unidades S2 recuperadas exitosamente con nuevo firmware OTA. **Commits:** e4e6236, cb0dd11, ed7d598, c15d227. **Lección:** SIEMPRE cuestionar el código si fallan unidades — el hardware estaba OK, el firmware necesitaba fix.
-
----
-
-## Estado de Hardware S2 (2026-05-04 19:20)
-
-**Unidades recuperadas:** 5/12 ✅ (nuevo firmware OTA + fixes)
-
-**Unidades pendientes diagnóstico:** 7/12 ⚠️
-- Problemas diversos sin identificar aún
-- Requieren investigación a fondo
-- **Hipótesis por validar:** código vs. hardware — aplicar mismo principio que OTA (cuestionar firmware primero)
-
-**Cambios recientes (2026-05-04 19:20):**
-- Desactivado NVSValidator completamente (interfería con WiFi)
-- Arreglado OtaManager::_saveCredentials() para guardar en ambos namespaces
-- Agregados logs detallados para debugging de credenciales WiFi
-
----
-
-## Versión Firmware S2
-
-### **FW 0.0.3 (2026-05-04 19:20)**
-
-**Cambios incluidos:**
-- Desactivar completamente NVSValidator (comentado en main.cpp y Display.cpp)
-- Arreglar `OtaManager::_saveCredentials()` para guardar en ambos namespaces (ptxx + wifiman)
-- Agregar logs detallados en OTA para debugging de credenciales WiFi
-- Limpiar CLAUDE.md: remover secciones desactualizadas
-
-**Commits:** 8880c85, f028ae0
-
-**Estado:** Compilable, WiFi OTA debería funcionar correctamente
-
-### **FW 0.0.2 (2026-05-04 18:30)**
-
-**Cambios incluidos:**
-- GPIO33 pulso RST obligatorio antes de `tft.init()` — fix display en 5 unidades
-- WiFi credentials configurables en `config.h`: SSID, password, OTA password
-- OTA WiFi sin `Update.abort()` — fix "Connection reset by peer"
-- Splash screen reposicionado centrado verticalmente
-
-**Commits:** 7ac20d0, f47cbbd, 5eedcde, 0f9e092, c7e8ae1, 96e6227
-
----
-
-## Pendientes ordenados por complejidad (S3 → P4 → S2 → Cross-system)
-
-### S3 Extender
-1. **LED REC — RESUELTO**
-2. **LED FF — RESUELTO**
-3. **LED RW — RESUELTO**
-4. **RS485 intermitente — DOCUMENTADO, BAJO CONTROL** — Sistema S3 funciona: comunica datos, LEDs y Display actualizan correctamente. Timeouts ocasionales no bloquean operación. Patrón: ~10-20 timeouts, luego respuesta OK, repite. Causa desconocida (posible: timing hardware, timeout 1500µs, ISR conflicts). No intentar buffer circular o cambios arquitectónicos sin compilar first. Problema arrastrado desde S3 original.
-5. VPot ring LEDs (CC 16–23, 48–55), jog wheel (CC 60), rude solo (nota 115)
-
-### P4
-6. mutex o double-buffer en `vuLevels[]`
-7. respuesta táctil lenta en vista de faders — investigar qué bloquea el hilo de touch, especialmente en UIPage faders
-8. no muestra datos en Display tras conectarse — posible regresión en la transición a CONNECTED tras cambios en handshake
-9. NeoTrellis sin implementar — atención a pines I2C nuevos (SDA=GPIO33, SCL=GPIO31)
-
-### S2
-10. **Encoder — RESUELTO (2026-04-28)** — Problema de sequenciamiento: `Encoder::reset()` estaba en línea 214 (inmediatamente post-RS485), antes de procesar VPot. Esto causaba contador=0 al leer para VPot → VPot ring nunca cambiaba en Logic. SAT funcionaba porque procesaba sin ese reset intermedio. Fix: mover `reset()` a línea 242 (post-VPot, pre-updateDisplay) asegura que RS485 y Display usan el mismo delta.
-11. **FaderTouch — EN DESARROLLO** — Detección por sostenimiento (tiempo). Perfecto sin plástico, necesita ajuste con plástico. Lógica actual: raw debe sostenerse > baseline×1.015 durante 6 frames (120ms) para detectar toque. Baseline actualizado siempre con IIR (alpha=1/16, no congelado). TEST_TOUCH en SAT testea correctamente. Próximos pasos: validar con plástico real, ajustar thresholds si es necesario.
-12. revisar FaderADC tras reescritura — validar lecturas actuales con hardware real
-13. ADS1015 pedido — cuando llegue, reemplazar lectura ADC nativa por I2C ADS1015 para resolver ruido en fader
-
-### S2 — NeoPixel (continuación)
-**NeoPixel secuencia de brillo (2026-04-28 16:15) — IMPLEMENTADO:**
-- Azul tenue (NEOPIXEL_DIM_BRIGHTNESS=5) al inicio/reposo
-- Colores muy tenues (NEOPIXEL_ULTRA_DIM=1) cuando Logic conecta primera vez
-- O encendido (NEOPIXEL_DEFAULT_BRIGHTNESS=30) o tenue de morir (NEOPIXEL_ULTRA_DIM=1)
-- Optimización monocore: detección de cambios interna sin flags innecesarios
-- Comparación de estado (neoWaitingHandshake + 4 botones) en updateAllNeopixels()
-
-**HW_STATUS display en boot screen (2026-04-28 16:15) — IMPLEMENTADO:**
-- 10 componentes hardware con estado color-coded (Rojo=0, Naranja=1, Blanco=2)
-- Fuente bitmap pequeña (setTextFont(1)) consistente con SAT
-- Inyección automática vía pre_build.py desde config.h markers
-
-### Cross-system
-14. RS485: verificar pines en S3 (legacy) y P4 (TX=50, RX=51, EN=52) — confirmar que ambos compilan y funcionan correctamente
-15. LEDs NeoPixel master: implementar control de brillo centralizado — estudiar si viable vía MIDI (CC o SysEx dedicado) para controlar brillo de todos los slaves desde Logic/P4
-
----
+**→ [Ver STATUS.md](STATUS.md)** para bugs conocidos y pendientes.
 
 ## Protocolo RS485
 
-**→ [Ver documentación completa en `docs/RS485_PROTOCOL.md`](docs/RS485_PROTOCOL.md)**
+**→ [Ver documentación completa en STATUS.md](STATUS.md)**
 
 RS485 es el bus serial que conecta master (P4 o S3) con slaves (S2):
 - **Baudrate:** 500 kbaud, 8N1
@@ -571,29 +476,9 @@ RS485 es el bus serial que conecta master (P4 o S3) con slaves (S2):
 - **Bus B (S3):** 8 slaves, TX=GPIO15, RX=GPIO16, EN=GPIO1
 - **Slaves (S2):** TX=GPIO8, RX=GPIO9, EN=GPIO35
 
-Toda la especificación de paquetes (MasterPacket, SlavePacket), máquina de estados, timing, CRC, troubleshooting y optimizaciones históricas está en [`docs/RS485_PROTOCOL.md`](docs/RS485_PROTOCOL.md).
+Toda la especificación de paquetes (MasterPacket, SlavePacket), máquina de estados, timing, CRC, troubleshooting y optimizaciones históricas está en STATUS.md.
 
----
-
-### Auditoría RS485 (2026-04-27 14:00)
-
-**Hallazgo:** Código RS485 está **bien optimizado**. Neopixel bloqueante (15-30ms) ya fue removido de ruta crítica en optimización anterior.
-
-**Documentos de auditoría:**
-
-| Documento | Contenido |
-|---|---|
-| [`RS485_TIMING_AUDIT.md`](docs/RS485_TIMING_AUDIT.md) | Análisis línea-por-línea de timing en onMasterData(), sendResponse(), updateDisplay(), updateAllNeopixels(). Identifica bottlenecks residuales y propone mediciones. |
-| [`RS485_COMMENTING_GUIDE.md`](docs/RS485_COMMENTING_GUIDE.md) | Patrones de comentarios para documentar restricciones de timing. Usa cuando edites RS485Handler.cpp, RS485.cpp o main.cpp. |
-| [`RS485_NEXT_ACTIONS.md`](docs/RS485_NEXT_ACTIONS.md) | Plan de 6 tareas para próximas sesiones: instrumentación de timing (30min), comentar código (45min), validar con hardware (1h), proponer mejoras (opt). |
-
-**Resumen:**
-- ✅ RS485Handler::onMasterData() — 200-400µs (correcto, sin bloqueos)
-- ✅ RS485Slave::sendResponse() — 360µs (timing setup/hold correcto)
-- ⚠️ updateDisplay() — 10-100ms variable (post-RS485, no crítico)
-- ⚠️ updateAllNeopixels() — 15-30ms bloqueante (post-sendResponse, pero medir varianza)
-
-**Próximo:** Ejecutar instrumentación de timing para confirmar métricas reales vs. teóricas.
+Ver también: **→ [STATUS.md](STATUS.md)** para auditoría RS485 y métricas de timing.
 
 ---
 
@@ -704,18 +589,6 @@ Implementado en `Transporte::setLedByNote()`.
 
 ---
 
-## Convenciones de código
-
-- Cambios quirúrgicos, no rewrites completos salvo petición explícita
-- `Serial.printf` en S2, `log_i`/`log_w` en P4
-- SatMenu callbacks en `main.cpp`: funciones estáticas nombradas, no lambdas (ICE en xtensa)
-- Logic es la única fuente de verdad para estados de botones — S2 nunca hace toggle local
-- Un proyecto PlatformIO por variante MCU — `config.h` de S3/S2 son independientes
-- No tocar código sin ver primero los ficheros reales
-- **Documentación:** Siempre incluir **fecha + hora** en investigaciones, bugs, hallazgos y cambios de arquitectura. Formato: `YYYY-MM-DD HH:MM` (ej: `2026-05-04 18:57`). Ayuda a correlacionar con commits, iteraciones y evolución del problema.
-- **Sincronización Código ↔ CLAUDE.md:** Cuando cambies arquitectura de `loop()`, orden de `init()`, pines GPIO, o tiempos críticos → **actualiza CLAUDE.md con los diagramas/tablas correspondientes**. Cambios pequeños (bug fixes, optimizaciones locales) no requieren actualizar. CLAUDE.md es fuente de verdad para decisiones de diseño.
-
----
 
 ## Repositorio
 
