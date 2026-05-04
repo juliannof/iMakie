@@ -179,18 +179,75 @@
 
 ## S3 (ESP32-S3 Extender)
 
-### Bugs S3
-- **Note Off en botones de transporte** — **RESUELTO** — `onButtonReleased` envía `0x80 + note + 0x00`.
-- **Handshake MCU** — **RESUELTO** — protocolo completo implementado (ver sección handshake en CLAUDE.md).
-- **Transport LEDs** — **RESUELTO** — notas 91–95 mapeadas a LEDs físicos en `setLedByNote()`.
-- **RS485 intermitente** — **FUNCIONANDO CON TIMEOUTS** — Sistema comunica: LEDs actualizan, Display muestra datos. Timeouts ocasionales e impredecibles (~10-20 consecutivos, luego OK, repite). Comunicación física funciona a 500kbaud. NO se debe modificar arquitectura actual de lectura sin probar compilación first.
+### **RS485**
+**Estado:** funcional con timeouts ocasionales
 
-### Pendientes S3
-1. **LED REC — RESUELTO**
-2. **LED FF — RESUELTO**
-3. **LED RW — RESUELTO**
-4. **RS485 intermitente — DOCUMENTADO, BAJO CONTROL** — Sistema S3 funciona: comunica datos, LEDs y Display actualizan correctamente. Timeouts ocasionales no bloquean operación. Patrón: ~10-20 timeouts, luego respuesta OK, repite. Causa desconocida (posible: timing hardware, timeout 1500µs, ISR conflicts). No intentar buffer circular o cambios arquitectónicos sin compilar first. Problema arrastrado desde S3 original.
-5. VPot ring LEDs (CC 16–23, 48–55), jog wheel (CC 60), rude solo (nota 115)
+#### Bugs
+- **RS485 intermitente** — **FUNCIONANDO CON TIMEOUTS** — Sistema comunica: LEDs actualizan, datos OK. Timeouts ocasionales e impredecibles (~10-20 consecutivos, luego OK, repite). Comunicación física funciona a 500kbaud. NO modificar arquitectura sin probar compilación first.
+
+#### Pendientes
+- Identificar causa raíz de timeouts (posible: timing hardware, timeout 1500µs, ISR conflicts)
+- No intentar buffer circular o cambios arquitectónicos sin validación en hardware
+
+#### Detalles técnicos
+- Bus B: 500 kbaud, protocolo binario custom, CRC8
+- TX=GPIO15, RX=GPIO16, EN=GPIO1 (pinout definitivo)
+- Controla 8 slaves S2 (IDs 1–8)
+- Timing: TX_EN=30µs, TX_DONE=30µs, RESP_TIMEOUT=3000µs, GAP=300µs, POLL_CYCLE=20ms
+
+---
+
+### **TRANSPORTE**
+**Estado:** funcional
+
+#### Bugs
+- **Note Off en botones de transporte** — **RESUELTO** — `onButtonReleased` envía `0x80 + note + 0x00`
+- **Transport LEDs** — **RESUELTO** — notas 91–95 mapeadas a LEDs físicos en `setLedByNote()`
+
+#### Pendientes
+(ninguno)
+
+#### Detalles técnicos
+- Botones: REC (GPIO11), PLAY (GPIO9), FF (GPIO7), STOP (GPIO5), RW (GPIO3)
+- LEDs: REC (GPIO12), PLAY (GPIO10), FF (GPIO8), STOP (GPIO6), RW (GPIO4)
+- Notas MIDI Transporte: RW=0x5B (91), FF=0x5C (92), STOP=0x5D (93), PLAY=0x5E (94), REC=0x5F (95)
+- LEDs controlados por `Transporte::setLedByNote()` con velocidad 127 (on) / 0 (off)
+
+---
+
+### **HANDSHAKE MCU**
+**Estado:** funcional (protocolo correcto 2026-05-04)
+
+#### Bugs
+- **Handshake MCU incorrecto** — **RESUELTO** — código antiguo implementaba challenge/response propio. Ahora protocolo correcto per CLAUDE.md
+
+#### Pendientes
+(ninguno)
+
+#### Detalles técnicos
+- Familia Mackie: 0x14 (S3 Extender)
+- Protocolo: sondeo inicial (cualquier familia) → handshake familia 0x14
+- Respuestas: 0x00→0x01, 0x13→0x14
+- Surface Type: 0x00 (Master) — hardcodeado, necesario para recibir transport LEDs
+- Suscripción: 0x10 00 (feedback subscription)
+- Ver CLAUDE.md "Mackie MCU — handshake correcto" para detalles completos
+
+---
+
+### **BUILD / PLATFORM**
+**Estado:** estable
+
+#### Bugs
+(ninguno)
+
+#### Pendientes
+- Verificar pines RS485 (TX=15, RX=16, EN=1) — confirmar compilación y funcionamiento en hardware
+
+#### Detalles técnicos
+- Chip: ESP32-S3 (familia Mackie: 0x14)
+- Slaves: 8 (IDs 1–8)
+- Config.h: independiente del S2 (proyecto separado S3/)
+- DEVICE_S3_EXTENDER flag en platformio.ini
 
 ---
 
