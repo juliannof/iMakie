@@ -158,7 +158,8 @@ void OtaManager::enableForUpload(bool otaOnlyMode) {
     delay(100);
 
     server.on("/", []() {
-        server.send(200, "text/plain", "Hi! This is ElegantOTA Demo.");
+        server.sendHeader("Location", "/update");
+        server.send(302);
     });
 
     ElegantOTA.begin(&server);
