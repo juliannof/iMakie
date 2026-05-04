@@ -68,6 +68,7 @@
 
 #### Pendientes
 - Investigar causa: ADC API, configuración atenuación, timing lectura
+- ADS1015 pedido (no llegó) — reemplazar ADC nativa por I2C ADS1015 (resuelve ruido ±30 cuentas, añade 16-bit)
 - ADS1015 pedido — reemplazar ADC nativa por I2C ADS1015 (solución definitiva)
 
 #### Detalles técnicos
