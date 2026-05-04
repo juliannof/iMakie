@@ -61,14 +61,14 @@
 ---
 
 ### **FADER**
-**Estado:** funcional, validación pendiente
+**Estado:** no funciona
 
 #### Bugs
-(ninguno)
+- **Fader no funciona** — Lectura ADC no responde o valores incorrectos. Investigar FaderADC y configuración ADC1_CH9 (GPIO10).
 
 #### Pendientes
-- Validar lecturas con hardware real tras reescritura
-- ADS1015 pedido — reemplazar ADC nativa por I2C ADS1015 (resuelve ruido ±30 cuentas)
+- Investigar causa: ADC API, configuración atenuación, timing lectura
+- ADS1015 pedido — reemplazar ADC nativa por I2C ADS1015 (solución definitiva)
 
 #### Detalles técnicos
 - ESP32-S2 ADC1_CH9 (GPIO10), 13-bit (0-8191), atenuación 11dB
