@@ -183,7 +183,9 @@
 - Suspende PSRAM y sprites → libera RAM para diagnósticos
 - TEST_TOUCH, TEST_ENCODER funcionales
 
-#### WiFi OTA (2026-05-04)
+### Sesiones
+
+#### WiFi OTA (2026-05-04 22:28)
 - ElegantOTA funciona perfecto (reemplazo de ArduinoOTA muerto)
 - Menu SAT: "WiFi OTA" carga firmware vía WiFi
 - Credenciales: SSID `Julianno-WiFi` | Pass `JULIANf1`
