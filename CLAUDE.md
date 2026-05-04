@@ -713,6 +713,7 @@ Implementado en `Transporte::setLedByNote()`.
 - Un proyecto PlatformIO por variante MCU — `config.h` de S3/S2 son independientes
 - No tocar código sin ver primero los ficheros reales
 - **Documentación:** Siempre incluir **fecha + hora** en investigaciones, bugs, hallazgos y cambios de arquitectura. Formato: `YYYY-MM-DD HH:MM` (ej: `2026-05-04 18:57`). Ayuda a correlacionar con commits, iteraciones y evolución del problema.
+- **Sincronización Código ↔ CLAUDE.md:** Cuando cambies arquitectura de `loop()`, orden de `init()`, pines GPIO, o tiempos críticos → **actualiza CLAUDE.md con los diagramas/tablas correspondientes**. Cambios pequeños (bug fixes, optimizaciones locales) no requieren actualizar. CLAUDE.md es fuente de verdad para decisiones de diseño.
 
 ---
 
