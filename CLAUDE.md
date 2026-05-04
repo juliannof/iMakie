@@ -166,7 +166,7 @@ loop() {
      - Si FaderTouch::isTouched() → Motor::stop()
      - Si no → Motor::update()
   7. updateButtons()                ← procesa botones para display
-  8. updateDisplay()                ← pantalla SPI3
+  8. updateDisplay()                ← Display SPI3
   9. updateAllNeopixels()           ← LEDs
 }
 ```
@@ -275,7 +275,7 @@ Total: 240×400 (offset_y=20 en ST7789 interno)
 - Lógica única en `Encoder.cpp` (SAT no duplica)
 - Debounce 3ms, derecha=+1, izquierda=-1
 - Delta acumulado resetea tras `buildResponse()`
-- `Encoder::currentVPotLevel` rango 0-14 mapea pantalla
+- `Encoder::currentVPotLevel` rango 0-14 mapea Display
 
 ### NeoPixels (12 LEDs)
 
@@ -462,14 +462,14 @@ Menú en display (Encoder push > 3s):
 
 ### P4
 1. **`uiOfflineCreate()` doble llamada en `setup()`** — ~~primera antes de `prefs.begin()`, segunda después. Leak de LVGL garantizado.~~ **RESUELTO** — solo existe una llamada, después de `prefs.begin()`.
-2. **Pantalla negra en boot** — Dos causas independientes: (a) ~~backlight off si `lastPage` era 1 o 2 (backlight solo se encendía vía `uiMenuInit()` → `uiPage3Create()`). Fix: `displaySetBrightness()` en `setup()` después de `initDisplay()`.~~ **RESUELTO**. (b) ~~`UIOffline` empieza con `s_blink_label` en HIDDEN y solo lo muestra cuando el logo termina de revelarse (~5-6 s); sin logo, pantalla negra permanente.~~ **RESUELTO** — label visible desde el inicio, parpadeo activo desde el primer tick independientemente del estado del logo.
+2. **Pantalla negra en boot** — Dos causas independientes: (a) ~~backlight off si `lastPage` era 1 o 2 (backlight solo se encendía vía `uiMenuInit()` → `uiPage3Create()`). Fix: `displaySetBrightness()` en `setup()` después de `initDisplay()`.~~ **RESUELTO**. (b) ~~`UIOffline` empieza con `s_blink_label` en HIDDEN y solo lo muestra cuando el logo termina de revelarse (~5-6 s); sin logo, Display negra permanente.~~ **RESUELTO** — label visible desde el inicio, parpadeo activo desde el primer tick independientemente del estado del logo.
 3. **Handshake MCU incorrecto** — ~~código antiguo implementaba un challenge/response propio; P4 actuaba como HOST generando challenges aleatorios.~~ **RESUELTO** — ver sección "Mackie MCU — handshake" abajo.
 
 ### S3 Extender
 - **Note Off en botones de transporte** — **RESUELTO** — `onButtonReleased` envía `0x80 + note + 0x00`.
 - **Handshake MCU** — **RESUELTO** — protocolo completo implementado (ver sección handshake).
 - **Transport LEDs** — **RESUELTO** — notas 91–95 mapeadas a LEDs físicos en `setLedByNote()`.
-- **RS485 intermitente** — **FUNCIONANDO CON TIMEOUTS** — Sistema comunica: LEDs actualizan, pantalla muestra datos. Timeouts ocasionales e impredecibles (~10-20 consecutivos, luego OK, repite). Comunicación física funciona a 500kbaud. NO se debe modificar arquitectura actual de lectura sin probar compilación first.
+- **RS485 intermitente** — **FUNCIONANDO CON TIMEOUTS** — Sistema comunica: LEDs actualizan, Display muestra datos. Timeouts ocasionales e impredecibles (~10-20 consecutivos, luego OK, repite). Comunicación física funciona a 500kbaud. NO se debe modificar arquitectura actual de lectura sin probar compilación first.
 
 ### S2
 - **OTA WiFi timeout durante upload — PROBLEMA DE HEAP — MEJORADO (2026-04-29 10:30)** — WiFi conecta OK pero ArduinoOTA.handle() falla con timeout a mitad del upload. **Causa:** heap muy bajo (~83KB) durante WiFi.begin() + ArduinoOTA buffering de chunks (1024B cada uno). Conversor 3.3V débil agrava el problema. **Mitigación (2026-04-29 10:30):** (1) Apagar display completamente (brillo 0) antes de WiFi.begin() → libera ~20-30KB heap, (2) Restaurar brillo a 8% (valor 20) una vez WiFi conecta → permite ver IP/progreso sin sobrecargar, (3) Motor y NeoPixels ya estaban OFF en SAT. **Resultado:** va mucho mejor pero sigue siendo marginal en unidades con regulador débil. **Alternativas si falla:** (a) alimentar con PSU externa 5V @ 2A (no USB), (b) revisar físicamente soldaduras/capacitores regulador 3.3V en PCB.
@@ -525,17 +525,17 @@ Menú en display (Encoder push > 3s):
 1. **LED REC — RESUELTO**
 2. **LED FF — RESUELTO**
 3. **LED RW — RESUELTO**
-4. **RS485 intermitente — DOCUMENTADO, BAJO CONTROL** — Sistema S3 funciona: comunica datos, LEDs y pantalla actualizan correctamente. Timeouts ocasionales no bloquean operación. Patrón: ~10-20 timeouts, luego respuesta OK, repite. Causa desconocida (posible: timing hardware, timeout 1500µs, ISR conflicts). No intentar buffer circular o cambios arquitectónicos sin compilar first. Problema arrastrado desde S3 original.
+4. **RS485 intermitente — DOCUMENTADO, BAJO CONTROL** — Sistema S3 funciona: comunica datos, LEDs y Display actualizan correctamente. Timeouts ocasionales no bloquean operación. Patrón: ~10-20 timeouts, luego respuesta OK, repite. Causa desconocida (posible: timing hardware, timeout 1500µs, ISR conflicts). No intentar buffer circular o cambios arquitectónicos sin compilar first. Problema arrastrado desde S3 original.
 5. VPot ring LEDs (CC 16–23, 48–55), jog wheel (CC 60), rude solo (nota 115)
 
 ### P4
 6. mutex o double-buffer en `vuLevels[]`
 7. respuesta táctil lenta en vista de faders — investigar qué bloquea el hilo de touch, especialmente en UIPage faders
-8. no muestra datos en pantalla tras conectarse — posible regresión en la transición a CONNECTED tras cambios en handshake
+8. no muestra datos en Display tras conectarse — posible regresión en la transición a CONNECTED tras cambios en handshake
 9. NeoTrellis sin implementar — atención a pines I2C nuevos (SDA=GPIO33, SCL=GPIO31)
 
 ### S2
-10. **Encoder — RESUELTO (2026-04-28)** — Problema de sequenciamiento: `Encoder::reset()` estaba en línea 214 (inmediatamente post-RS485), antes de procesar VPot. Esto causaba contador=0 al leer para VPot → VPot ring nunca cambiaba en Logic. SAT funcionaba porque procesaba sin ese reset intermedio. Fix: mover `reset()` a línea 242 (post-VPot, pre-updateDisplay) asegura que RS485 y pantalla usan el mismo delta.
+10. **Encoder — RESUELTO (2026-04-28)** — Problema de sequenciamiento: `Encoder::reset()` estaba en línea 214 (inmediatamente post-RS485), antes de procesar VPot. Esto causaba contador=0 al leer para VPot → VPot ring nunca cambiaba en Logic. SAT funcionaba porque procesaba sin ese reset intermedio. Fix: mover `reset()` a línea 242 (post-VPot, pre-updateDisplay) asegura que RS485 y Display usan el mismo delta.
 11. **FaderTouch — EN DESARROLLO** — Detección por sostenimiento (tiempo). Perfecto sin plástico, necesita ajuste con plástico. Lógica actual: raw debe sostenerse > baseline×1.015 durante 6 frames (120ms) para detectar toque. Baseline actualizado siempre con IIR (alpha=1/16, no congelado). TEST_TOUCH en SAT testea correctamente. Próximos pasos: validar con plástico real, ajustar thresholds si es necesario.
 12. revisar FaderADC tras reescritura — validar lecturas actuales con hardware real
 13. ADS1015 pedido — cuando llegue, reemplazar lectura ADC nativa por I2C ADS1015 para resolver ruido en fader
@@ -607,7 +607,7 @@ Toda la especificación de paquetes (MasterPacket, SlavePacket), máquina de est
 
 **Usuarios correctos:**
 - `RS485Handler::buildResponse()` → captura delta para enviar al master
-- `main.cpp` → calcula nivel VPot (-7..+7) y redibuja pantalla
+- `main.cpp` → calcula nivel VPot (-7..+7) y redibuja Display
 
 **RESUELTO (2026-04-28 15:30) — Sequenciamiento corregido:**
 
@@ -642,7 +642,7 @@ updateButtons();
 updateDisplay();  // redibuja con nuevos niveles
 ```
 
-Resultado: RS485 y pantalla ahora usan el mismo delta, VPot ring responde correctamente en Logic.
+Resultado: RS485 y Display ahora usan el mismo delta, VPot ring responde correctamente en Logic.
 
 ---
 
