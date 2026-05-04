@@ -152,7 +152,7 @@ void OtaManager::enableForUpload(bool otaOnlyMode) {
     Serial.println(WiFi.localIP());
 
     // 3. Crear servidor y ElegantOTA (LITERAL al ejemplo)
-    WebServer server(80);
+    static WebServer server(80);
 
     Update.abort();
     delay(100);
