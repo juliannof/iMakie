@@ -148,7 +148,7 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 ### WiFi / OTA
 - Credenciales: WiFi SSID: `Julianno-WiFi` | WiFi Pass: `JULIANf1`
 - Provisioning: sketch USB que guarda credenciales en NVS namespace `"ptxx"` (claves: `wifiSsid`, `wifiPass`, `trackId`)
-- OTA WiFi: `OtaManager::enableForUpload()` — carga firmware vía WiFi en SAT menu "WiFi OTA" (ArduinoOTA, sin contraseña)
+- OTA WiFi: `OtaManager::enableForUpload()` — carga firmware vía WiFi en SAT menu "WiFi OTA" (ElegantOTA 3.1.7, funciona perfecto)
 
 ### NVS namespace S2
 `"ptxx"` — claves: `wifiSsid`, `wifiPass`, `trackId`, `label`, `pwmMin`, `pwmMax`, `touchEn`, `motorDis`

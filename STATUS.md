@@ -5,7 +5,7 @@
 ## S2 (ESP32-S2)
 
 ### Bugs S2
-- **ArduinoOTA WiFi — en uso** — Cambio desde ElegantOTA (resolución 2026-05-04). Ver sección "### WiFi / OTA" en CLAUDE.md para configuración actual.
+(ninguno)
 
 ### Pendientes S2
 10. **Encoder — RESUELTO (2026-04-28)** — Problema de sequenciamiento: `Encoder::reset()` estaba en línea 214 (inmediatamente post-RS485), antes de procesar VPot. Esto causaba contador=0 al leer para VPot → VPot ring nunca cambiaba en Logic. SAT funcionaba porque procesaba sin ese reset intermedio. Fix: mover `reset()` a línea 242 (post-VPot, pre-updateDisplay) asegura que RS485 y Display usan el mismo delta.
