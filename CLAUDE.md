@@ -135,12 +135,12 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 - `vTaskDelay(1)` en estados WAIT_RESP y GAP para no matar Core 1
 
 ### WiFi / OTA
-- Credenciales: WiFi SSID: `Julianno-WiFi` | WiFi Pass: `JULIANf1` | OTA password: `9821`
-- Provisioning: sketch USB que guarda credenciales en NVS namespace `"ptxx"` (claves: `wifiSsid`, `wifiPass`, `otaPass`, `trackId`)
-- OTA WiFi: `OtaManager::enableForUpload()` — carga firmware vía WiFi en SAT menu "WiFi OTA"
+- Credenciales: WiFi SSID: `Julianno-WiFi` | WiFi Pass: `JULIANf1`
+- Provisioning: sketch USB que guarda credenciales en NVS namespace `"ptxx"` (claves: `wifiSsid`, `wifiPass`, `trackId`)
+- OTA WiFi: `OtaManager::enableForUpload()` — carga firmware vía WiFi en SAT menu "WiFi OTA" (ArduinoOTA, sin contraseña)
 
 ### NVS namespace S2
-`"ptxx"` — claves: `wifiSsid`, `wifiPass`, `otaPass`, `trackId`, `label`, `pwmMin`, `pwmMax`, `touchEn`, `motorDis`
+`"ptxx"` — claves: `wifiSsid`, `wifiPass`, `trackId`, `label`, `pwmMin`, `pwmMax`, `touchEn`, `motorDis`
 
 ---
 
