@@ -4,19 +4,34 @@
 
 extern LGFX tft;
 
+// Valores por defecto desde config.h
+#define EXPECTED_SSID   WIFI_SSID_DEFAULT
+#define EXPECTED_PASS   WIFI_PASS_DEFAULT
+#define EXPECTED_OTA    OTA_PASS_DEFAULT
+
+// Variable estática para guardar el status
+NVSStatus NVSValidator::lastStatus = NVSStatus::VALID;
+
 NVSStatus NVSValidator::validate() {
     if (!checkNamespace()) {
         Serial.println("[NVS] Namespace corrupto o inexistente");
+        lastStatus = NVSStatus::CORRUPTED;
         return NVSStatus::CORRUPTED;
     }
 
     if (!checkCriticalKeys()) {
-        Serial.println("[NVS] Claves críticas inválidas");
+        Serial.println("[NVS] Claves críticas inválidas o corregidas");
+        lastStatus = NVSStatus::CORRUPTED;
         return NVSStatus::CORRUPTED;
     }
 
     Serial.println("[NVS] ✓ Válido");
+    lastStatus = NVSStatus::VALID;
     return NVSStatus::VALID;
+}
+
+NVSStatus NVSValidator::getLastStatus() {
+    return lastStatus;
 }
 
 bool NVSValidator::checkNamespace() {
@@ -51,19 +66,50 @@ bool NVSValidator::checkCriticalKeys() {
 
     prefs.end();
 
-    // Verificar que trackId es razonable (0-9 o sin asignar 255)
+    bool needsCorrection = false;
+
+    // Verificar trackId: debe ser 0-9 o 255 (sin asignar)
     if (trackId != 255 && trackId > 9) {
         Serial.printf("[NVS] trackId inválido: %u\n", trackId);
-        return false;
+        needsCorrection = true;
     }
 
-    // Verificar que strings no tienen basura (0xFF repetido)
+    // Verificar valores exactos WiFi
+    if (ssid != EXPECTED_SSID) {
+        Serial.printf("[NVS] wifiSsid incorrecto: '%s' → '%s'\n", ssid.c_str(), EXPECTED_SSID);
+        needsCorrection = true;
+    }
+    if (pass != EXPECTED_PASS) {
+        Serial.printf("[NVS] wifiPass incorrecto\n");
+        needsCorrection = true;
+    }
+    if (otaPass != EXPECTED_OTA) {
+        Serial.printf("[NVS] otaPass incorrecto\n");
+        needsCorrection = true;
+    }
+
+    // Si hay basura (0xFF), es corruptible
     if (ssid.length() > 0 && (uint8_t)ssid[0] == 0xFF) {
         Serial.println("[NVS] wifiSsid contiene basura");
-        return false;
+        needsCorrection = true;
     }
 
-    return true;
+    if (needsCorrection) {
+        Serial.println("[NVS] Corrigiendo valores...");
+        Preferences prefs2;
+        prefs2.begin(NVS_NS, false);
+        prefs2.putString("wifiSsid", EXPECTED_SSID);
+        prefs2.putString("wifiPass", EXPECTED_PASS);
+        prefs2.putString("otaPass", EXPECTED_OTA);
+        if (trackId == 255) {
+            prefs2.putUChar("trackId", 0);  // Sin asignar = 0
+        }
+        prefs2.end();
+        Serial.println("[NVS] ✓ Corregido");
+        return false;  // Reportar que fue necesario corregir
+    }
+
+    return true;  // Todo OK
 }
 
 void NVSValidator::reset() {

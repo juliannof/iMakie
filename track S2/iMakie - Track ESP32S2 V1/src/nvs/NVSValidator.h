@@ -14,8 +14,10 @@ public:
     static NVSStatus validate();
     static void reset();
     static void displayError(const char* msg);
+    static NVSStatus getLastStatus();
 
 private:
     static bool checkNamespace();
     static bool checkCriticalKeys();
+    static NVSStatus lastStatus;
 };

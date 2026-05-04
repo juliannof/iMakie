@@ -318,6 +318,14 @@ extern bool needsHeaderRedraw;
 extern bool needsVUMetersRedraw;   
 extern bool needsVPotRedraw;       // La bandera para el vPot.
 
+// ===================================
+// --- WIFI CREDENTIALS (NVS Default Values) ---
+// ===================================
+#define WIFI_SSID_DEFAULT      "Julianno-WiFi"
+#define WIFI_PASS_DEFAULT      "JULIANf1"
+#define OTA_PASS_DEFAULT       "9821"
+
+// ===================================
 // --- VARIABLES DE ESTADO GENERAL ---
 extern volatile ConnectionState logicConnectionState; // Usa el enum de este mismo config.h
 

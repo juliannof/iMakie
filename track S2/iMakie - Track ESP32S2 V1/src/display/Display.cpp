@@ -4,8 +4,9 @@
 #include "hardware/encoder/Encoder.h"
 #include "../hardware/Hardware.h"
 #include <Preferences.h>
-#include "SpriteUtils.h"           // en Display.cpp                                                          
+#include "SpriteUtils.h"           // en Display.cpp
 #include "../config.h"
+#include "../nvs/NVSValidator.h"
 
 extern LGFX        tft;
 extern LGFX_Sprite header;
@@ -142,8 +143,9 @@ void drawSplashScreen() {
     tft.drawString(verBuf, TFT_WIDTH / 2, 125);
     tft.drawString(FW_BUILD_ID, TFT_WIDTH / 2, 140);
 
-    // Círculo verde al pie si NVS pasó test
-    tft.fillCircle(TFT_WIDTH / 2, 200, 6, TFT_GREEN);
+    // Círculo: verde si NVS válido, rojo si corrupto
+    uint16_t circleColor = (NVSValidator::getLastStatus() == NVSStatus::VALID) ? TFT_GREEN : TFT_RED;
+    tft.fillCircle(TFT_WIDTH / 2, 200, 6, circleColor);
 }
 
 
