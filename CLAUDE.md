@@ -21,6 +21,14 @@ Referencia única de componentes, flujos MIDI, RS485, y puntos críticos.
 - No importa si es un cambio "pequeño" o "obvio" — SIEMPRE explica primero
 - Esta regla es VINCULANTE en cada nuevo chat
 
+**TODOS LOS CAMBIOS DOCUMENTADOS DEBEN INCLUIR FECHA Y HORA. (2026-05-04 19:20)**
+
+- Cuando documentes cambios en CLAUDE.md o en comentarios de código: **SIEMPRE incluye fecha + hora**
+- Formato: `(YYYY-MM-DD HH:MM)` ejemplo: `(2026-05-04 14:30)`
+- Si un cambio está documentado sin fecha/hora, **cuestiona su validez antes de aplicarlo**
+- La fecha/hora permite rastrear evolución y correlacionar con commits/sesiones
+- Sin fecha, el cambio es inútil para auditoría y debugging futuro
+
 ---
 
 ## Qué es esto
@@ -332,8 +340,7 @@ Menú en display (Encoder push > 3s):
 - **Brightness** — test backlight
 - **RS485 On/Off** — simula desconexión
 - **LEDs Test** — secuencia RGB por índice
-- **WiFi OTA** — carga firmware via WiFi (para unidades con conectividad OK)
-- **Serial OTA** — carga firmware por USB (para unidades con problemas de hardware)
+- **WiFi OTA** — carga firmware via WiFi
 - **Reboot** — reinicia
 
 **Nota:** SAT suspende PSRAM y sprites → libera RAM para diagnósticos
@@ -425,13 +432,12 @@ Menú en display (Encoder push > 3s):
 - **RS485 intermitente** — **FUNCIONANDO CON TIMEOUTS** — Sistema comunica: LEDs actualizan, pantalla muestra datos. Timeouts ocasionales e impredecibles (~10-20 consecutivos, luego OK, repite). Comunicación física funciona a 500kbaud. NO se debe modificar arquitectura actual de lectura sin probar compilación first.
 
 ### S2
-- **OTA WiFi timeout durante upload — PROBLEMA DE HEAP — MEJORADO (2026-04-29)** — WiFi conecta OK pero ArduinoOTA.handle() falla con timeout a mitad del upload. **Causa:** heap muy bajo (~83KB) durante WiFi.begin() + ArduinoOTA buffering de chunks (1024B cada uno). Conversor 3.3V débil agrava el problema. **Mitigación (2026-04-29):** (1) Apagar display completamente (brillo 0) antes de WiFi.begin() → libera ~20-30KB heap, (2) Restaurar brillo a 8% (valor 20) una vez WiFi conecta → permite ver IP/progreso sin sobrecargar, (3) Motor y NeoPixels ya estaban OFF en SAT. **Resultado:** va mucho mejor pero sigue siendo marginal en unidades con regulador débil. **Alternativas si falla:** (a) alimentar con PSU externa 5V @ 2A (no USB), (b) usar Serial OTA si conversor falla, (c) revisar físicamente soldaduras/capacitores regulador 3.3V en PCB.
-- **NVS corrupto en boot — PROBLEMA DETECTADO Y RESUELTO (2026-04-28)** — Algunas unidades boot-loopaban por NVS namespace corrupto (garbage en strings, trackId fuera de rango, namespace no legible). **Solución:** NVSValidator estático integrado en setup() detecta corrupción automáticamente. Si corrupto: muestra "NVS CORRUPTO\nReparando..." en display, reseta a defaults, reinicia limpio. Boot subsecuente funciona normal con indicador verde en splash screen. Sin intervención manual necesaria.
-- **ElegantOTA WiFi — RESUELTO (2026-05-04)** — **Causa raíz:** Patrón fail→fail→success sin reinicio equipo por `Update.abort()` missing. Partición OTA quedaba half-written tras fallos. **Fix implementado:** (1) `Update.abort(); delay(100);` marca partición limpia antes de `ElegantOTA.begin()`, (2) Handler "/" redirige a `/update` (patrón exacto demo oficial), (3) WebServer estática para acceso lambda. **Validación:** 5 unidades S2 recuperadas exitosamente con nuevo firmware OTA. **Commits:** e4e6236, cb0dd11, ed7d598, c15d227. **Lección:** SIEMPRE cuestionar el código si fallan unidades — el hardware estaba OK, el firmware necesitaba fix.
+- **OTA WiFi timeout durante upload — PROBLEMA DE HEAP — MEJORADO (2026-04-29 10:30)** — WiFi conecta OK pero ArduinoOTA.handle() falla con timeout a mitad del upload. **Causa:** heap muy bajo (~83KB) durante WiFi.begin() + ArduinoOTA buffering de chunks (1024B cada uno). Conversor 3.3V débil agrava el problema. **Mitigación (2026-04-29 10:30):** (1) Apagar display completamente (brillo 0) antes de WiFi.begin() → libera ~20-30KB heap, (2) Restaurar brillo a 8% (valor 20) una vez WiFi conecta → permite ver IP/progreso sin sobrecargar, (3) Motor y NeoPixels ya estaban OFF en SAT. **Resultado:** va mucho mejor pero sigue siendo marginal en unidades con regulador débil. **Alternativas si falla:** (a) alimentar con PSU externa 5V @ 2A (no USB), (b) revisar físicamente soldaduras/capacitores regulador 3.3V en PCB.
+- **ElegantOTA WiFi — RESUELTO (2026-05-04 09:45)** — **Causa raíz:** Patrón fail→fail→success sin reinicio equipo por `Update.abort()` missing. Partición OTA quedaba half-written tras fallos. **Fix implementado:** (1) `Update.abort(); delay(100);` marca partición limpia antes de `ElegantOTA.begin()`, (2) Handler "/" redirige a `/update` (patrón exacto demo oficial), (3) WebServer estática para acceso lambda. **Validación:** 5 unidades S2 recuperadas exitosamente con nuevo firmware OTA. **Commits:** e4e6236, cb0dd11, ed7d598, c15d227. **Lección:** SIEMPRE cuestionar el código si fallan unidades — el hardware estaba OK, el firmware necesitaba fix.
 
 ---
 
-## Estado de Hardware S2 (2026-05-04)
+## Estado de Hardware S2 (2026-05-04 19:20)
 
 **Unidades recuperadas:** 5/12 ✅ (nuevo firmware OTA + fixes)
 
@@ -440,23 +446,36 @@ Menú en display (Encoder push > 3s):
 - Requieren investigación a fondo
 - **Hipótesis por validar:** código vs. hardware — aplicar mismo principio que OTA (cuestionar firmware primero)
 
+**Cambios recientes (2026-05-04 19:20):**
+- Desactivado NVSValidator completamente (interfería con WiFi)
+- Arreglado OtaManager::_saveCredentials() para guardar en ambos namespaces
+- Agregados logs detallados para debugging de credenciales WiFi
+
 ---
 
 ## Versión Firmware S2
 
-### **FW 0.0.2 (2026-05-04 ~18:30)**
+### **FW 0.0.3 (2026-05-04 19:20)**
+
+**Cambios incluidos:**
+- Desactivar completamente NVSValidator (comentado en main.cpp y Display.cpp)
+- Arreglar `OtaManager::_saveCredentials()` para guardar en ambos namespaces (ptxx + wifiman)
+- Agregar logs detallados en OTA para debugging de credenciales WiFi
+- Limpiar CLAUDE.md: remover secciones desactualizadas
+
+**Commits:** 8880c85, f028ae0
+
+**Estado:** Compilable, WiFi OTA debería funcionar correctamente
+
+### **FW 0.0.2 (2026-05-04 18:30)**
 
 **Cambios incluidos:**
 - GPIO33 pulso RST obligatorio antes de `tft.init()` — fix display en 5 unidades
-- NVS Validator: valida y corrige WiFi credentials automáticamente (sin reinicio)
 - WiFi credentials configurables en `config.h`: SSID, password, OTA password
-- Splash screen: círculo verde (NVS válido) o rojo (corrupto)
 - OTA WiFi sin `Update.abort()` — fix "Connection reset by peer"
 - Splash screen reposicionado centrado verticalmente
 
 **Commits:** 7ac20d0, f47cbbd, 5eedcde, 0f9e092, c7e8ae1, 96e6227
-
-**Estado:** Compilable, pronto para testear con 7 unidades pendientes
 
 ---
 
@@ -482,14 +501,14 @@ Menú en display (Encoder push > 3s):
 13. ADS1015 pedido — cuando llegue, reemplazar lectura ADC nativa por I2C ADS1015 para resolver ruido en fader
 
 ### S2 — NeoPixel (continuación)
-**NeoPixel secuencia de brillo (2026-04-28) — IMPLEMENTADO:**
+**NeoPixel secuencia de brillo (2026-04-28 16:15) — IMPLEMENTADO:**
 - Azul tenue (NEOPIXEL_DIM_BRIGHTNESS=5) al inicio/reposo
 - Colores muy tenues (NEOPIXEL_ULTRA_DIM=1) cuando Logic conecta primera vez
 - O encendido (NEOPIXEL_DEFAULT_BRIGHTNESS=30) o tenue de morir (NEOPIXEL_ULTRA_DIM=1)
 - Optimización monocore: detección de cambios interna sin flags innecesarios
 - Comparación de estado (neoWaitingHandshake + 4 botones) en updateAllNeopixels()
 
-**HW_STATUS display en boot screen (2026-04-28) — IMPLEMENTADO:**
+**HW_STATUS display en boot screen (2026-04-28 16:15) — IMPLEMENTADO:**
 - 10 componentes hardware con estado color-coded (Rojo=0, Naranja=1, Blanco=2)
 - Fuente bitmap pequeña (setTextFont(1)) consistente con SAT
 - Inyección automática vía pre_build.py desde config.h markers
@@ -516,7 +535,7 @@ Toda la especificación de paquetes (MasterPacket, SlavePacket), máquina de est
 
 ---
 
-### Auditoría RS485 (2026-04-27)
+### Auditoría RS485 (2026-04-27 14:00)
 
 **Hallazgo:** Código RS485 está **bien optimizado**. Neopixel bloqueante (15-30ms) ya fue removido de ruta crítica en optimización anterior.
 
@@ -540,7 +559,7 @@ Toda la especificación de paquetes (MasterPacket, SlavePacket), máquina de est
 
 ## Encoder — Arquitectura y sequenciamiento (S2)
 
-**Fuente única de verdad:** `src/hardware/encoder/Encoder.cpp` (confirmado 2026-04-27)
+**Fuente única de verdad:** `src/hardware/encoder/Encoder.cpp` (confirmado 2026-04-27 14:00)
 - ISR basada en cambio de flanco (CHANGE) en GPIO12 y GPIO13
 - Debounce 3ms en ISR (válido)
 - Dirección: A LOW + B HIGH = -1 (izquierda), A LOW + B LOW = +1 (derecha)
@@ -550,7 +569,7 @@ Toda la especificación de paquetes (MasterPacket, SlavePacket), máquina de est
 - `RS485Handler::buildResponse()` → captura delta para enviar al master
 - `main.cpp` → calcula nivel VPot (-7..+7) y redibuja pantalla
 
-**RESUELTO (2026-04-28) — Sequenciamiento corregido:**
+**RESUELTO (2026-04-28 15:30) — Sequenciamiento corregido:**
 
 Problema: `Encoder::reset()` estaba en la línea 214 de main.cpp (post-RS485, antes de procesar VPot), causando que el contador fuera 0 al leer para VPot → VPot ring nunca cambiaba en Logic. SAT funcionaba porque procesaba el contador sin ese reset intermedio.
 
