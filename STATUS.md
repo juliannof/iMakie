@@ -44,10 +44,10 @@
 ---
 
 ### **BOTONES**
-**Estado:** funcional
+**Estado:** funcional pero lento
 
 #### Bugs
-(ninguno)
+- **Botones perezosos** — Respuesta lenta en botones (REC, SOLO, MUTE, SELECT). Investigar debounce y latencia en ButtonManager.
 
 #### Pendientes
 (ninguno)
