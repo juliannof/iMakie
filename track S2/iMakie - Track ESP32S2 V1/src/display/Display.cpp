@@ -49,6 +49,12 @@ void initDisplay(bool otaOnlyMode) {
     esp_reset_reason_t reason = esp_reset_reason();
     Serial.printf("Reset reason: %d\n", (int)reason);
 
+    // Pulso de reset obligatorio GPIO33 antes de tft.init()
+    pinMode(33, OUTPUT);
+    digitalWrite(33, LOW);
+    delay(100);
+    digitalWrite(33, HIGH);
+    delay(50);
 
     tft.init();
     tft.setRotation(0);
