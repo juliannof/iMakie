@@ -253,16 +253,122 @@
 
 ## P4 (ESP32-P4 Master)
 
-### Bugs P4
-1. **`uiOfflineCreate()` doble llamada en `setup()`** — ~~primera antes de `prefs.begin()`, segunda después. Leak de LVGL garantizado.~~ **RESUELTO** — solo existe una llamada, después de `prefs.begin()`.
-2. **Pantalla negra en boot** — Dos causas independientes: (a) ~~backlight off si `lastPage` era 1 o 2 (backlight solo se encendía vía `uiMenuInit()` → `uiPage3Create()`). Fix: `displaySetBrightness()` en `setup()` después de `initDisplay()`.~~ **RESUELTO**. (b) ~~`UIOffline` empieza con `s_blink_label` en HIDDEN y solo lo muestra cuando el logo termina de revelarse (~5-6 s); sin logo, Display negra permanente.~~ **RESUELTO** — label visible desde el inicio, parpadeo activo desde el primer tick independientemente del estado del logo.
-3. **Handshake MCU incorrecto** — ~~código antiguo implementaba un challenge/response propio; P4 actuaba como HOST generando challenges aleatorios.~~ **RESUELTO** — ver sección "Mackie MCU — handshake" en CLAUDE.md.
+### **RS485**
+**Estado:** funcional
 
-### Pendientes P4
-6. mutex o double-buffer en `vuLevels[]`
-7. respuesta táctil lenta en vista de faders — investigar qué bloquea el hilo de touch, especialmente en UIPage faders
-8. no muestra datos en Display tras conectarse — posible regresión en la transición a CONNECTED tras cambios en handshake
-9. NeoTrellis sin implementar — atención a pines I2C nuevos (SDA=GPIO33, SCL=GPIO31)
+#### Bugs
+(ninguno)
+
+#### Pendientes
+- Verificar pines (TX=50, RX=51, EN=52) — confirmar compilación y funcionamiento
+
+#### Detalles técnicos
+- Bus A: 500 kbaud, protocolo binario custom, CRC8
+- Controla 9 slaves S2 (IDs 1–9)
+- Master MCU — P4 es el controlador central, reemplaza S3 #1 original
+- Transceiver externo (no integrado de la placa)
+
+---
+
+### **HANDSHAKE MCU**
+**Estado:** funcional (protocolo correcto 2026-05-04)
+
+#### Bugs
+- **Handshake MCU incorrecto** — ~~código antiguo implementaba challenge/response propio; P4 actuaba como HOST generando challenges aleatorios.~~ **RESUELTO** — protocolo correcto implementado
+
+#### Pendientes
+(ninguno)
+
+#### Detalles técnicos
+- Familia Mackie: 0x14 (P4 Master)
+- Protocolo: sondeo inicial (cualquier familia) → handshake familia 0x14
+- Respuestas: 0x00→0x01, 0x13→0x14
+- Surface Type: 0x00 (Master) — hardcodeado
+- Suscripción: 0x10 00 (feedback subscription para MIDI notes de transporte)
+- Ver CLAUDE.md "Mackie MCU — handshake correcto" para detalles completos
+
+---
+
+### **DISPLAY**
+**Estado:** funcional
+
+#### Bugs
+- **Pantalla negra en boot** — ~~backlight off + UIOffline label timing.~~ **RESUELTO** — backlight en setup(), label visible desde inicio
+
+#### Pendientes
+- Investigar regresión: no muestra datos en Display tras conectarse (posible issue en transición CONNECTED)
+
+#### Detalles técnicos
+- ST7701S MIPI-DSI 2-lane, 480×800 portrait
+- LVGL v9
+- Solo inicializa en portrait — landscape por rotación software
+- Rotación widgets: `lv_obj_set_style_transform_rotation(obj, 900, 0)`, coordenadas X/Y intercambiadas mentalmente
+
+---
+
+### **TOUCH**
+**Estado:** funcional pero lento en vista de faders
+
+#### Bugs
+(ninguno)
+
+#### Pendientes
+- Respuesta táctil lenta en vista de faders — investigar qué bloquea el hilo de touch (especialmente en UIPage faders)
+
+#### Detalles técnicos
+- GT911 I2C en I2C_NUM_1 (SDA=GPIO7, SCL=GPIO8)
+- Detector capacitivo multi-touch
+- Issue conocido: latencia en UIPage faders (posible core contentión, mutex contention)
+
+---
+
+### **NEOTRELLS**
+**Estado:** sin implementar
+
+#### Bugs
+(ninguno)
+
+#### Pendientes
+- Implementar control NeoTrellis (Adafruit seesaw, dos tiles 4×4)
+- Atención a pines I2C nuevos (SDA=GPIO33, SCL=GPIO31)
+
+#### Detalles técnicos
+- Adafruit seesaw, dos tiles 4×4 en I2C_NUM_0
+- Direcciones: 0x2F (izquierda) y 0x2E (derecha) → matriz 4×8
+- Pines: SDA=GPIO33, SCL=GPIO31
+
+---
+
+### **VU LEVELS**
+**Estado:** funcional pero sin sincronización thread-safe
+
+#### Bugs
+(ninguno)
+
+#### Pendientes
+- Implementar mutex o double-buffer en `vuLevels[]` — Core 0 escribe, Core 1 lee en `handleVUMeterDecay` sin protección
+
+#### Detalles técnicos
+- Dual-core: taskCore0 / taskCore1
+- Flags de cambio de página: `volatile bool g_switchToPage3/3A/3B/Offline`
+- Race condition conocido en lectura/escritura de vuLevels
+
+---
+
+### **BUILD / PLATFORM**
+**Estado:** estable (LVGL v9)
+
+#### Bugs
+- **`uiOfflineCreate()` doble llamada en `setup()`** — ~~leak de LVGL.~~ **RESUELTO** — una sola llamada post-prefs.begin()
+
+#### Pendientes
+(ninguno)
+
+#### Detalles técnicos
+- Chip: ESP32-P4 (placa GUITION JC4880P433C)
+- Familia Mackie: 0x14 (9 slaves)
+- DEVICE_P4_MASTER flag en platformio.ini
+- LVGL v9 (portrait orientation por defecto)
 
 ---
 
