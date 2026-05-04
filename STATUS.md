@@ -112,10 +112,10 @@
 ---
 
 ### **DISPLAY**
-**Estado:** funcional
+**Estado:** funcional con issue de brillo
 
 #### Bugs
-(ninguno)
+- **Brillo máximo al inicio** — Pantalla enciende con brillo máximo en boot (debería ser moderado). Investigar `displaySetBrightness()` y orden de init.
 
 #### Pendientes
 (ninguno)
