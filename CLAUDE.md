@@ -150,18 +150,24 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 
 ```
 loop() {
+  0. SAT menu — si está abierto, return (máxima prioridad)
   1. ButtonManager::update()        ← botones REC/SOLO/MUTE/SELECT → flags
-  2. RS485 receive (si hay data):
-     - RS485Handler::onMasterData() ← recibe faderTarget, nombre, flags
-     - buildResponse()              ← arma SlavePacket con estado actual
-     - sendResponse()               ← envía al master S3 o P4
-     - Encoder::reset()             ← limpia delta acumulado
-  3. faderADC.update()              ← lee ADC 13-bit: 0-8191
-  4. FaderTouch::update()           ← detección sostenimiento: >1.5% baseline × 120ms
-  5. Motor::update()                ← control PID hacia faderTarget
-  6. Encoder::update()              ← acumula deltas (-127..+127)
-  7. updateDisplay()                ← pantalla SPI3
-  8. updateAllNeopixels()           ← LEDs
+  2. Encoder::update()              ← ANTES de RS485, captura delta actualizado
+     - Si changed: actualiza VPotLevel, setea needsVPotRedraw
+  3. RS485.update() (si no suspended):
+     - Si hasNewData():
+       - RS485Handler::onMasterData() ← recibe faderTarget, nombre, flags
+       - buildResponse() + sendResponse() ← arma y envía SlavePacket
+       - Encoder::reset()             ← limpia delta acumulado
+     - checkTimeout()
+  4. faderADC.update()              ← lee ADC 13-bit: 0-8191
+  5. FaderTouch::update()           ← detección sostenimiento
+  6. Motor::setADC() + control:
+     - Si FaderTouch::isTouched() → Motor::stop()
+     - Si no → Motor::update()
+  7. updateButtons()                ← procesa botones para display
+  8. updateDisplay()                ← pantalla SPI3
+  9. updateAllNeopixels()           ← LEDs
 }
 ```
 
