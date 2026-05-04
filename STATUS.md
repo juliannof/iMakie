@@ -5,12 +5,13 @@
 ## S2 (ESP32-S2)
 
 ### **RS485**
-**Estado:** funcional
+**Estado:** funcional pero con pérdida de paquetes
 
 #### Bugs
-(ninguno)
+- **Pérdida de paquetes** — S2 pierde paquetes ocasionalmente, causa timeouts en master. Investigación pendiente.
 
 #### Pendientes
+- Identificar causa raíz de pérdida de paquetes (posible: buffer overflow, timing ISR, baudrate stability)
 - Verificar pines en P4 (TX=50, RX=51, EN=52) — confirmar compilación y funcionamiento
 
 #### Detalles técnicos
@@ -18,6 +19,7 @@
 - Comunicación master-slave: MasterPacket (16B) → SlavePacket (9B)
 - Timing crítico: sendResponse() < 150µs después de recibir
 - Timeout 1000ms → LED11 rojo, suspende motor
+- RxBuffer: `Serial1.setRxBufferSize()` antes de `Serial1.begin()` — verificar tamaño actual
 
 ---
 
