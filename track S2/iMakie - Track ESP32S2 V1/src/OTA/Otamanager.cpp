@@ -154,9 +154,12 @@ void OtaManager::enableForUpload(bool otaOnlyMode) {
     // 3. Crear servidor y ElegantOTA (LITERAL al ejemplo)
     WebServer server(80);
 
-    server.on("/", [&server]() {
-        server.send(200, "text/plain", "ElegantOTA Server Ready");
+    server.on("/", []() {
+        server.send(200, "text/plain", "Hi! This is ElegantOTA Demo.");
     });
+
+    Update.abort();
+    delay(100);
 
     ElegantOTA.begin(&server);
     ElegantOTA.onStart(onOTAStart);
