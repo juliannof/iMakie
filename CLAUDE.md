@@ -598,3 +598,12 @@ Local: `/Users/julianno/Documents/PlatformIO/Projects/iMakie/`
 Subproyectos PlatformIO:
 - `S3/` — master
 - `track S2/` — slave
+
+---
+
+## SESION (2026-05-04)
+
+- STATUS.md reorganizado: S2, S3, P4, Cross-system con estructura MAYÚSCULAS + NEGRITA
+- Subsecciones Bugs/Pendientes/Detalles técnicos en cada componente
+- 7 bugs críticos documentados en S2 (RS485 pérdida, Display brillo, Botones lentos, Fader no funciona, FaderTouch con plástico, Motor no funciona, Encoder solo SAT)
+- WiFi/OTA: ArduinoOTA muerto → ElegantOTA funciona
