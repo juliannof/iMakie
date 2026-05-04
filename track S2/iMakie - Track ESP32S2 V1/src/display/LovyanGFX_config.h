@@ -12,7 +12,7 @@ public:
             auto cfg = _bus_instance.config();
             cfg.spi_host    = SPI3_HOST;
             cfg.spi_mode    = 0;
-            cfg.freq_write  = 5000000;
+            cfg.freq_write  = 10000000;
             cfg.freq_read   = 8000000;
             cfg.spi_3wire   = false;
             cfg.use_lock    = true;

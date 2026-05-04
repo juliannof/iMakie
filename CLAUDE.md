@@ -100,7 +100,7 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 
 ### Display
 - Panel ST7789V3 240×280, SPI3_HOST
-- `freq_write=5MHz` (unidireccional, sin MISO)
+- `freq_write=10MHz` (unidireccional, sin MISO) — probado estable
 - `memory_height=320`, `offset_y=20`, `invert=true`, `rgb_order=false`
 - BL PWM 500Hz
 - **Obligatorio:** pulso RST manual (GPIO33 LOW 100ms) antes de `tft.init()`
