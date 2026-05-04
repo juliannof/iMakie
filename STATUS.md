@@ -133,13 +133,15 @@
 ---
 
 ### **ENCODER**
-**Estado:** funcional (sequenciamiento corregido 2026-04-28)
+**Estado:** funcional en SAT, roto en Logic
 
 #### Bugs
-(ninguno)
+- **No funciona en Logic** — Encoder responde en SAT pero no controla VPot en Logic. Bug en RS485 encoding, SlavePacket, o protocolo Mackie.
 
 #### Pendientes
-(ninguno)
+- Investigar encoderDelta en SlavePacket (¿se envía correctamente?)
+- Verificar RS485 transmission de delta
+- Validar mapping MIDI VPot en Logic (CC 49-56)
 
 #### Detalles técnicos
 - Rotario Gray code: A=GPIO12, B=GPIO13, Push=GPIO21
