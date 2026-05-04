@@ -6,7 +6,7 @@
 #include <Preferences.h>
 #include "SpriteUtils.h"           // en Display.cpp
 #include "../config.h"
-#include "../nvs/NVSValidator.h"
+// #include "../nvs/NVSValidator.h"  // DESACTIVADO
 
 extern LGFX        tft;
 extern LGFX_Sprite header;
@@ -134,18 +134,18 @@ void drawSplashScreen() {
     tft.setTextColor(TFT_MCU_GRAY);
     char buf[16];
     snprintf(buf, sizeof(buf), "Track %d", trackId);
-    tft.drawString(buf, TFT_WIDTH / 2, 95);
+    tft.drawString(buf, TFT_WIDTH / 2, 105);
 
     tft.setFont(&fonts::FreeSans9pt7b);
     tft.setTextColor(TFT_WHITE);
     char verBuf[32];
     snprintf(verBuf, sizeof(verBuf), "FW %s", FW_VERSION);
-    tft.drawString(verBuf, TFT_WIDTH / 2, 125);
-    tft.drawString(FW_BUILD_ID, TFT_WIDTH / 2, 140);
+    tft.drawString(verBuf, TFT_WIDTH / 2, 130);
+    tft.drawString(FW_BUILD_ID, TFT_WIDTH / 2, 160);
 
-    // Círculo: verde si NVS válido, rojo si corrupto
-    uint16_t circleColor = (NVSValidator::getLastStatus() == NVSStatus::VALID) ? TFT_GREEN : TFT_RED;
-    tft.fillCircle(TFT_WIDTH / 2, 200, 6, circleColor);
+    // DESACTIVADO: círculo NVS validator
+    // uint16_t circleColor = (NVSValidator::getLastStatus() == NVSStatus::VALID) ? TFT_GREEN : TFT_RED;
+    // tft.fillCircle(TFT_WIDTH / 2, 200, 6, circleColor);
 }
 
 

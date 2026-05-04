@@ -123,40 +123,10 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 - `sendResponse()` inmediatamente después de recibir paquete — antes de display/neopixel/motor
 - `vTaskDelay(1)` en estados WAIT_RESP y GAP para no matar Core 1
 
-### WiFi / OTA — PCB V2
-- GPIO8 (RS485 TX) recibe 4.6V backfeed del bus a través del transceiver → bloquea radio WiFi
-- **Fix software en `OtaManager::enableForUpload()`**: deshabilitar transceiver (EN=HIGH, GPIO8 LOW, Serial1.end()) antes de `WiFi.begin()`; restaurar si falla conexión
-- El rework de 100Ω en GPIO8 está **permanentemente descartado** — fix es solo software
-- OTA password: `9821` | WiFi SSID: `Julianno-WiFi`
-- Provisioning via sketch USB que cachea credenciales en NVS namespace `"ptxx"`
-
-**Serial/USB OTA — alternativa para unidades con problemas de hardware (2026-04-28)**
-- Nuevo entorno PlatformIO: `[env:lolin_s2_mini_serial]`
-- Upload protocol: `esptool` (no WiFi, directo por USB a 460800 baud)
-- Seleccionar en SAT menu: "Serial OTA" (7ma opción)
-- `OtaManager::enableSerialMode()` muestra "Reiniciando en modo serial..." y reinicia
-- Tras reinicio, ejecutar: `pio run -e lolin_s2_mini_serial --target upload`
-- **Seguridad RS485 → WiFi:** TX buffer drenado antes de deshabilitar transceiver
-  - Secuencia: 100ms wait → `Serial1.flush()` → 50ms → `Serial1.end()` → 50ms → GPIO manipulation
-  - Previene brownout/reset durante escritura NVS en unidades marginal-powered
-
-**NVS Validation — detección y reparación automática en boot (2026-04-28)**
-- Nuevo validador: `NVSValidator.h/cpp` — estático, sin instancias
-- `validate()` — retorna `NVSStatus::VALID` o `CORRUPTED`
-  - Verifica namespace `ptxx` existe y no está corrupto
-  - Valida `trackId` (0-9 o 255=sin asignar)
-  - Detecta garbage en strings (0xFF repetido)
-- `reset()` — si corrupto:
-  - Muestra "NVS CORRUPTO\nReparando..." en display (si inicializado)
-  - Borra namespace, reescribe con defaults, reinicia
-- **Integración en setup()** (después de `initDisplay()`):
-  ```cpp
-  if (NVSValidator::validate() == NVSStatus::CORRUPTED) {
-      NVSValidator::reset();  // No regresa (reinicia)
-      return;
-  }
-  ```
-- **Indicador en splash screen:** círculo verde al pie si NVS válido, ausente si falla
+### WiFi / OTA
+- Credenciales: WiFi SSID: `Julianno-WiFi` | WiFi Pass: `JULIANf1` | OTA password: `9821`
+- Provisioning: sketch USB que guarda credenciales en NVS namespace `"ptxx"` (claves: `wifiSsid`, `wifiPass`, `otaPass`, `trackId`)
+- OTA WiFi: `OtaManager::enableForUpload()` — carga firmware vía WiFi en SAT menu "WiFi OTA"
 
 ### NVS namespace S2
 `"ptxx"` — claves: `wifiSsid`, `wifiPass`, `otaPass`, `trackId`, `label`, `pwmMin`, `pwmMax`, `touchEn`, `motorDis`

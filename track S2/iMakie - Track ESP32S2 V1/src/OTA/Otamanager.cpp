@@ -249,11 +249,18 @@ bool OtaManager::_loadCredentials(char* ssid, char* pass, char* otaPass) {
 }
 
 void OtaManager::_saveCredentials(const char* ssid, const char* pass, const char* otaPass) {
+    // Guardar en namespace "ptxx" (como sketch provisioning)
     Preferences prefs;
     prefs.begin(NVS_NS, false);
     prefs.putString(NVS_SSID,     ssid);
     prefs.putString(NVS_PASS,     pass);
     prefs.putString(NVS_OTA_PASS, otaPass);
+    prefs.end();
+
+    // Guardar en namespace "wifiman" (como sketch provisioning)
+    prefs.begin("wifiman", false);
+    prefs.putString("ssid", ssid);
+    prefs.putString("pass", pass);
     prefs.end();
 }
 

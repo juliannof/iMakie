@@ -126,10 +126,10 @@ void NVSValidator::reset() {
 
     // Reescribir con valores por defecto
     prefs.begin(NVS_NS, false);
-    prefs.putUChar("trackId", 0);           // Sin ID asignado
-    prefs.putString("wifiSsid", "");        // Vacío
-    prefs.putString("wifiPass", "");        // Vacío
-    prefs.putString("otaPass", "");         // Vacío
+    prefs.putUChar("trackId", 0);
+    prefs.putString("wifiSsid", EXPECTED_SSID);
+    prefs.putString("wifiPass", EXPECTED_PASS);
+    prefs.putString("otaPass", EXPECTED_OTA);
     prefs.end();
 
     Serial.println("[NVS] ✓ Reescrito con valores por defecto");

@@ -18,7 +18,7 @@
 #include "hardware/button/ButtonManager.h"
 #include "SAT/SatMenu.h"
 #include "display/SpriteUtils.h"
-#include "nvs/NVSValidator.h"
+// #include "nvs/NVSValidator.h"  // DESACTIVADO
 #include <driver/dac_oneshot.h>
 
 
@@ -165,11 +165,11 @@ void setup() {
     initDisplay();
     log_i("Display OK");
 
-    // Validar NVS antes de cualquier cosa
-    if (NVSValidator::validate() == NVSStatus::CORRUPTED) {
-        NVSValidator::reset();  // Repara y reinicia
-        return;  // Nunca llegará aquí
-    }
+    // DESACTIVADO: NVSValidator
+    // if (NVSValidator::validate() == NVSStatus::CORRUPTED) {
+    //     NVSValidator::reset();  // Repara y reinicia
+    //     return;  // Nunca llegará aquí
+    // }
 
     drawSplashScreen();
     
