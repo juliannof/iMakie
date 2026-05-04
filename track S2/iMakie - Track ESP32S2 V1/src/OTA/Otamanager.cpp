@@ -129,7 +129,9 @@ void OtaManager::enableForUpload(bool otaOnlyMode) {
     }
 
     // 2. Conectar WiFi
+    Serial.printf("[OTA] Namespace: '%s'\n", NVS_NS);
     Serial.printf("[OTA] Conectando a %s...\n", ssid);
+    Serial.printf("[OTA] SSID='%s' | PASS='%s' | OTA='%s'\n", ssid, pass, otaPass);
     WiFi.begin(ssid, pass);
 
     uint32_t t0 = millis();
