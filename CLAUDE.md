@@ -362,6 +362,19 @@ Menú en display (Encoder push > 3s):
 
 **Placa:** GUITION JC4880P433C (ESP32-P4)
 
+### Pinout definitivo P4
+
+| Función | GPIO |
+|---|---|
+| RS485 TX | 50 |
+| RS485 RX | 51 |
+| RS485 EN | 52 |
+| NeoTrellis SDA | 33 |
+| NeoTrellis SCL | 31 |
+| Touch SDA (GT911) | 7 |
+| Touch SCL (GT911) | 8 |
+| Display MIPI-DSI | Integrado placa |
+
 ### Display
 - ST7701S MIPI-DSI 2-lane, 480×800 portrait
 - LVGL v9
@@ -391,6 +404,24 @@ Menú en display (Encoder push > 3s):
 ## Hardware S3 (Extender)
 
 **Chip:** ESP32-S3 | **Familia Mackie:** 0x14 | **Slaves:** 8 (IDs 1–8)
+
+### Pinout definitivo S3
+
+| Función | GPIO |
+|---|---|
+| RS485 TX | 15 |
+| RS485 RX | 16 |
+| RS485 EN | 1 |
+| LED REC | 12 |
+| BTN REC | 11 |
+| LED PLAY | 10 |
+| BTN PLAY | 9 |
+| LED FF | 8 |
+| BTN FF | 7 |
+| LED STOP | 6 |
+| BTN STOP | 5 |
+| LED RW | 4 |
+| BTN RW | 3 |
 
 ### RS485 (bus B)
 - TX=GPIO15, RX=GPIO16, EN=GPIO1
