@@ -21,13 +21,16 @@ Referencia única de componentes, flujos MIDI, RS485, y puntos críticos.
 - No importa si es un cambio "pequeño" o "obvio" — SIEMPRE explica primero
 - Esta regla es VINCULANTE en cada nuevo chat
 
-**TODOS LOS CAMBIOS DOCUMENTADOS DEBEN INCLUIR FECHA Y HORA. (2026-05-04 19:20)**
-
+**Documentación — Fecha y hora obligatorios (2026-05-04 19:20):**
 - Cuando documentes cambios en CLAUDE.md o en comentarios de código: **SIEMPRE incluye fecha + hora**
 - Formato: `(YYYY-MM-DD HH:MM)` ejemplo: `(2026-05-04 14:30)`
 - Si un cambio está documentado sin fecha/hora, **cuestiona su validez antes de aplicarlo**
 - La fecha/hora permite rastrear evolución y correlacionar con commits/sesiones
 - Sin fecha, el cambio es inútil para auditoría y debugging futuro
+
+**Commits a GitHub:**
+- Cuando el usuario dice **"commit"** o **"commitea"** = **git commit + git push** automático
+- No es solo guardar local — es guardar + subir a GitHub en una operación
 
 ---
 
@@ -672,6 +675,7 @@ Implementado en `Transporte::setLedByNote()`.
 - Logic es la única fuente de verdad para estados de botones — S2 nunca hace toggle local
 - Un proyecto PlatformIO por variante MCU — `config.h` de S3/S2 son independientes
 - No tocar código sin ver primero los ficheros reales
+- **Documentación:** Siempre incluir **fecha + hora** en investigaciones, bugs, hallazgos y cambios de arquitectura. Formato: `YYYY-MM-DD HH:MM` (ej: `2026-05-04 18:57`). Ayuda a correlacionar con commits, iteraciones y evolución del problema.
 
 ---
 
