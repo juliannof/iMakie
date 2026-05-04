@@ -132,7 +132,7 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 - 500 kbaud, protocolo binario custom, CRC8
 - `Serial1.setRxBufferSize()` **antes** de `Serial1.begin()`
 - `sendResponse()` inmediatamente después de recibir paquete — antes de display/neopixel/motor
-- `vTaskDelay(1)` en estados WAIT_RESP y GAP para no matar Core 1
+- `vTaskDelay(1)` en estados WAIT_RESP y GAP para yield a otras tareas (S2 es single-core)
 
 ### WiFi / OTA
 - Credenciales: WiFi SSID: `Julianno-WiFi` | WiFi Pass: `JULIANf1`
