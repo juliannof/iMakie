@@ -472,6 +472,24 @@ Menú en display (Encoder push > 3s):
 
 ---
 
+## Versión Firmware S2
+
+### **FW 0.0.2 (2026-05-04 ~18:30)**
+
+**Cambios incluidos:**
+- GPIO33 pulso RST obligatorio antes de `tft.init()` — fix display en 5 unidades
+- NVS Validator: valida y corrige WiFi credentials automáticamente (sin reinicio)
+- WiFi credentials configurables en `config.h`: SSID, password, OTA password
+- Splash screen: círculo verde (NVS válido) o rojo (corrupto)
+- OTA WiFi sin `Update.abort()` — fix "Connection reset by peer"
+- Splash screen reposicionado centrado verticalmente
+
+**Commits:** 7ac20d0, f47cbbd, 5eedcde, 0f9e092, c7e8ae1, 96e6227
+
+**Estado:** Compilable, pronto para testear con 7 unidades pendientes
+
+---
+
 ## Pendientes ordenados por complejidad (S3 → P4 → S2 → Cross-system)
 
 ### S3 Extender
