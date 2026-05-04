@@ -79,14 +79,15 @@
 ---
 
 ### **FADER TOUCH**
-**Estado:** EN DESARROLLO
+**Estado:** EN DESARROLLO (roto con plástico)
 
 #### Bugs
-(ninguno)
+- **No detecta con plástico** — Detección funciona perfecto sin plástico, pero con plástico real no detecta toque. Threshold demasiado bajo o atenuación del plástico no calculada.
 
 #### Pendientes
-- Validar con plástico real (perfecto sin plástico actualmente)
-- Ajustar thresholds si es necesario tras validación
+- Investigar atenuación del plástico y ajustar thresholds
+- Posible: aumentar sensitivity, recalibrar baseline con plástico presente
+- Validar solución con hardware real
 
 #### Detalles técnicos
 - Detección por sostenimiento: raw > baseline×1.015 sostenido > 6 frames (120ms) = TOQUE
