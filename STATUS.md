@@ -97,13 +97,15 @@
 ---
 
 ### **MOTOR**
-**Estado:** funcional post-calibración
+**Estado:** no funciona
 
 #### Bugs
-(ninguno)
+- **Motor no funciona** — No responde a comandos. Investigar DRV8833 driver, GPIO control (IN1, IN2, PWM), y secuencia de init.
 
 #### Pendientes
-(ninguno)
+- Verificar GPIO IN1 (GPIO14), IN2 (GPIO16), PWM (GPIO18)
+- Investigar init: analogWrite vs ledcAttach/ledcWrite
+- Validar calibración secuencia
 
 #### Detalles técnicos
 - Driver DRV8833: IN1=GPIO14, IN2=GPIO16 (dirección), PWM=GPIO18 (analogWrite)
