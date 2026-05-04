@@ -142,37 +142,6 @@ void drawSplashScreen() {
     tft.drawString(verBuf, TFT_WIDTH / 2, 95);
     tft.drawString(FW_BUILD_ID, TFT_WIDTH / 2, 110);
 
-    // Hardware Status (0=Rojo, 1=Naranja, 2=Blanco)
-    tft.setFont(nullptr);
-    tft.setTextFont(1);
-    tft.setTextSize(0);
-
-    const char* hwStatus = HW_STATUS;
-    const char* hwLabels[] = {
-        "Motor",
-        "RS485",
-        "Display",
-        "ADC",
-        "Fader",
-        "TouchFader",
-        "NeoPixels",
-        "Touch",
-        "Encoder",
-        "Buttons"
-    };
-
-    int y = 128;
-    for (int i = 0; i < 10; i++) {
-        uint16_t color = (hwStatus[i] == '2') ? TFT_WHITE :
-                        (hwStatus[i] == '1') ? TFT_ORANGE : TFT_RED;
-        tft.setTextColor(color);
-
-        char line[48];
-        snprintf(line, sizeof(line), "%s=%c", hwLabels[i], hwStatus[i]);
-        tft.drawString(line, TFT_WIDTH / 2, y);
-        y += 13;
-    }
-
     // Círculo verde al pie si NVS pasó test
     tft.fillCircle(TFT_WIDTH / 2, TFT_HEIGHT - 15, 6, TFT_GREEN);
 }
