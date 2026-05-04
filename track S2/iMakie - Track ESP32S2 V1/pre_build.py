@@ -3,7 +3,7 @@ import datetime
 import re
 
 now = datetime.datetime.now()
-fw_ver   = "0.0.1"
+fw_ver   = "0.0.2"
 ver_comp = fw_ver.replace(".", "")
 build_id = now.strftime("%Y%m%d.%H%M") + f".{ver_comp}"
 
