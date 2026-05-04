@@ -127,23 +127,23 @@ void drawSplashScreen() {
 
     tft.setFont(&fonts::FreeSans24pt7b);
     tft.setTextColor(TFT_WHITE);
-    tft.drawString("iMakie", TFT_WIDTH / 2, 40);
+    tft.drawString("iMakie", TFT_WIDTH / 2, 70);
 
     tft.setFont(&fonts::FreeSans12pt7b);
     tft.setTextColor(TFT_MCU_GRAY);
     char buf[16];
     snprintf(buf, sizeof(buf), "Track %d", trackId);
-    tft.drawString(buf, TFT_WIDTH / 2, 70);
+    tft.drawString(buf, TFT_WIDTH / 2, 95);
 
     tft.setFont(&fonts::FreeSans9pt7b);
     tft.setTextColor(TFT_WHITE);
     char verBuf[32];
     snprintf(verBuf, sizeof(verBuf), "FW %s", FW_VERSION);
-    tft.drawString(verBuf, TFT_WIDTH / 2, 95);
-    tft.drawString(FW_BUILD_ID, TFT_WIDTH / 2, 110);
+    tft.drawString(verBuf, TFT_WIDTH / 2, 125);
+    tft.drawString(FW_BUILD_ID, TFT_WIDTH / 2, 140);
 
     // Círculo verde al pie si NVS pasó test
-    tft.fillCircle(TFT_WIDTH / 2, TFT_HEIGHT - 15, 6, TFT_GREEN);
+    tft.fillCircle(TFT_WIDTH / 2, 200, 6, TFT_GREEN);
 }
 
 
