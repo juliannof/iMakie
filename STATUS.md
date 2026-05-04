@@ -374,7 +374,36 @@
 
 ## Cross-system
 
-### Pendientes Cross-system
-14. RS485: verificar pines en S3 (legacy) y P4 (TX=50, RX=51, EN=52) — confirmar que ambos compilan y funcionan correctamente
-15. LEDs NeoPixel master: implementar control de brillo centralizado — estudiar si viable vía MIDI (CC o SysEx dedicado) para controlar brillo de todos los slaves desde Logic/P4
+### **RS485 BUSES**
+**Estado:** funcional (verificación pendiente)
+
+#### Bugs
+(ninguno)
+
+#### Pendientes
+- Verificar pines en P4 (TX=50, RX=51, EN=52) — confirmar compilación y funcionamiento
+- Verificar pines en S3 (legacy TX=15, RX=16, EN=1) — confirmar compilación y funcionamiento
+
+#### Detalles técnicos
+- Bus A (P4 Master): 9 slaves S2 (IDs 1–9)
+- Bus B (S3 Extender): 8 slaves S2 (IDs 1–8)
+- Ambos buses: 500 kbaud, protocolo binario custom, CRC8
+- Topología star: master → slaves, timeouts y retransmisiones
+
+---
+
+### **NEOPIXEL MASTER**
+**Estado:** sin implementar
+
+#### Bugs
+(ninguno)
+
+#### Pendientes
+- Implementar control de brillo centralizado — estudiar si viable vía MIDI (CC o SysEx dedicado)
+- Permite controlar brillo de todos los slaves desde Logic/P4
+
+#### Detalles técnicos
+- Cada slave S2 tiene 12 × WS2812B (NeoPixels)
+- Master debe poder enviar comandos de brillo via MIDI o protocolo RS485
+- Posibles enfoques: CC dedicado (CC 7?) o SysEx custom
 
