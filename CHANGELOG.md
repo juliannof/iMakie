@@ -8,6 +8,23 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 ## [Unreleased]
 
 ### Changed
+- **S2 MOTOR — Orden inicialización PWM: pinMode → frequency/resolution → analogWrite (2026-05-09 23:45)**
+  - HIPÓTESIS: Motor.cpp::init() ponía `analogWrite()` ANTES de `analogWriteFrequency/Resolution`
+  - analogWrite() hace attach implícito con frecuencia default, luego frequency() no tiene efecto
+  - CAMBIO: Restaurar orden correcto: pinMode → frequency/resolution → LUEGO analogWrite
+  - ESPERADO: PWM a 20kHz funcione (vs frecuencia default mucho menor)
+  - TESTING REQUERIDO: Compilar + calibración (rango ADC debe ser 0-8191, no 24-26)
+  - Commit: `0305c6a`
+
+- **S2 MOTOR — Variables de estado centralizadas en config.h (2026-05-09 23:45)**
+  - CalibPhase enum: IDLE, KICK_UP, GOING_UP, SETTLE_UP, KICK_DOWN, GOING_DOWN, SETTLE_DOWN, DONE, ERROR
+  - Variables calibración: _phase, _phaseStart, _calibStart, _calibMinDetect, _stableStart, _stableRef
+  - Variables ADC: _adcTop, _adcMin, _adcMax, _adcSpan, _adcPos, _targetADC, _lastMidiTarget
+  - Variables noise: _settleMin, _settleMax, _noiseTopSpan
+  - Variables control: _motorActive, _currentPWM
+  - Motor.cpp simplificado: solo lógica, no variables de estado
+  - Commit: `0305c6a`
+
 - **S2 FADER — ADS1115 se hace obligatorio (2026-05-09)**
   - Eliminados TODOS los `#ifdef USE_ADS1015` del código
   - ADC nativo (GPIO10, 13-bit) descartado permanentemente
