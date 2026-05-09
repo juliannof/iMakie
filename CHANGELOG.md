@@ -8,7 +8,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 ## [Unreleased]
 
 ### Changed
-- **S2 FADER — ADS1115 devient obligatoire (2026-05-09 23:15)**
+- **S2 FADER — ADS1115 se hace obligatorio (2026-05-09)**
   - Eliminados TODOS los `#ifdef USE_ADS1015` del código
   - ADC nativo (GPIO10, 13-bit) descartado permanentemente
   - Entorno default: `lolin_s2_mini` (ADS1115) con librerías ADS1X15 + BusIO
@@ -19,7 +19,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ### Added
 - **S2 FADER — ADS1115 I2C ADC (Fase 1)** (2026-05-09)
-  - ISR ALERT/RDY en IO34 — no polling, 860 SPS continuo
+  - ISR ALERT/RDY en GPIO17 — no polling, 860 SPS continuo
   - Buffer circular 256 muestras con timestamp (no-bloqueante)
   - GAIN_ONE (±4.096V) para rango 3.3V directo
   - Función `dumpAdsLog()` para análisis CSV de ruido
@@ -27,24 +27,24 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ### Modified
 - **platformio.ini:** Nuevo entorno `lolin_s2_mini_ads` con libs ADS1X15 + BusIO; eliminado `extends` (2026-05-09)
-- **config.h:** Defines ADS (SDA=21, SCL=17, ALERT=34, addr=0x48) bajo guardia
+- **config.h:** Defines ADS (SDA=21, SCL=34, ALERT=17, addr=0x48) bajo guardia
 - **protocol.h:** Comentario `faderPos` documentado para dual-mode 13/16-bit
-- **FaderADC.h:** Estructura dual ADS/ADC con includes, miembros, ISR bajo guardias
+- **FaderADC.h:** Estructura con Adafruit_ADS1115, TwoWire I2C, ISR ALERT/RDY
 - **FaderADC.cpp:** ISR definition, `begin()`, `update()`, `measureRange()`, `dumpAdsLog()`
-- **main.cpp:** Diagnóstico ADS1115 periódico (cada 500ms) en loop; log: `[ADS] raw=X pos=X` (2026-05-09 14:15)
+- **main.cpp:** Diagnóstico ADS1115 periódico (cada 500ms) en loop; log: `[ADS] raw=X pos=X`
 
 ### Fixed
-- **S2 FADER — ALERT pin trigger FALLING (2026-05-09 23:30)**
+- **S2 FADER — ALERT pin trigger FALLING (2026-05-09)**
   - ADS1115 ALERT/RDY es activo-bajo: HIGH (reposo) → LOW (dato) = **FALLING**, no RISING
   - FaderADC.cpp usaba RISING → ISR nunca se disparaba → `_newData` siempre false
   - Motor nunca recibía posición → completamente ciego
   - Cambio: attachInterrupt(..., FALLING) — una línea, efecto crítico
   - Commit: `386765f`
 
-- **S2 FADER — measureRange() bloqueante documentado (2026-05-09 23:35)**
+- **S2 FADER — measureRange() bloqueante documentado (2026-05-09)**
   - `measureRange()` espera 5s en loop cerrado (S2 single-core)
   - Impacto: SAT menu congelado, RS485 timeout, Master marca slave NO_CALIBRATED
-  - Decisión: Documentar (no refactorizar por ahora)
+  - Decisión: Documentar impacto (no refactorizar por ahora)
   - Restricción: SOLO usar en diagnóstico excepcional, NUNCA durante operación/calibración
   - Documentación: FaderADC.h, FaderADC.cpp (comentarios), SatMenu.cpp (warning)
   - Commit: `bbddaa0`
