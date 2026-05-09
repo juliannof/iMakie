@@ -77,7 +77,7 @@ static_assert(sizeof(MasterPacket) == 16, "MasterPacket debe ser 16 bytes");
 struct __attribute__((packed)) SlavePacket {
     uint8_t  header;        // 0xBB
     uint8_t  id;            // MY_SLAVE_ID
-    uint16_t faderPos;      // FaderADC 0-8191
+    uint16_t faderPos;      // 0-8191 (ADC nativo) o 0-32767 (ADS1115 raw). Masters (P4/S3) mapean → 0-14848
     uint8_t  touchState;    // 0=libre 1=tocado
     uint8_t  buttons;       // FLAG_REC | FLAG_SOLO | FLAG_MUTE | FLAG_SELECT
     int8_t   encoderDelta;  // rotación acumulada (-127..+127)

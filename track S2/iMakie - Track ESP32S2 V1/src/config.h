@@ -63,6 +63,14 @@ enum class ConnectionState {
 // Porcentaje del valor base táctil para el umbral de detección (80% significa que detecta si el valor cae por debajo del 80% del valor base).
 #define FADER_TOUCH_THRESHOLD_PERCENTAGE 0.7
 
+// --- ADS1115 (I2C ADC externo) ---
+#ifdef USE_ADS1015
+  #define ADS_SDA_PIN     21
+  #define ADS_SCL_PIN     17
+  #define ADS_ALERT_PIN   34
+  #define ADS_I2C_ADDR    0x48
+#endif
+
 #define MOTOR_IN1    18
 #define MOTOR_IN2    16
 #define MOTOR_EN     14
