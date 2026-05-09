@@ -53,10 +53,6 @@ enum class ConnectionState {
 #define RS485_START_BYTE      0xAA
 #define RS485_RESP_BYTE       0xBB
 
-// Fader
-#define FADER_POT_PIN    10   // ADC1_CH9 — sin cambio
-#define FADER_VCC_PIN    17   // DAC_CHANNEL_1 — GPIO17, salida ~1.0V (77/255×3.3V)
-                              // API: dac_output_enable / dac_output_voltage — NO dacWrite()
 
 // --- SENSOR TÁCTIL DEL FADER ---
 #define FADER_TOUCH_PIN     T1 // Pin táctil para el fader (GPIO1 en ESP32-S2)
@@ -64,12 +60,10 @@ enum class ConnectionState {
 #define FADER_TOUCH_THRESHOLD_PERCENTAGE 0.7
 
 // --- ADS1115 (I2C ADC externo) ---
-#ifdef USE_ADS1015
-  #define ADS_SDA_PIN     21
-  #define ADS_SCL_PIN     17
-  #define ADS_ALERT_PIN   34
-  #define ADS_I2C_ADDR    0x48
-#endif
+#define ADS_SDA_PIN     21
+#define ADS_SCL_PIN     34
+#define ADS_ALERT_PIN   17
+#define ADS_I2C_ADDR    0x48
 
 #define MOTOR_IN1    18
 #define MOTOR_IN2    16
@@ -97,8 +91,8 @@ static uint16_t _posicionMaximaADC       = 0;
 
 // ─── FaderADC ─────────────────────────────────────────────────
 #define NOISE_WINDOW_SIZE     8
-#define NOISE_K_MOVE          3.0f    // diff > K×span → movimiento real
-#define NOISE_K_MICRO         0.3f    // diff > K×span → micro-ajuste
+#define NOISE_K_MOVE          3.0f
+#define NOISE_K_MICRO         0.3f
 #define FADER_EMA_ALPHA_FAST  0.20f
 
 // ─── Motor — calibración ──────────────────────────────────────

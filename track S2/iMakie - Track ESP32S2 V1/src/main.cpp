@@ -124,26 +124,6 @@ void setup() {
     Serial.printf("\n[BOOT] FW_VERSION=%s FW_BUILD_ID=%d\n", FW_VERSION, FW_BUILD_ID);
     Serial.flush();
 
-#ifdef USE_ADS1015
-    // Validación I2C — confirmar ADS1115 en 0x48
-    delay(100);
-    TwoWire testI2c = TwoWire(1);
-    testI2c.begin(ADS_SDA_PIN, ADS_SCL_PIN);
-    testI2c.setClock(100000);
-
-    byte error;
-    testI2c.beginTransmission(ADS_I2C_ADDR);
-    error = testI2c.endTransmission();
-
-    if (error == 0) {
-        log_i("[SETUP] ADS1115 detectado en I2C 0x%02X ✓", ADS_I2C_ADDR);
-    } else {
-        log_e("[SETUP] ADS1115 NO encontrado en 0x%02X ✗ — revisar pines SDA=%d SCL=%d",
-              ADS_I2C_ADDR, ADS_SDA_PIN, ADS_SCL_PIN);
-    }
-    testI2c.end();
-#endif
-
     // Detectar OTA-only mode
     Preferences prefs;
     prefs.begin("ptxx", true);
@@ -195,13 +175,6 @@ void setup() {
 
     otaManager.begin();
 
-#ifndef USE_ADS1015
-    // DAC para versión ADC nativa — pot a 2V
-    dac_oneshot_handle_t _dacHandle;
-    dac_oneshot_config_t _dacCfg = { .chan_id = DAC_CHAN_0 };
-    dac_oneshot_new_channel(&_dacCfg, &_dacHandle);
-    dac_oneshot_output_voltage(_dacHandle, 50);
-#endif
     delay(100);
     faderADC.begin();
     log_i("Fader iniciado.");
@@ -310,6 +283,12 @@ void loop() {
     FaderTouch::update();
 
     Motor::setADC(faderADC.getFaderPos());
+
+    static uint32_t lastLog = 0;
+    if (millis() - lastLog > 500) {
+        Serial.printf("[ADS] raw=%d pos=%d\n", faderADC.getRawLast(), faderADC.getFaderPos());
+        lastLog = millis();
+    }
 
     if (FaderTouch::isTouched()) {
         Motor::stop();

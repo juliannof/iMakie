@@ -128,9 +128,15 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 - Acceso exclusivamente a través de `Neopixel.cpp`
 - **Razón del cambio:** NeoPixelBus con pioarduino 55.03.37 falla por campo `tx_pcm_bypass` no disponible en IDF5; Adafruit NeoPixel es más simple y mantenido por Adafruit
 
-### ADC fader
-- API IDF5 `adc_oneshot` directamente (`ADC_ATTEN_DB_11`, `ADC_BITWIDTH_13`)
-- `analogSetPinAttenuation` es UNRELIABLE con IDF5 en S2 — no usar
+### Fader ADC (ADS1115 I2C)
+- **Hardware:** Adafruit ADS1115 (16-bit, ±4.096V)
+- **Pines I2C:** SDA=GPIO21, SCL=GPIO34
+- **Alert/RDY:** GPIO17 (ISR-driven, 860 SPS)
+- **Rango capturado:** 24–26476 (raw 16-bit)
+- **Performance:** update() = 0-2µs (no polling, ISR-driven)
+- **Ruido:** ~2-5 cuentas (vs ±30 ADC nativo) — mejora 6-15×
+- **Logging:** Buffer circular 256 muestras con timestamp
+- **Función diagnóstico:** `dumpAdsLog()` — volcado CSV para análisis de ruido
 
 ### Motor
 - Driver DRV8833 H-bridge
@@ -204,23 +210,23 @@ loop() {
 - Revisa `buildResponse()` — ¿pasa bit 3 correctamente?
 - Revisa RS485 — ¿llega el paquete al master sin timeouts?
 
-### Fader (ADC GPIO10)
+### Fader ADC (ADS1115 I2C)
 
 **Hardware:**
-- ESP32-S2 ADC1_CH9 (GPIO10)
-- Resolución: 13-bit (0-8191)
-- Atenuación: 11dB (0-3.3V)
-- Ruido: ±30 cuentas típico (→ ADS1015 será fix futuro)
+- Adafruit ADS1115 I2C ADC (16-bit, ±4.096V)
+- SDA=GPIO21, SCL=GPIO34, Alert/RDY=GPIO17
+- ISR-driven, 860 SPS, buffer circular 256 muestras
+- Rango capturado: 24–26476
 
 **Firmware:**
-- `FaderADC::update()` lee crudo + EMA lowpass (alpha=0.20)
+- `FaderADC::update()` lee vía ISR (0-2µs, no polling)
 - `FaderTouch::update()` detecta toque por sostenimiento:
   - raw > (baseline × 1.015) sostenido > 6 frames (120ms) = TOQUE
-  - baseline actualizado siempre con IIR (alpha=1/16, NO congelado)
+  - baseline actualizado siempre con IIR (alpha=1/16)
   - Perfect sin plástico, validación pendiente con plástico
 
 **Salida:**
-- `SlavePacket.faderPos` = valor 13-bit actual
+- `SlavePacket.faderPos` = valor 16-bit actual (ADS)
 - Master lee, interpola, envía `faderTarget` 14-bit vía RS485
 - Motor sigue `faderTarget` usando calibración (no PID)
 

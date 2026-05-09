@@ -7,10 +7,18 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### Changed
+- **S2 FADER — ADS1115 devient obligatoire (2026-05-09 23:15)**
+  - Eliminados TODOS los `#ifdef USE_ADS1015` del código
+  - ADC nativo (GPIO10, 13-bit) descartado permanentemente
+  - Entorno default: `lolin_s2_mini` (ADS1115) con librerías ADS1X15 + BusIO
+  - platformio.ini consolidado: Serial y OTA ahora usan ADS
+  - FaderADC simplificado: solo rama ADS, sin compilación condicional
+  - config.h limpiado: removed `FADER_POT_PIN`, `FADER_VCC_PIN`, `NOISE_WINDOW_SIZE`, `FADER_EMA_ALPHA_FAST`
+  - main.cpp: removed DAC setup (`#ifndef USE_ADS1015`), diagnóstico ADS incondicional
+
 ### Added
 - **S2 FADER — ADS1115 I2C ADC (Fase 1)** (2026-05-09)
-  - Implementación dual-mode: ADC nativo (13-bit) vs ADS1115 (16-bit)
-  - Compilación condicional: entorno `lolin_s2_mini_ads` con `-DUSE_ADS1015`
   - ISR ALERT/RDY en IO34 — no polling, 860 SPS continuo
   - Buffer circular 256 muestras con timestamp (no-bloqueante)
   - GAIN_ONE (±4.096V) para rango 3.3V directo
@@ -18,12 +26,12 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
   - Validación I2C en setup() — log automático de detección
 
 ### Modified
-- **platformio.ini:** Nuevo entorno `lolin_s2_mini_ads` con libs ADS1X15 + BusIO
+- **platformio.ini:** Nuevo entorno `lolin_s2_mini_ads` con libs ADS1X15 + BusIO; eliminado `extends` (2026-05-09)
 - **config.h:** Defines ADS (SDA=21, SCL=17, ALERT=34, addr=0x48) bajo guardia
 - **protocol.h:** Comentario `faderPos` documentado para dual-mode 13/16-bit
 - **FaderADC.h:** Estructura dual ADS/ADC con includes, miembros, ISR bajo guardias
 - **FaderADC.cpp:** ISR definition, `begin()`, `update()`, `measureRange()`, `dumpAdsLog()`
-- **main.cpp:** DAC guardia + validación I2C en setup()
+- **main.cpp:** Diagnóstico ADS1115 periódico (cada 500ms) en loop; log: `[ADS] raw=X pos=X` (2026-05-09 14:15)
 
 ### Technical Notes
 - **Resolución:** ADS 16-bit (0-32767) sin escalado FP → P4/S3 mapean a 0-14848
