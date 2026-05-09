@@ -3,21 +3,25 @@
 
 // ─── Hardware — sin lógica de estado ──────────────────────────
 static void _hwBrake() {
+    log_d("[HW] BRAKE");
     digitalWrite(MOTOR_EN, HIGH);
     analogWrite(MOTOR_IN1, 255);
     analogWrite(MOTOR_IN2, 255);
 }
 static void _hwOff() {
+    log_d("[HW] OFF");
     digitalWrite(MOTOR_EN, LOW);
     analogWrite(MOTOR_IN1, 0);
     analogWrite(MOTOR_IN2, 0);
 }
 static void _hwUp(uint8_t pwm) {
+    log_d("[HW] UP pwm=%d", pwm);
     digitalWrite(MOTOR_EN, HIGH);
     analogWrite(MOTOR_IN2, 0);
     analogWrite(MOTOR_IN1, pwm);
 }
 static void _hwDown(uint8_t pwm) {
+    log_d("[HW] DOWN pwm=%d", pwm);
     digitalWrite(MOTOR_EN, HIGH);
     analogWrite(MOTOR_IN1, 0);
     analogWrite(MOTOR_IN2, pwm);
@@ -230,8 +234,8 @@ void init() {
     // Attach LEDC con duty=0 explícito ANTES de configurar frecuencia
     //    Si analogWriteFrequency va primero, el duty inicial es indeterminado
     digitalWrite(MOTOR_EN,  LOW);
-    //analogWrite(MOTOR_IN1, 0);   // attach + duty=0 garantizado
-    //analogWrite(MOTOR_IN2, 0);   // attach + duty=0 garantizado
+    analogWrite(MOTOR_IN1, 0);   // attach + duty=0 garantizado
+    analogWrite(MOTOR_IN2, 0);   // attach + duty=0 garantizado
 
     // Ahora frecuencia y resolución — el duty ya está en 0, no cambia
     analogWriteFrequency(MOTOR_IN1, 20000);

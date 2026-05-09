@@ -172,6 +172,7 @@ void setup() {
     // }
 
     drawSplashScreen();
+    setScreenBrightness(255);
 
     otaManager.begin();
 
@@ -230,7 +231,7 @@ void setup() {
     log_i("Track ID: %d", slaveId);
     rs485.begin(slaveId);
 
-    setScreenBrightness(255);
+    
 
     // ⚠️ TEMPORAL: Auto-calibración sin S3 (testing únicamente)
     // En producción, S3 enviará FLAG_CALIB vía RS485
