@@ -93,9 +93,6 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 | Encoder A | 12 |
 | Encoder B | 13 |
 | Encoder BTN | 21 |
-| Motor IN1 | 14 |
-| Motor IN2 | 16 |
-| Motor PWM | 18 |
 | Display SCLK | 7 |
 | Display MOSI | 4 |
 | Display DC | 6 |
@@ -232,9 +229,18 @@ loop() {
 
 ### Motor (DRV8833 H-bridge)
 
+**<u>DEBUGGING (2026-05-10 00:15): Motor NO responde en ningún caso (calibración ni control)</u>**
+- Síntoma: Motor completamente inmóvil
+- Driver funciona (verificado)
+- Causa desconocida: posible fallo EN (GPIO14), IN1/IN2 no se configuran, o init() rompe pines
+- **Investigación pendiente con osciloscopio en EN/IN1/IN2**
+
+**<u>FIX (2026-05-09 23:50): _hwUp() y _hwDown() invertidos — UP=IN2 PWM, DOWN=IN1 PWM</u>**
+
 **Control:**
-- IN1=GPIO14, IN2=GPIO16 (dirección via digitalWrite)
-- PWM=GPIO18 (analogWrite 0-255)
+- MOTOR_EN=GPIO14 (nSLEEP pin)
+- MOTOR_IN1=GPIO18 (control, puede PWM)
+- MOTOR_IN2=GPIO16 (control, puede PWM)
 - Sensor: faderADC feedback
 
 **Estados calibración (máquina de estado):**

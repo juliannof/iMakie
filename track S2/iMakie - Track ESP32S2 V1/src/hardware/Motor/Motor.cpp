@@ -17,23 +17,16 @@ static void _hwOff() {
 static void _hwUp(uint8_t pwm) {
     log_i("[HW] UP pwm=%d", pwm);
     digitalWrite(MOTOR_EN, HIGH);
-    analogWrite(MOTOR_IN2, 0);
-    analogWrite(MOTOR_IN1, pwm);
+    analogWrite(MOTOR_IN1, 0);
+    analogWrite(MOTOR_IN2, pwm);
 }
 static void _hwDown(uint8_t pwm) {
     log_i("[HW] DOWN pwm=%d", pwm);
     digitalWrite(MOTOR_EN, HIGH);
-    analogWrite(MOTOR_IN1, 0);
-    analogWrite(MOTOR_IN2, pwm);
+    analogWrite(MOTOR_IN2, 0);
+    analogWrite(MOTOR_IN1, pwm);
 }
 
-// ─── Máquina de calibración ───────────────────────────────────
-enum class CalibPhase {
-    IDLE,
-    KICK_UP, GOING_UP, SETTLE_UP,
-    KICK_DOWN, GOING_DOWN, SETTLE_DOWN,
-    DONE, ERROR
-};
 
 
 // ─── Helper ───────────────────────────────────────────────────
