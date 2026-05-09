@@ -11,7 +11,7 @@ class FaderADC {
 public:
     void     begin();
     void     update();
-    void     measureRange();
+    void     measureRange();    // ⚠️ BLOQUEANTE 5s — RS485 timeout, motor desincronizado
     void     dumpAdsLog();
     uint16_t getFaderPos() const { return _faderPos; }
     int      getRawLast()  const { return _rawLast;  }
