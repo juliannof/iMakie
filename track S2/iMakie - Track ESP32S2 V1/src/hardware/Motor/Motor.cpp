@@ -3,25 +3,25 @@
 
 // ─── Hardware — sin lógica de estado ──────────────────────────
 static void _hwBrake() {
-    log_d("[HW] BRAKE");
+    log_i("[HW] BRAKE");
     digitalWrite(MOTOR_EN, HIGH);
     analogWrite(MOTOR_IN1, 255);
     analogWrite(MOTOR_IN2, 255);
 }
 static void _hwOff() {
-    log_d("[HW] OFF");
+    log_i("[HW] OFF");
     digitalWrite(MOTOR_EN, LOW);
     analogWrite(MOTOR_IN1, 0);
     analogWrite(MOTOR_IN2, 0);
 }
 static void _hwUp(uint8_t pwm) {
-    log_d("[HW] UP pwm=%d", pwm);
+    log_i("[HW] UP pwm=%d", pwm);
     digitalWrite(MOTOR_EN, HIGH);
     analogWrite(MOTOR_IN2, 0);
     analogWrite(MOTOR_IN1, pwm);
 }
 static void _hwDown(uint8_t pwm) {
-    log_d("[HW] DOWN pwm=%d", pwm);
+    log_i("[HW] DOWN pwm=%d", pwm);
     digitalWrite(MOTOR_EN, HIGH);
     analogWrite(MOTOR_IN1, 0);
     analogWrite(MOTOR_IN2, pwm);
