@@ -41,6 +41,14 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
   - Cambio: attachInterrupt(..., FALLING) — una línea, efecto crítico
   - Commit: `386765f`
 
+- **S2 FADER — measureRange() bloqueante documentado (2026-05-09 23:35)**
+  - `measureRange()` espera 5s en loop cerrado (S2 single-core)
+  - Impacto: SAT menu congelado, RS485 timeout, Master marca slave NO_CALIBRATED
+  - Decisión: Documentar (no refactorizar por ahora)
+  - Restricción: SOLO usar en diagnóstico excepcional, NUNCA durante operación/calibración
+  - Documentación: FaderADC.h, FaderADC.cpp (comentarios), SatMenu.cpp (warning)
+  - Commit: `bbddaa0`
+
 ### Technical Notes
 - **Resolución:** ADS 16-bit (0-32767) sin escalado FP → P4/S3 mapean a 0-14848
 - **Performance:** update() ADS = 0-2µs (vs 24ms ADC nativo) — no impacta loop() S2 single-core
