@@ -236,8 +236,6 @@ void setup() {
     // ⚠️ TEMPORAL: Auto-calibración sin S3 (testing únicamente)
     // En producción, S3 enviará FLAG_CALIB vía RS485
     // REMOVER cuando S3 esté disponible
-    Motor::startCalib();
-    log_i("[TEMP] Motor auto-calibración iniciada (sin S3 — testing)");
 
     log_i("=== BOOT completo | heap libre: %d bytes ===", ESP.getFreeHeap());
 }
@@ -246,6 +244,15 @@ void setup() {
 //  loop
 // =============================================================
 void loop() {
+    // ⚠️ TEMPORAL: Auto-calibración a los 30s del arranque (sin S3 — testing)
+    static uint32_t bootTime = millis();
+    static bool calibrated = false;
+    if (!calibrated && millis() - bootTime >= 30000) {
+        calibrated = true;
+        Motor::startCalib();
+        log_i("[TEMP] Motor auto-calibración iniciada (30s post-boot)");
+    }
+
     // OTA siempre tiene máxima prioridad, incluso si SAT está abierto
     if (satMenu && satMenu->isOpen()) {
         satMenu->update();
