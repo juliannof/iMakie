@@ -8,6 +8,24 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 ## [Unreleased]
 
 ### Changed
+- **S2 MOTOR — _hwUp() y _hwDown() invertidos (2026-05-10 00:15)**
+  - Hardware tiene pines invertidos: UP=IN2 PWM, DOWN=IN1 PWM
+  - Cambio: invertir lógica en ambas funciones
+  - Estado: compilado, debugging con osciloscopio en progreso
+  - Commit: `479f64b`
+
+- **S2 MOTOR — CalibPhase duplicado removido (2026-05-10 00:15)**
+  - CalibPhase enum estaba en Motor.cpp y config.h
+  - Removido de Motor.cpp (config.h es autoridad)
+  - Commit: `479f64b`
+
+### Bugs Encontrados
+- **S2 MOTOR — No responde en ningún caso (2026-05-10 00:15)**
+  - Motor completamente inmóvil: ni en calibración ni en control
+  - Driver funciona (verificado)
+  - Causa desconocida: posible fallo EN (GPIO14), pines no se configuran, o init() rompe pines
+  - Investigación: osciloscopio midiendo EN/IN1/IN2 en progreso
+  - Estado: BLOQUEADO - esperando resultados de medición
 - **S2 MOTOR — Orden inicialización PWM: pinMode → frequency/resolution → analogWrite (2026-05-09 23:45)**
   - HIPÓTESIS: Motor.cpp::init() ponía `analogWrite()` ANTES de `analogWriteFrequency/Resolution`
   - analogWrite() hace attach implícito con frecuencia default, luego frequency() no tiene efecto
