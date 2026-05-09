@@ -111,6 +111,36 @@ static constexpr int      DEAD_ZONE                = 100;
 static constexpr int      ADC_SPIKE_GUARD          = 500;     // salto máximo aceptado en setADC()
 static constexpr uint16_t MIDI_PB_MAX              = 16383;   // pitch bend 14-bit estándar
 
+// ─── Motor — variables de estado (máquina calibración) ────────
+enum class CalibPhase {
+    IDLE,
+    KICK_UP, GOING_UP, SETTLE_UP,
+    KICK_DOWN, GOING_DOWN, SETTLE_DOWN,
+    DONE, ERROR
+};
+
+static CalibPhase _phase          = CalibPhase::IDLE;
+static uint32_t   _phaseStart     = 0;
+static uint32_t   _calibStart     = 0;
+static uint32_t   _calibMinDetect = 0;
+static uint32_t   _stableStart    = 0;
+static int        _stableRef      = 0;
+
+static uint16_t   _adcTop         = 0;
+static uint16_t   _adcMin         = 0;
+static uint16_t   _adcMax         = 8191;
+static uint16_t   _adcSpan        = 8191;
+static uint16_t   _adcPos         = 0;
+static uint16_t   _targetADC      = 0;
+static uint16_t   _lastMidiTarget = 0;
+
+static uint16_t   _settleMin      = 8191;
+static uint16_t   _settleMax      = 0;
+static uint16_t   _noiseTopSpan   = 0;
+
+static bool       _motorActive    = false;
+static int        _currentPWM     = 0;
+
 // ─── FaderTouch — detección por varianza ──────────────────────
 static constexpr uint32_t TOUCH_VAR_THRESHOLD      = 150;     // ajustar con plástico puesto
 static constexpr int32_t  TOUCH_DELTA_THRESHOLD    = 40;      // shift de nivel sobre baseline

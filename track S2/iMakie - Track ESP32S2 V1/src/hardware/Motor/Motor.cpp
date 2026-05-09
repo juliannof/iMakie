@@ -9,7 +9,7 @@ static void _hwBrake() {
     analogWrite(MOTOR_IN2, 255);
 }
 static void _hwOff() {
-    log_i("[HW] OFF");
+    //log_i("[HW] OFF");
     digitalWrite(MOTOR_EN, LOW);
     analogWrite(MOTOR_IN1, 0);
     analogWrite(MOTOR_IN2, 0);
@@ -35,28 +35,6 @@ enum class CalibPhase {
     DONE, ERROR
 };
 
-static CalibPhase _phase          = CalibPhase::IDLE;
-static uint32_t   _phaseStart     = 0;
-static uint32_t   _calibStart     = 0;
-static uint32_t   _calibMinDetect = 0;
-static uint32_t   _stableStart    = 0;
-static int        _stableRef      = 0;
-
-static uint16_t   _adcTop         = 0;
-static uint16_t   _adcMin         = 0;
-static uint16_t   _adcMax         = 8191;
-static uint16_t   _adcSpan        = 8191;
-static uint16_t   _adcPos         = 0;
-static uint16_t   _targetADC      = 0;
-static uint16_t   _lastMidiTarget = 0;
-
-// ─── Noise measurement durante SETTLE ─────────────────────────
-static uint16_t   _settleMin      = 8191;
-static uint16_t   _settleMax      = 0;
-static uint16_t   _noiseTopSpan   = 0;
-
-static bool       _motorActive    = false;
-static int        _currentPWM     = 0;
 
 // ─── Helper ───────────────────────────────────────────────────
 static bool _isCalibrating() {
@@ -226,24 +204,24 @@ static void _positionTick() {
 namespace Motor {
 
 void init() {
-    // Dirección OUTPUT
+    // ORDEN CRÍTICO: pinMode → frecuencia/resolución → LUEGO attach/duty
     pinMode(MOTOR_EN,  OUTPUT);
     pinMode(MOTOR_IN1, OUTPUT);
     pinMode(MOTOR_IN2, OUTPUT);
 
-    // Attach LEDC con duty=0 explícito ANTES de configurar frecuencia
-    //    Si analogWriteFrequency va primero, el duty inicial es indeterminado
-    digitalWrite(MOTOR_EN,  LOW);
-    analogWrite(MOTOR_IN1, 0);   // attach + duty=0 garantizado
-    analogWrite(MOTOR_IN2, 0);   // attach + duty=0 garantizado
-
-    // Ahora frecuencia y resolución — el duty ya está en 0, no cambia
+    // Configurar frecuencia y resolución ANTES de analogWrite
+    // Si analogWrite va primero, hace attach implícito con valores default
+    // y analogWriteFrequency() ya no tiene efecto
     analogWriteFrequency(MOTOR_IN1, 20000);
     analogWriteFrequency(MOTOR_IN2, 20000);
     analogWriteResolution(MOTOR_IN1, 8);
     analogWriteResolution(MOTOR_IN2, 8);
 
-    // 5. Estado final
+    // Ahora inicializar PWM/EN en valores default
+    digitalWrite(MOTOR_EN, LOW);
+    analogWrite(MOTOR_IN1, 0);
+    analogWrite(MOTOR_IN2, 0);
+
     _hwOff();
     log_i("[MOTOR] init OK  IN1=%d IN2=%d EN=%d", MOTOR_IN1, MOTOR_IN2, MOTOR_EN);
 }
