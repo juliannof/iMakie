@@ -33,6 +33,14 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 - **FaderADC.cpp:** ISR definition, `begin()`, `update()`, `measureRange()`, `dumpAdsLog()`
 - **main.cpp:** Diagnóstico ADS1115 periódico (cada 500ms) en loop; log: `[ADS] raw=X pos=X` (2026-05-09 14:15)
 
+### Fixed
+- **S2 FADER — ALERT pin trigger FALLING (2026-05-09 23:30)**
+  - ADS1115 ALERT/RDY es activo-bajo: HIGH (reposo) → LOW (dato) = **FALLING**, no RISING
+  - FaderADC.cpp usaba RISING → ISR nunca se disparaba → `_newData` siempre false
+  - Motor nunca recibía posición → completamente ciego
+  - Cambio: attachInterrupt(..., FALLING) — una línea, efecto crítico
+  - Commit: `386765f`
+
 ### Technical Notes
 - **Resolución:** ADS 16-bit (0-32767) sin escalado FP → P4/S3 mapean a 0-14848
 - **Performance:** update() ADS = 0-2µs (vs 24ms ADC nativo) — no impacta loop() S2 single-core
