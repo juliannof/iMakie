@@ -21,7 +21,7 @@ void FaderADC::begin() {
 
     pinMode(ADS_ALERT_PIN, INPUT);
     attachInterrupt(digitalPinToInterrupt(ADS_ALERT_PIN),
-                    FaderADC::_alertISR, RISING);
+                    FaderADC::_alertISR, FALLING);
 
     _ads.startADCReading(ADS1X15_REG_CONFIG_MUX_SINGLE_0, /*continuous=*/true);
 
