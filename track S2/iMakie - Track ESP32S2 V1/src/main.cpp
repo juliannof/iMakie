@@ -217,6 +217,12 @@ void setup() {
     Motor::begin();
     log_i("Motor OK");
 
+    // ⚠️ TEMPORAL: Auto-calibración sin S3 (testing únicamente)
+    // En producción, S3 enviará FLAG_CALIB vía RS485
+    // REMOVER cuando S3 esté disponible
+    Motor::startCalib();
+    log_i("[TEMP] Motor auto-calibración iniciada (sin S3 — testing)");
+
     if (psramFound()) {
         log_i("PSRAM: %u KB total, %u KB libre",
             ESP.getPsramSize() / 1024, ESP.getFreePsram() / 1024);
