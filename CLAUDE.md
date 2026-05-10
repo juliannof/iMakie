@@ -37,6 +37,14 @@
 - Cambios de código se entregan sin compilación — el usuario compila en su máquina
 - Esta regla es ABSOLUTA e INVIOLABLE
 
+**⚠️ ADVERTENCIA — Motor Init Order (2026-05-10 20:45):**
+- **NUNCA usar analogWrite implícito para pines críticos (EN, IN1, IN2)**
+- **ORDEN CRÍTICO:** pinMode → ledcAttach → ledcWrite(0,0)
+- **EN (GPIO14) DEBE estar LOW** en init() — usar digitalWrite(MOTOR_EN, LOW) EXPLÍCITO
+- **Incidente:** Fader se disparó al boot por EN alto + IN1/IN2 flotantes → rompió 2 faders
+- Si cambias inicialización de motor: test en bench ANTES de desplegar
+- Resultado: 2 faders dañados, humano en riesgo — CRÍTICO
+
 **Código Moderno — Alineación con Stack de Librerías (2026-05-10 19:45):**
 - **Usar MISMAS APIs que las librerías del proyecto usan internamente**
 - LovyanGFX usa LEDC → Motor DEBE usar LEDC (no analogWrite)
