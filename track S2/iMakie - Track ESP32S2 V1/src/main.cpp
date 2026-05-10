@@ -215,9 +215,6 @@ void setup() {
     ButtonManager::begin(&tft, satMenu);
     log_i("ButtonManager OK");
 
-    Motor::begin();
-    log_i("Motor OK (comentado - reset en progreso)");
-
     if (psramFound()) {
         log_i("PSRAM: %u KB total, %u KB libre",
             ESP.getPsramSize() / 1024, ESP.getFreePsram() / 1024);
@@ -244,21 +241,6 @@ void setup() {
 //  loop
 // =============================================================
 void loop() {
-    // ⚠️ TEMPORAL: Prueba UP/DOWN a partir de los 6s del arranque
-    static uint32_t bootTime = millis();
-    static bool testStarted = false;
-
-    // A los 6s, iniciar test
-    if (!testStarted && millis() - bootTime >= 6000) {
-        testStarted = true;
-        log_i("[TEST] Iniciando prueba UP/DOWN a los 6s | PWM_MAX=%d", PWM_MAX);
-    }
-
-    // Ejecutar test continuamente
-    if (testStarted) {
-        Motor::testUpDown();
-    }
-
     // OTA siempre tiene máxima prioridad, incluso si SAT está abierto
     if (satMenu && satMenu->isOpen()) {
         satMenu->update();
