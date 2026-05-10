@@ -243,7 +243,7 @@ void setup() {
 
 // ─── TEST MODE (automático a 3s del boot) ─────────────────
 static unsigned long g_bootTime = 0;
-static bool g_testStarted = false;
+static bool g_testStarted = false;\nstatic bool g_calibStarted = false;
 static uint32_t g_testPhaseTime = 0;
 static int g_testPhase = 0;
 
@@ -328,10 +328,11 @@ void loop() {
 
     // ─── TEST MODE: inicia a 3s del boot ─────────────────────
     if (!g_testStarted && millis() - g_bootTime > 3000) {
-        if (!Motor::isCalibrated()) {
+        if (!g_calibStarted && !Motor::isCalibrated()) {
             Motor::startCalib();
+            g_calibStarted = true;
             log_i("[TEST] Iniciando calibración automática...");
-        } else {
+        } else if (Motor::isCalibrated() && !g_testStarted) {
             g_testStarted = true;
             g_testPhaseTime = millis();
             log_i("[TEST] Motor calibrado. Iniciando test de posiciones...");
