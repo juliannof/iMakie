@@ -7,6 +7,16 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### Changed
+- **S2 MOTOR + FADER — Auditoría exhaustiva (2026-05-10 15:02)**
+  - Motor.cpp: control ordering crítico, timestamp recapture en transiciones, dinámica PWM mapping
+  - FaderADC.cpp: 8 problemas corregidos — variable scope, tipo consistencia, validación de rango completa, bandera gotData
+  - FaderADC.h: eliminados campos muertos (_emaValue, _noiseSpan, _noiseWindow, _noiseHead), método _isTrending()
+  - FaderTouch.cpp: 8 problemas corregidos — baseline pausada durante toque, timestamp-based detección (frame-rate independent), touchRead() validado, fallback de baseline
+  - config.h: FADERTOUCH completada con constantes (TOUCH_POLL_MS, TOUCH_THR_*, TOUCH_SOSTENIMIENTO, etc.)
+  - Resultado: 210+ líneas de código muerto eliminadas, arquitectura simplificada, robusto a race conditions
+  - Commit: `534021d`
+
 ### Removed
 - **S2 MOTOR — Reset total: borrado Motor.h / Motor.cpp (2026-05-11 08:15)**
   - Razón: Código base defectuoso. Motor solo se mueve en un sentido.
