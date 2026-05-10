@@ -244,67 +244,46 @@ void setup() {
 //  loop
 // =============================================================
 void loop() {
-    // ⚠️ TEST SIMPLE: Ciclos UP/DOWN con protección de límites
+    // ⚠️ TEST SIMPLE: UP/DOWN solo resultado final
     static uint32_t bootTime = millis();
     static bool testStarted = false;
     static uint32_t testPhaseStart = 0;
     static bool isGoingUp = true;
-    static bool hitLimit = false;
+    static bool lastPhase = true;
 
     if (!testStarted && millis() - bootTime >= 6000) {
         testStarted = true;
         testPhaseStart = millis();
         isGoingUp = true;
-        hitLimit = false;
-        log_i("[TEST] Iniciado ciclos UP/DOWN con límites MIN=%d MAX=%d",
-              FADER_ADC_MIN, FADER_ADC_MAX);
+        log_i("[TEST] START");
     }
 
     if (testStarted) {
         uint16_t adc = Motor::getRawADC();
         bool atLimit = false;
 
-        // Protección: no pasar límites
         if (isGoingUp && adc >= FADER_ADC_MAX) {
-            if (!hitLimit) {
-                log_w("[TEST] ⚠️ LÍMITE MÁXIMO ALCANZADO: ADC=%d", adc);
-                hitLimit = true;
-            }
-            Motor::driveRaw(0);  // Parar motor
+            Motor::driveRaw(0);
             atLimit = true;
         } else if (!isGoingUp && adc <= FADER_ADC_MIN) {
-            if (!hitLimit) {
-                log_w("[TEST] ⚠️ LÍMITE MÍNIMO ALCANZADO: ADC=%d", adc);
-                hitLimit = true;
-            }
-            Motor::driveRaw(0);  // Parar motor
+            Motor::driveRaw(0);
             atLimit = true;
-        } else {
-            hitLimit = false;
         }
 
-        // Cambiar dirección cada 4 segundos (solo si no está en límite)
-        if (!atLimit && millis() - testPhaseStart >= 4000) {
+        if (!atLimit && millis() - testPhaseStart >= 5000) {
             isGoingUp = !isGoingUp;
             testPhaseStart = millis();
-            log_i("[TEST] Cambio de dirección: %s", isGoingUp ? "↑ SUBIENDO" : "↓ BAJANDO");
+            log_i("[TEST] %s", isGoingUp ? "UP" : "DOWN");
         }
 
-        // Enviar comando (si no está en límite)
         if (!atLimit) {
-            if (isGoingUp) {
-                Motor::driveRaw(100);  // Arriba
-            } else {
-                Motor::driveRaw(-100); // Abajo
-            }
+            Motor::driveRaw(isGoingUp ? 100 : -100);
         }
 
-        // Log cada 1s
+        // Log solo cambios cada 5s
         static uint32_t lastLog = 0;
-        if (millis() - lastLog > 1000) {
-            log_i("[TEST] %s ADC=%d (min=%d max=%d) %s",
-                  isGoingUp ? "↑" : "↓", adc, FADER_ADC_MIN, FADER_ADC_MAX,
-                  atLimit ? "⚠️ LÍMITE" : "");
+        if (millis() - lastLog > 5000) {
+            log_i("[TEST] ADC=%d", adc);
             lastLog = millis();
         }
     }
