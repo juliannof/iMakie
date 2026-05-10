@@ -240,40 +240,6 @@ void setup() {
     log_i("=== BOOT completo | heap libre: %d bytes ===", ESP.getFreeHeap());
 }
 
-// ─── Prueba motor UP/DOWN sin calibración ─────────────────────
-static void testMotorUpDown() {
-    static int testPhase = 0;  // 0 = UP to 75%, 1 = DOWN to 25%
-    static uint32_t lastLogTime = 0;
-
-    uint16_t currentADC = faderADC.getFaderPos();
-    uint16_t target75 = 23 + (26423 - 23) * 3 / 4;   // ~19866 (75%)
-    uint16_t target25 = 23 + (26423 - 23) * 1 / 4;   // ~6580 (25%)
-
-    if (testPhase == 0) {
-        Motor::driveRaw(PWM_MAX);
-        if (millis() - lastLogTime > 500) {
-            log_i("[TEST-UP] ADC=%d target75=%d", currentADC, target75);
-            lastLogTime = millis();
-        }
-        if (currentADC >= target75) {
-            testPhase = 1;
-            log_i("[TEST] ✓ Reached 75%% ADC=%d, switching to DOWN", currentADC);
-            lastLogTime = millis();
-        }
-    } else {
-        Motor::driveRaw(-PWM_MAX);
-        if (millis() - lastLogTime > 500) {
-            log_i("[TEST-DOWN] ADC=%d target25=%d", currentADC, target25);
-            lastLogTime = millis();
-        }
-        if (currentADC <= target25) {
-            testPhase = 0;
-            log_i("[TEST] ✓ Reached 25%% ADC=%d, switching to UP", currentADC);
-            lastLogTime = millis();
-        }
-    }
-}
-
 // =============================================================
 //  loop
 // =============================================================
@@ -290,7 +256,7 @@ void loop() {
 
     // Ejecutar test continuamente
     if (testStarted) {
-        testMotorUpDown();
+        Motor::testUpDown();
     }
 
     // OTA siempre tiene máxima prioridad, incluso si SAT está abierto

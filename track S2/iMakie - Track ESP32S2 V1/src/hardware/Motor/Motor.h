@@ -51,5 +51,7 @@ namespace Motor {
 
     void off();   // corte incondicional — usar en desconexión
 
+    // Prueba diagnóstico: sube a 75%, baja a 25%, repite
+    void testUpDown();
 
 } // namespace Motor                  

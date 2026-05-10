@@ -338,4 +338,37 @@ void driveRaw(int pwm) {
     else           _hwDown((uint8_t)constrain(-pwm, 0, 255));
 }
 
+void testUpDown() {
+    static int testPhase = 0;  // 0 = UP to 75%, 1 = DOWN to 25%
+    static uint32_t lastLogTime = 0;
+
+    uint16_t currentADC = _adcPos;
+    uint16_t target75 = 23 + (26423 - 23) * 3 / 4;   // ~19866 (75%)
+    uint16_t target25 = 23 + (26423 - 23) * 1 / 4;   // ~6580 (25%)
+
+    if (testPhase == 0) {
+        driveRaw(PWM_MAX);
+        if (millis() - lastLogTime > 500) {
+            log_i("[TEST-UP] ADC=%d target75=%d", currentADC, target75);
+            lastLogTime = millis();
+        }
+        if (currentADC >= target75) {
+            testPhase = 1;
+            log_i("[TEST] ✓ Reached 75%% ADC=%d, switching to DOWN", currentADC);
+            lastLogTime = millis();
+        }
+    } else {
+        driveRaw(-PWM_MAX);
+        if (millis() - lastLogTime > 500) {
+            log_i("[TEST-DOWN] ADC=%d target25=%d", currentADC, target25);
+            lastLogTime = millis();
+        }
+        if (currentADC <= target25) {
+            testPhase = 0;
+            log_i("[TEST] ✓ Reached 25%% ADC=%d, switching to UP", currentADC);
+            lastLogTime = millis();
+        }
+    }
+}
+
 } // namespace Motor
