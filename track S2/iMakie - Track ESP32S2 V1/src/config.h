@@ -76,6 +76,10 @@ static uint32_t _ultimoTiempoEstable     = 0;
 static int      _ultimoValorEstable      = 0;
 static uint16_t _posicionMaximaADC       = 0;
 
+// Calibración (valores aproximados — ajustar con autocalibración)
+#define FADER_ADC_MIN       23  // leer real en 0%
+#define FADER_ADC_MAX      26423   // leer real en 100%
+
 // ─── ButtonManager — SAT long press ──────────────────────────
 #define SAT_HOLD_MS      3000   // tiempo para abrir SAT
 #define SAT_BAR_SHOW_MS  2500   // tiempo antes de mostrar barra
@@ -85,9 +89,7 @@ static uint16_t _posicionMaximaADC       = 0;
 #define SAT_BAR_CY       140
 #define SAT_LABEL_Y      (SAT_BAR_CY - 16)
 
-// Calibración (valores aproximados — ajustar con autocalibración)
-#define FADER_ADC_MIN       768  // leer real en 0%
-#define FADER_ADC_MAX      4090   // leer real en 100%
+
 
 // ─── FaderADC ─────────────────────────────────────────────────
 #define NOISE_WINDOW_SIZE     8

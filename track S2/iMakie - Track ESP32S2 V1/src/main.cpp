@@ -244,27 +244,42 @@ void setup() {
 //  loop
 // =============================================================
 void loop() {
-    // ⚠️ TEMPORAL: Auto-calibración continua a partir de los 6s del arranque (debugging motor)
+    // ⚠️ TEST SIMPLE: Ciclos UP/DOWN a partir de los 6s
     static uint32_t bootTime = millis();
-    static bool calibStarted = false;
-    static auto lastCalibState = Motor::CalibState::IDLE;
+    static bool testStarted = false;
+    static uint32_t testPhaseStart = 0;
+    static bool isGoingUp = true;
 
-    // A los 6s, iniciar calibración
-    if (!calibStarted && millis() - bootTime >= 6000) {
-        calibStarted = true;
-        Motor::startCalib();
-        log_i("[TEMP] Motor auto-calibración iniciada (ejecución continua)");
+    if (!testStarted && millis() - bootTime >= 6000) {
+        testStarted = true;
+        testPhaseStart = millis();
+        isGoingUp = true;
+        log_i("[TEST] Iniciado ciclos UP/DOWN");
     }
 
-    // Detectar transición a DONE o ERROR y reiniciar
-    if (calibStarted) {
-        auto currentState = Motor::getCalibState();
-        if ((currentState == Motor::CalibState::DONE || currentState == Motor::CalibState::ERROR) &&
-            (lastCalibState == Motor::CalibState::CALIB_UP || lastCalibState == Motor::CalibState::CALIB_DOWN)) {
-            Motor::startCalib();
-            log_i("[TEMP] Motor auto-calibración reiniciada");
+    if (testStarted) {
+        // Cambiar dirección cada 4 segundos
+        if (millis() - testPhaseStart >= 4000) {
+            isGoingUp = !isGoingUp;
+            testPhaseStart = millis();
+            log_i("[TEST] Cambio de dirección: %s", isGoingUp ? "↑ SUBIENDO" : "↓ BAJANDO");
         }
-        lastCalibState = currentState;
+
+        // Enviar comando
+        if (isGoingUp) {
+            Motor::driveRaw(100);  // Arriba
+        } else {
+            Motor::driveRaw(-100); // Abajo
+        }
+
+        // Log cada 1s
+        static uint32_t lastLog = 0;
+        if (millis() - lastLog > 1000) {
+            uint16_t adc = Motor::getRawADC();
+            log_i("[TEST] %s ADC=%d (min=23 max=26423)",
+                  isGoingUp ? "↑" : "↓", adc);
+            lastLog = millis();
+        }
     }
 
     // OTA siempre tiene máxima prioridad, incluso si SAT está abierto
