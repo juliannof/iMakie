@@ -25,22 +25,23 @@ void FaderADC::begin() {
 
     _ads.startADCReading(ADS1X15_REG_CONFIG_MUX_SINGLE_0, /*continuous=*/true);
 
-    int raw = 0;
     for (int i = 0; i < 10; i++) {
         if (_newData) {
             _newData = false;
-            raw = _ads.getLastConversionResults();
+            int raw = _ads.getLastConversionResults();
             if (raw < 0) raw = 0;
-            break;
+            _rawLast = raw;
+            _emaValue = (float)raw;
+            for (int i = 0; i < NOISE_WINDOW_SIZE; i++) _noiseWindow[i] = (float)raw;
+            _adsLogIdx = 0;
+            log_i("[ADC] ADS1115 OK  GAIN_ONE  860SPS  ALERT=IO%d  seed=%d", ADS_ALERT_PIN, _rawLast);
+            return;  // Éxito
         }
         delay(10);
     }
-    _rawLast  = raw;
-    _emaValue = (float)raw;
-    for (int i = 0; i < NOISE_WINDOW_SIZE; i++) _noiseWindow[i] = (float)raw;
-    _adsLogIdx = 0;
 
-    log_i("[ADC] ADS1115 OK  GAIN_ONE  860SPS  ALERT=IO%d  seed=%d", ADS_ALERT_PIN, _rawLast);
+    // Timeout: ISR no respondió
+    log_e("[ADC] ADS1115 ISR timeout — no data en 100ms");
 }
 
 void FaderADC::update() {
