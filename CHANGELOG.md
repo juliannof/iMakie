@@ -7,7 +7,24 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### Removed
+- **S2 MOTOR — Reset total: borrado Motor.h / Motor.cpp (2026-05-11 08:15)**
+  - Razón: Código base defectuoso. Motor solo se mueve en un sentido.
+  - Removido: máquina de calibración (CalibPhase), control de posición, analogWrite/LEDC mixtos, todos los logs internos
+  - Documentación: `/track S2/iMakie - Track ESP32S2 V1/src/hardware/Motor/Motor.h` y `.cpp` vaciados excepto headers
+  - Impacto: main.cpp sigue compilando (Motor:: namespace existe pero vacío), permite reescritura limpia sin legacy
+  - Lección: Código base con migración analogWrite→LEDC fallida + órdenes init inconsistentes → restart mejor que patch
+  - Próximo paso: reescribir Motor desde cero con especificación clara de DRV8833 control
+
 ### Changed
+- **S2 MOTOR TEST — FaderADC desactivado (2026-05-10 22:30)**
+  - Razón: I2C interfiere en unidades DAC (sin ADS1115)
+  - Cambio: `faderADC.begin()` comentado en main.cpp setup()
+  - GPIO34/GPIO21 liberados para DAC del fader
+  - GPIO17 (ADS_ALERT) fijo OUTPUT LOW — evita flotante
+  - Estado: Motor-only test mode activo
+  - Nota: Cambio temporal para debugging de motor en unidad DAC
+
 - **Versión — 0.4.2 (2026-05-10 20:00)**
   - Schema: MAJOR.MINOR.PATCH desarrollo
   - 0 = Debug/Development state

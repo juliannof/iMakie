@@ -3,55 +3,13 @@
 
 // ============================================================
 //  Motor.h  —  Control de fader motorizado PTxx Track S2
-//  DRV8833  |  ADC via FaderADC → setADC()  |  DAC ref GPIO17
+//  DRV8833 H-bridge control
+//
+//  REMOVED (2026-05-11 08:15) — código base defectuoso (motor 1 dirección)
+//  Implementación anterior eliminada. Namespace vacío para compilación.
+//  Ver CHANGELOG.md
 // ============================================================
 
 namespace Motor {
 
-    // Estados de calibración
-    enum class CalibState {
-        IDLE,
-        CALIB_DOWN,   // bajando a tope inferior
-        CALIB_UP,     // subiendo a tope superior
-        DONE,         // calibrado OK
-        ERROR         // calibración fallida
-    };
-
-    // Llamar lo primero en setup() — silencia el motor antes de todo
-    void init();
-
-    // Inicializar — no arranca calibración
-    void begin();
-
-    // Disparar calibración — llamar cuando S3 lo ordene por RS485
-    void startCalib();
-
-    // Avanza la máquina de calibración + control de posición
-    // Llamar en cada loop()
-    void update();
-
-    // Recibe la lectura filtrada de FaderADC — llamar antes de update()
-    void setADC(uint16_t value);
-
-    // Target MIDI Pitch Bend 14-bit (0–16383)
-    // Ignorado hasta que calibración esté DONE
-    void setTarget(uint16_t midiTarget);
-
-    // Parar el motor inmediatamente
-    void stop();
-
-    // Estado
-    CalibState getCalibState();
-    bool       isCalibrated();
-    uint16_t   getADCMin();
-    uint16_t   getADCMax();
-    uint16_t   getRawADC();    // último valor recibido por setADC()
-    float      getPosition();  // 0.0–1.0 posición real
-    void driveRaw(int pwm);  // >0 arriba, <0 abajo, 0 stop
-
-    void off();   // corte incondicional — usar en desconexión
-
-    // Prueba diagnóstico: sube a 75%, baja a 25%, repite
-    void testUpDown();
-
-} // namespace Motor                  
+} // namespace Motor
