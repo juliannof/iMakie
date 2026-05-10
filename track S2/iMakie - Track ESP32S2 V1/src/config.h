@@ -65,6 +65,8 @@ enum class ConnectionState {
 #define ADS_ALERT_PIN   17
 #define ADS_I2C_ADDR    0x48
 
+
+// --- MOTOR ---
 #define MOTOR_IN1    18
 #define MOTOR_IN2    16
 #define MOTOR_EN     14
