@@ -128,6 +128,9 @@ void setup() {
     Serial.printf("\n[BOOT] FW_VERSION=%s FW_BUILD_ID=%d\n", FW_VERSION, FW_BUILD_ID);
     Serial.flush();
 
+    // Leer PWM range de NVS (2026-05-10 20:20)
+    Motor::initPWM();
+
     // Detectar OTA-only mode
     Preferences prefs;
     prefs.begin("ptxx", true);
@@ -243,7 +246,8 @@ void setup() {
 
 // ─── TEST MODE (automático a 3s del boot) ─────────────────
 static unsigned long g_bootTime = 0;
-static bool g_testStarted = false;\nstatic bool g_calibStarted = false;
+static bool g_testStarted = false;
+static bool g_calibStarted = false;
 static uint32_t g_testPhaseTime = 0;
 static int g_testPhase = 0;
 
@@ -324,7 +328,10 @@ void loop() {
         lastLog = millis();
     }
 
-    Motor::update();
+    // Motor::update() SOLO si SAT no está en Test Mode activo (2026-05-10 20:35)
+    if (!(satMenu && satMenu->isOpen())) {
+        Motor::update();
+    }
 
     // ─── TEST MODE: inicia a 3s del boot ─────────────────────
     if (!g_testStarted && millis() - g_bootTime > 3000) {

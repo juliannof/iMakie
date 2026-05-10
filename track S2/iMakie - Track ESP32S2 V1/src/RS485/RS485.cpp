@@ -11,6 +11,11 @@ RS485Slave rs485;
 void RS485Slave::begin(uint8_t myId) {
     _myId = myId;
 
+    // Si Serial1 ya está activo, terminarlo primero (2026-05-10 19:54)
+    if (Serial1) {
+        Serial1.end();
+    }
+
     pinMode(RS485_ENABLE_PIN, OUTPUT);
     digitalWrite(RS485_ENABLE_PIN, LOW);
 

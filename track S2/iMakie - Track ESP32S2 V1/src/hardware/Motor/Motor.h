@@ -12,8 +12,9 @@ namespace Motor {
     };
 
     // Ciclo de vida
-    void init();    // configurar pines + PWM — llamar ANTES de Serial.begin()
-    void update();  // tick de calibración + control de posición
+    void init();        // configurar pines + PWM — llamar ANTES de Serial.begin()
+    void initPWM();     // leer pwmMin/Max de NVS — si inválido, pwmMin=pwmMax=0 (2026-05-10 20:20)
+    void update();      // tick de calibración + control de posición
 
     // Entrada ADC (desde FaderADC)
     void setADC(uint16_t raw);
@@ -33,5 +34,14 @@ namespace Motor {
     void       startCalib();
     CalibState getCalibState();
     bool       isCalibrated();
+
+    // Test mode — control directo (2026-05-10 19:54)
+    void testUp(uint8_t pwm);
+    void testDown(uint8_t pwm);
+    void testOff();
+
+    // PWM range (lee de NVS, 0=inválido) (2026-05-10 20:20)
+    uint8_t getPWMMin();
+    uint8_t getPWMMax();
 
 } // namespace Motor

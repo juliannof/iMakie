@@ -60,13 +60,14 @@
 
 **Código Moderno — Alineación con Stack de Librerías (2026-05-10 19:45):**
 - **Usar MISMAS APIs que las librerías del proyecto usan internamente**
-- LovyanGFX usa LEDC → Motor DEBE usar LEDC (no analogWrite)
+- **Motor S2:** usa `analogWrite` (no LEDC) — conflicto de canales LEDC con LovyanGFX backlight (2026-05-10 19:54)
+  - analogWrite es simple, robusta, sin conflictos de recursos
+  - LEDC migración fue revertida tras identificar agotamiento de canales
 - Adafruit librerías usan Wire moderno → I2C DEBE usar Wire (no legacy)
 - IDF5/pioarduino 55.03.37 es la base → APIs deben ser compatibles
-- Validar SIEMPRE retorno de inicializaciones: `if (!ledcAttach(...))` o `if (!Wire.begin())`
+- Validar SIEMPRE retorno de inicializaciones: `if (!Wire.begin())`, etc.
 - Logging: usar log_i/log_e (no Serial legacy) — ya integrado en setup()
-- **PROHIBIDO mezclar APIs en mismo subsistema:** LEDC + analogWrite = ERROR FATAL
-- Comentar versión de API usada en código (ej: "LEDC Core 3.x")
+- Comentar versión de API usada en código (ej: "analogWrite PWM 20kHz 8-bit")
 
 **Desarrollo de código:**
 - Cambios quirúrgicos, no rewrites completos salvo petición explícita

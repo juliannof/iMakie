@@ -78,6 +78,7 @@ private:
         TEST_DISPLAY, TEST_ENCODER, TEST_FADER, TEST_NEOPIXEL, TEST_TOUCH,
         MOTOR_CALIB,
         MOTOR_POS,
+        MOTOR_TEST,
     };
 
     struct Item { const char* badge; const char* label; Scr target; };
@@ -183,6 +184,7 @@ private:
 
     void _tickMotorCalib(Btn b);
     void _tickMotorPos(Btn b);
+    void _tickMotorTest(Btn b);
 
     int           _fadCalMin  = 8191;
     int           _fadCalMax  = 0;

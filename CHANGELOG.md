@@ -7,6 +7,61 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### Removed
+- **S2 SAT MOTOR — Opción "Posicion" removida (2026-05-10 19:54)**
+  - Razón: Pantalla era stub no funcional (todo comentado, valores hardcodeados a 0)
+  - Motor nunca se movía: `Motor::setTarget()` nunca era llamado
+  - Impacto: Menú Motor ahora tiene 5 opciones (quitadas 6)
+  - Actualizado: `_motorN = 5`, casos switch ajustados
+
+### Changed
+- **S2 SAT MOTOR — Test Mode movido a opción 1 (primero) (2026-05-10 19:54)**
+  - Antes: Motor ON/OFF → Calibrar → Test Mode → PWM Min/Max
+  - Ahora: Motor ON/OFF → Test Mode → Calibrar → PWM Min/Max
+  - Razón: Si motor no funciona, testear ANTES de calibración
+  - Orden: caso 1 para Test Mode, caso 2 para Calibrar
+
+### Fixed
+- **S2 SAT MOTOR — Menu item count + Test Mode handler (2026-05-10 19:54)**
+  - Bug 1: `_motorN = 6` pero solo 5 items válidos (Posición era stub)
+  - Bug 2: Switch en `_hMotor()` con casos incorrectos
+  - Solución: Removida "Posición", `_motorN = 5`, casos reajustados a 0-4
+
+- **S2 RS485 — Error setRxBufferSize when reinitializing (2026-05-10 19:54)**
+  - Problema: Cada reinicio de RS485 (SAT config saved) intentaba resize Serial1 ya activo
+  - Solución: `Serial1.end()` antes de `Serial1.setRxBufferSize()` en `RS485Slave::begin()`
+  - Elimina error: `RX Buffer can't be resized when Serial is already running`
+  - Impacto: RS485 reinicia limpiamente sin logs de error
+
+### Added
+- **S2 MOTOR — Test Mode + Funciones de Control Directo (2026-05-10 19:54)**
+  - Nuevas funciones públicas en Motor: `testUp(pwm)`, `testDown(pwm)`, `testOff()`
+  - SAT menu opción nueva: "Motor → Test Mode"
+  - Control con botones:
+    - **REC button** = UP (PWM_MAX)
+    - **MUTE button** = DOWN (PWM_MAX)
+    - **SOLO button** = OFF
+  - Display en tiempo real: ADC, estado botones, PWM actual
+  - No afecta calibración automática (independent test)
+  - Logs en Serial: `[MOTOR-TEST] UP/DOWN/OFF pwm=X`
+
+- **S2 MOTOR — Detección de Motor Bloqueado + Fallback a DOWN (2026-05-10 19:54)**
+  - Nueva constante: `CALIB_STUCK_TIMEOUT = 500ms`
+  - Detección en `GOING_UP`: si ADC no cambia en 500ms → salta a `KICK_DOWN` inmediatamente
+  - Detección en `GOING_DOWN`: si ADC no cambia en 500ms → `ERROR` (motor definitivamente muerto)
+  - Secuencia: KICK_UP → GOING_UP (falla) → KICK_DOWN → GOING_DOWN (falla) → ERROR
+  - Diferencia clara: "motor invertido/parcial" (UP falla) vs "motor muerto" (ambas fallan)
+  - Útil para diagnosticar: inversión de cables, dirección bloqueada, driver dañado
+
+### Documentation
+- **S2 MOTOR — LEDC Migración Revertida, analogWrite Definitivo (2026-05-10 19:54)**
+  - LEDC migración fue intentada pero revertida: conflicto de canales LEDC
+  - **Causa:** LovyanGFX backlight (GPIO3) + Motor (GPIO18/16) agotaban 8 canales LEDC del ESP32-S2
+  - **Solución:** analogWrite definitivo (API simple, robusta, sin conflictos)
+  - **Criterio:** "Si funciona y no hay conflicto, no refactorizar"
+  - Documentación: CLAUDE.md actualizado, memory s2_motor_ledc_conflict.md creado
+  - **Impacto:** Motor.cpp sin cambios (ya usa analogWrite correcto)
+
 ### Changed
 - **S2 MOTOR — Test mode + Safety + Compilation fixes (2026-05-10 15:20)**
   - Test mode automático: calibración + movimiento a 5 posiciones (0%, 25%, 50%, 75%, 100%) cada 2s

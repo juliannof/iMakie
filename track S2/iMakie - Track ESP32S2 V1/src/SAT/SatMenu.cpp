@@ -4,6 +4,7 @@
 #include "SatMenu.h"
 #include "../hardware/encoder/Encoder.h"
 #include "../config.h"
+#include "../hardware/Hardware.h"  // Para buttonRec, buttonMute (2026-05-10 19:54)
 
 #include "../hardware/fader/FaderADC.h"   // ← añadir
 #include "../hardware/fader/FaderTouch.h"
@@ -24,8 +25,8 @@ const SatMenu::Item SatMenu::_mainItems[] = {
 };
 const SatMenu::Item SatMenu::_motorItems[] = {
     {"DI","Motor ON/OFF",  Scr::MOTOR     },
-    {"CA","Calibrar",      Scr::MOTOR_CALIB},  // ← añadir
-    {"PO","Posicion",      Scr::MOTOR_POS },   // ← añadir
+    {"TE","Test Mode",     Scr::MOTOR_TEST},
+    {"CA","Calibrar",      Scr::MOTOR_CALIB},
     {"MN","PWM Minimo",    Scr::EDIT_PWMMIN},
     {"MX","PWM Maximo",    Scr::EDIT_PWMMAX},
 };
@@ -41,7 +42,7 @@ const SatMenu::Item SatMenu::_diagItems[] = {
     {"TC","Test Touch",    Scr::TEST_TOUCH    },
 };
 const int SatMenu::_mainN  = 6;
-const int SatMenu::_motorN = 5;
+const int SatMenu::_motorN = 5;  // Motor ON/OFF, Calibrar, Test Mode, PWM Min, PWM Max (2026-05-10 19:54)
 const int SatMenu::_touchN = 2;
 const int SatMenu::_diagN  = 5;
 
@@ -59,10 +60,7 @@ SatMenu::SatMenu(LovyanGFX* tft)
     pinMode(ENCODER_PIN_A,  INPUT);
     pinMode(ENCODER_PIN_B,  INPUT);
     pinMode(ENCODER_SW_PIN, INPUT_PULLUP);
-    pinMode(MOTOR_IN1, OUTPUT);
-    pinMode(MOTOR_IN2, OUTPUT);
-    pinMode(MOTOR_EN,  OUTPUT);
-    _motorStop();
+    // Motor pines controlados SOLO por Motor::init(), NO por SAT (2026-05-10 20:30)
     _load();
     _tmp = _cfg;
 }
@@ -97,7 +95,7 @@ void SatMenu::close() {
     _open = false;
     _encoderConsumed = false;
 
-    _motorStop();
+    // Motor controlado SOLO por Motor.cpp, NO por SAT (2026-05-10 20:30)
     _spr.deleteSprite();
 
     if (_cbMotorOn)  _cbMotorOn();
@@ -143,6 +141,7 @@ void SatMenu::update() {
         case Scr::MOTOR:         _hMotor(b);           break;
         case Scr::MOTOR_CALIB:   _tickMotorCalib(b); break;
         case Scr::MOTOR_POS:     _tickMotorPos(b);   break;
+        case Scr::MOTOR_TEST:    _tickMotorTest(b);  break;
         case Scr::TOUCH:         _hTouch(b);           break;
         case Scr::DIAG:          _hDiag(b);            break;
         case Scr::EDIT_TRACKID:
@@ -214,6 +213,7 @@ void SatMenu::_render() {
         case Scr::TEST_TOUCH:    _tickTestTouch(Btn::NONE);    return;
         case Scr::MOTOR_CALIB:   _tickMotorCalib(Btn::NONE); return;
         case Scr::MOTOR_POS:     _tickMotorPos(Btn::NONE);   return;
+        case Scr::MOTOR_TEST:    _tickMotorTest(Btn::NONE);  return;
         default: break;
     }
 
@@ -233,11 +233,25 @@ void SatMenu::_render() {
                 _spr.drawString("Configura Track ID antes de usar", W/2, SAT_HDR_H+10);
             }
             break;
-        case Scr::MOTOR:
+        case Scr::MOTOR: {
             _drawHdr("Motor");
-            _drawList(_motorItems, _motorN);
-            _drawHints("","","Atras","Entrar");
+
+            // Verificar si PWM es válido (2026-05-10 20:20)
+            if (Motor::getPWMMin() == 0 || Motor::getPWMMax() == 0) {
+                int W = _spr.width(), H = _spr.height();
+                _spr.setTextColor(C_RED, C_BG);
+                _spr.setTextSize(2);
+                _spr.setTextDatum(textdatum_t::middle_center);
+                _spr.drawString("PWM invalido", W/2, H/2);
+                _spr.setTextSize(1);
+                _spr.drawString("Configura PWM Min/Max", W/2, H/2+40);
+                _drawHints("","","Atras","");
+            } else {
+                _drawList(_motorItems, _motorN);
+                _drawHints("","","Atras","Entrar");
+            }
             break;
+        }
         case Scr::TOUCH: {
             _drawHdr("Touch");
             int W = _spr.width();
@@ -613,10 +627,10 @@ void SatMenu::_hMotor(Btn b) {
                 _dirty = true;
                 _toast(_cfg.motorDisabled ? "Motor DESACTIVADO" : "Motor ACTIVADO", Scr::MOTOR);
                 break;
-            case 1: _goto(Scr::MOTOR_CALIB); break;  // ← añadir
-            case 2: _goto(Scr::MOTOR_POS);   break;  // ← añadir
+            case 1: _goto(Scr::MOTOR_TEST);  break;  // Test Mode primero (2026-05-10 19:54)
+            case 2: _goto(Scr::MOTOR_CALIB); break;
             case 3:
-                _eTitle="PWM Minimo"; _eVal=_tmp.pwmMin; _eMin=0; _eMax=120;
+                _eTitle="PWM Minimo"; _eVal=_tmp.pwmMin; _eMin=0; _eMax=200;
                 _goto(Scr::EDIT_PWMMIN);
                 break;
             case 4:
@@ -792,31 +806,18 @@ void SatMenu::_drawDivider(int y) {
     _spr.drawFastHLine(0,y,_spr.width(),C_GRAY);
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Motor
-// ─────────────────────────────────────────────────────────────
-void SatMenu::_motorStop() {
-    if (_cbMotorDrv) { _cbMotorDrv(0); return; }
-    digitalWrite(MOTOR_EN,LOW); digitalWrite(MOTOR_IN1,LOW); digitalWrite(MOTOR_IN2,LOW);
-}
-void SatMenu::_motorDrive(int pwm) {
-    if (_cbMotorDrv) { _cbMotorDrv(pwm); return; }
-    if (pwm==0) { _motorStop(); return; }
-    digitalWrite(MOTOR_EN,HIGH);
-    if (pwm>0) { analogWrite(MOTOR_IN1,constrain(pwm,0,255)); digitalWrite(MOTOR_IN2,LOW); }
-    else       { digitalWrite(MOTOR_IN1,LOW); analogWrite(MOTOR_IN2,constrain(-pwm,0,255)); }
-}
+// Motor controlado SOLO por Motor.cpp — estas funciones ya no existen (2026-05-10 20:30)
 
 // ─────────────────────────────────────────────────────────────
 //  NVS
 // ─────────────────────────────────────────────────────────────
 void SatMenu::_load() {
     _prefs.begin("ptxx",true);
-    _cfg.trackId        = _prefs.getUChar("trackId",0);
-    _cfg.pwmMin         = _prefs.getUChar("pwmMin", 40);
-    _cfg.pwmMax         = _prefs.getUChar("pwmMax", 220);
-    _cfg.touchEnabled   = _prefs.getBool ("touchEn",true);
-    _cfg.motorDisabled = _prefs.getBool("motorDis", false);
+    _cfg.trackId        = _prefs.getUChar("trackId", 0);
+    _cfg.pwmMin         = _prefs.getUChar("pwmMin", PWM_MIN);   // Fallback a config.h (2026-05-10 20:10)
+    _cfg.pwmMax         = _prefs.getUChar("pwmMax", PWM_MAX);   // Fallback a config.h (2026-05-10 20:10)
+    _cfg.touchEnabled   = _prefs.getBool ("touchEn", true);
+    _cfg.motorDisabled  = _prefs.getBool("motorDis", false);
     _prefs.end();
 }
 void SatMenu::_save() {
@@ -827,6 +828,11 @@ void SatMenu::_save() {
     _prefs.putBool ("touchEn", _cfg.touchEnabled);
     _prefs.putBool("motorDis", _cfg.motorDisabled);
     _prefs.end();
+
+    // Actualizar Motor con nuevos valores de NVS sin reiniciar (2026-05-10 20:45)
+    if (_cfg.pwmMin > 0 && _cfg.pwmMax > 0) {
+        Motor::initPWM();
+    }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1029,5 +1035,83 @@ void SatMenu::_tickMotorPos(Btn b) {
     } */
 
     _drawHints("tgt+100","tgt-100","Atras","");
+    _push();
+}
+
+//  MOTOR TEST — Control con botones (2026-05-10 19:54)
+void SatMenu::_tickMotorTest(Btn b) {
+    int W = _spr.width(), H = _spr.height();
+
+    // CRÍTICO: actualizar Button2 cada frame antes de leer estado (2026-05-10 20:05)
+    updateButtons();
+
+    // MUTE presionado = salir
+    if (buttonMute.wasPressed()) {
+        Motor::testOff();
+        log_i("[MOTOR_TEST] Saliendo por MUTE");
+        _goto(Scr::MOTOR);
+        return;
+    }
+
+    if (b == Btn::BACK) {
+        Motor::testOff();
+        log_i("[MOTOR_TEST] Apagado, volviendo a Motor");
+        _goto(Scr::MOTOR);
+        return;
+    }
+
+    // Control directo: REC=UP, SOLO=DOWN, solo mientras presionados (2026-05-10 20:00)
+    bool recPressed  = buttonRec.isPressed();
+    bool soloPressed = buttonSolo.isPressed();
+
+    uint8_t pwmMax = Motor::getPWMMax();  // Lee de NVS (2026-05-10 20:25)
+
+    if (recPressed) {
+        Motor::testUp(pwmMax);
+    } else if (soloPressed) {
+        Motor::testDown(pwmMax);
+    } else {
+        Motor::testOff();  // Suelta cualquier botón → para
+    }
+
+    // Pantalla
+    _spr.fillScreen(C_BG);
+    _drawHdr("MOTOR TEST");
+
+    int y = SAT_HDR_H + 8;
+    char buf[48];
+
+    // ADC real + posición
+    _spr.setTextColor(C_CYAN, C_BG);
+    _spr.setTextSize(1);
+    _spr.setTextDatum(textdatum_t::top_left);
+    uint16_t adc = Motor::getRawADC();
+    float pos = Motor::getPosition();
+    snprintf(buf, 48, "ADC=%u (%.1f%%)", adc, pos * 100.0f);
+    _spr.drawString(buf, 4, y); y+=18;
+
+    // Rango calibrado
+    snprintf(buf, 48, "Min=%u Max=%u", Motor::getADCMin(), Motor::getADCMax());
+    _spr.drawString(buf, 4, y); y+=18;
+
+    // Estado de botones
+    _spr.setTextColor(recPressed ? C_RED : C_GRAY, C_BG);
+    snprintf(buf, 48, "REC(UP): %s", recPressed ? "ACTIVO" : "---");
+    _spr.drawString(buf, 4, y); y+=14;
+
+    _spr.setTextColor(soloPressed ? C_RED : C_GRAY, C_BG);
+    snprintf(buf, 48, "SOLO(DN): %s", soloPressed ? "ACTIVO" : "---");
+    _spr.drawString(buf, 4, y); y+=18;
+
+    // PWM actual y estado (usa valores de NVS)
+    _spr.setTextColor(C_YELLOW, C_BG);
+    const char* state = "IDLE";
+    if (recPressed) state = "UP";
+    else if (soloPressed) state = "DOWN";
+    uint8_t pwmVal = recPressed ? pwmMax : (soloPressed ? pwmMax : 0);
+    snprintf(buf, 48, "PWM=%d (%s)", pwmVal, state);
+    _spr.drawString(buf, 4, y);
+
+    _drawHints("REC=UP","SOLO=DN","MUTE=exit","");
     _push();
 }

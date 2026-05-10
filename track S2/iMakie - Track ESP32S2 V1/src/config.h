@@ -98,7 +98,7 @@ static constexpr uint16_t MOTOR_ADC_MAX            = 27000;   // > máximo esper
 
 // Motor — control de posición (constantes)
 static constexpr uint8_t  PWM_MIN                  = 100;
-static constexpr uint8_t  PWM_MAX                  = 120;  // reducido de 130 para proteger motor (2026-05-10 15:05)
+static constexpr uint8_t  PWM_MAX                  = 130;  // reducido de 130 para proteger motor (2026-05-10 15:05)
 
 // Motor — spike guard (rechaza cambios > este valor)
 static constexpr uint16_t ADC_SPIKE_GUARD          = 200;     // cuentas máximas entre lecturas
@@ -111,6 +111,7 @@ static constexpr uint32_t CALIB_SETTLE_MS          = 200;     // ms para medir r
 static constexpr uint32_t CALIB_KICK_MS            = 150;     // ms para kick inicial
 static constexpr uint32_t CALIB_MIN_TRAVEL_MS      = 300;     // ms mínimo de viaje antes de medir
 static constexpr uint32_t CALIB_TIMEOUT            = 6000;    // ms timeout calibración
+static constexpr uint32_t CALIB_STUCK_TIMEOUT      = 500;     // ms sin movimiento = motor atascado (2026-05-10 19:54)
 static constexpr uint8_t  PWM_SLEW                 = 5;       // máximo cambio PWM por tick
 
 

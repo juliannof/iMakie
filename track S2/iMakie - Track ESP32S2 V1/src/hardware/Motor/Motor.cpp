@@ -1,5 +1,6 @@
 #include "Motor.h"
 #include "../../config.h"
+#include <Preferences.h>
 
 // ────────────────────────────────────────────────────────────────
 // Motor Control — iMakie PTxx Track S2
@@ -18,6 +19,10 @@
 // ────────────────────────────────────────────────────────────────
 
 // Variables de estado en config.h (extern disponibles aquí via config.h)
+
+// ─── PWM Range (lee de NVS, 0=inválido) ───────────────────────
+static uint8_t _pwm_min = 0;
+static uint8_t _pwm_max = 0;
 
 // ─── Funciones HW (privadas) ──────────────────────────────────
 static void _hwOff() {
@@ -63,7 +68,7 @@ static void _calibUpdate() {
         if (now - _motor_phaseStart >= CALIB_KICK_MS) {
             now = millis();  // Recapturar timestamp fresco
             _motor_phase       = CalibPhase::GOING_UP;
-            _hwUp(PWM_MIN);  // Movimiento controlado hacia el tope
+            _hwUp(_pwm_min);  // Movimiento controlado hacia el tope
             _motor_stableRef   = pos;
             _motor_stableStart = now;
             log_d("[CALIB] GOING_UP");
@@ -77,6 +82,19 @@ static void _calibUpdate() {
                 _motor_stableRef   = pos;
                 _motor_stableStart = now;
             }
+        } else if (now - _motor_stableStart >= CALIB_STUCK_TIMEOUT) {
+            // Motor no se movió UP → intentar DOWN inmediatamente
+            log_e("[CALIB] Sin movimiento en GOING_UP (pos=%d) → intentando DOWN", pos);
+            now = millis();  // Recapturar timestamp fresco
+            _motor_calibMinDetect = now + CALIB_MIN_TRAVEL_MS;
+            _motor_stableRef      = (int)_motor_adcPos;  // usar posición actual
+            _motor_stableStart    = now;
+            _motor_settleMin      = 27000;
+            _motor_settleMax      = 0;
+            _motor_phase          = CalibPhase::KICK_DOWN;
+            _hwDown(_pwm_max);
+            _motor_phaseStart     = now;
+            log_i("[CALIB] KICK_DOWN iniciado desde GOING_UP");
         } else if (now - _motor_stableStart >= CALIB_STABLE_TIME) {
             now = millis();  // Recapturar timestamp fresco
             _motor_phase      = CalibPhase::SETTLE_UP;
@@ -104,7 +122,7 @@ static void _calibUpdate() {
             _motor_settleMin      = 27000;
             _motor_settleMax      = 0;
             _motor_phase          = CalibPhase::KICK_DOWN;
-            _hwDown(PWM_MAX);
+            _hwDown(_pwm_max);
             _motor_phaseStart     = now;
         }
         break;
@@ -113,7 +131,7 @@ static void _calibUpdate() {
         if (now - _motor_phaseStart >= CALIB_KICK_MS) {
             now = millis();  // Recapturar timestamp fresco
             _motor_phase       = CalibPhase::GOING_DOWN;
-            _hwDown(PWM_MIN);  // Movimiento controlado hacia el tope
+            _hwDown(_pwm_min);  // Movimiento controlado hacia el tope
             _motor_stableRef   = pos;
             _motor_stableStart = now;
             log_d("[CALIB] GOING_DOWN");
@@ -127,6 +145,11 @@ static void _calibUpdate() {
                 _motor_stableRef   = pos;
                 _motor_stableStart = now;
             }
+        } else if (now - _motor_stableStart >= CALIB_STUCK_TIMEOUT) {
+            // Motor no se movió en tiempo máximo → ATASCADO
+            _motor_phase = CalibPhase::ERROR;
+            log_e("[CALIB] MOTOR BLOQUEADO — sin movimiento en GOING_DOWN (pos=%d)", pos);
+            _hwOff();
         } else if (now - _motor_stableStart >= CALIB_STABLE_TIME) {
             now = millis();  // Recapturar timestamp fresco
             _motor_phase      = CalibPhase::SETTLE_DOWN;
@@ -203,12 +226,12 @@ static void _positionTick() {
         log_d("[POS] ON  pos=%d err=%d", pos, err);
     }
 
-    int targetPWM = PWM_MIN + (min((uint16_t)absErr, _motor_adcSpan) * (PWM_MAX - PWM_MIN)) / _motor_adcSpan;
-    targetPWM = constrain(targetPWM, PWM_MIN, PWM_MAX);
+    int targetPWM = _pwm_min + (min((uint16_t)absErr, _motor_adcSpan) * (_pwm_max - _pwm_min)) / _motor_adcSpan;
+    targetPWM = constrain(targetPWM, _pwm_min, _pwm_max);
 
     _motor_currentPWM = constrain(
         _motor_currentPWM + constrain(targetPWM - _motor_currentPWM, -PWM_SLEW, PWM_SLEW),
-        0, PWM_MAX);
+        0, _pwm_max);
 
     if (err > 0) _hwUp((uint8_t)_motor_currentPWM);
     else         _hwDown((uint8_t)_motor_currentPWM);
@@ -238,6 +261,26 @@ void init() {
 
     _hwOff();
     log_i("[MOTOR] init COMPLETE");
+}
+
+void initPWM() {
+    // Lee pwmMin y pwmMax de NVS (2026-05-10 20:20)
+    // Si no existen o son inválidos (==0), _pwm_min y _pwm_max quedan en 0 (error)
+    Preferences prefs;
+    prefs.begin("ptxx", true);
+    uint8_t pwmMin = prefs.getUChar("pwmMin", 0);
+    uint8_t pwmMax = prefs.getUChar("pwmMax", 0);
+    prefs.end();
+
+    if (pwmMin > 0 && pwmMax > 0 && pwmMin < pwmMax) {
+        _pwm_min = pwmMin;
+        _pwm_max = pwmMax;
+        log_i("[MOTOR] PWM range: %u-%u (NVS)", _pwm_min, _pwm_max);
+    } else {
+        _pwm_min = 0;
+        _pwm_max = 0;
+        log_e("[MOTOR] PWM invalido en NVS: min=%u max=%u", pwmMin, pwmMax);
+    }
 }
 
 void update() {
@@ -312,7 +355,7 @@ void startCalib() {
     _motor_stableStart    = now;
     _motor_phaseStart     = now;
     _motor_phase          = CalibPhase::KICK_UP;
-    _hwUp(PWM_MAX);
+    _hwUp(_pwm_max);
     log_i("[CALIB] Iniciada");
 }
 
@@ -337,6 +380,29 @@ CalibState getCalibState() {
 
 bool isCalibrated() {
     return _motor_phase == CalibPhase::DONE && _motor_adcSpan > 100;
+}
+
+void testUp(uint8_t pwm) {
+    _hwUp(pwm);
+    log_d("[MOTOR-TEST] UP pwm=%d", pwm);
+}
+
+void testDown(uint8_t pwm) {
+    _hwDown(pwm);
+    log_d("[MOTOR-TEST] DOWN pwm=%d", pwm);
+}
+
+void testOff() {
+    _hwOff();
+    log_d("[MOTOR-TEST] OFF");
+}
+
+uint8_t getPWMMin() {
+    return _pwm_min;
+}
+
+uint8_t getPWMMax() {
+    return _pwm_max;
 }
 
 } // namespace Motor
