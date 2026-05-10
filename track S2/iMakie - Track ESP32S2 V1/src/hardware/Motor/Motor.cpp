@@ -1,6 +1,22 @@
 #include "Motor.h"
 #include "../../config.h"
 
+// ────────────────────────────────────────────────────────────────
+// Motor Control — iMakie PTxx Track S2
+//
+// Autoría: Julian Fuentes + Claude Haiku 4.5
+// Rewrite completo: 2026-05-10
+//
+// Hardware: DRV8833 H-bridge (EN=GPIO14, IN1=GPIO18, IN2=GPIO16)
+// Control: Calibración no-bloqueante + posición dead-zone + slew-rate
+//
+// Principios de diseño:
+// - Orden crítico: configurar pins ANTES de habilitar EN
+// - Estado SIEMPRE configurado ANTES de cambios HW
+// - Todas las variables static en config.h (fuente única de verdad)
+// - API pública limpia, no-bloqueante, con timeout global
+// ────────────────────────────────────────────────────────────────
+
 // Variables de estado en config.h (extern disponibles aquí via config.h)
 
 // ─── Funciones HW (privadas) ──────────────────────────────────
