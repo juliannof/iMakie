@@ -234,8 +234,7 @@ void update() {
 }
 
 void setADC(uint16_t v) {
-    if (!_isCalibrating() &&
-        _adcPos > 0 &&
+    if (_adcPos > 0 &&
         abs((int)v - (int)_adcPos) > ADC_SPIKE_GUARD) return;
     _adcPos = v;
 }
