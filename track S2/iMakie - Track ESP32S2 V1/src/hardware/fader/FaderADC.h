@@ -37,11 +37,6 @@ private:
 
     static void IRAM_ATTR _alertISR();
 
-    float    _emaValue   = 0.0f;
-    uint16_t _faderPos   = 0;
-    int      _rawLast    = 0;
-    float    _noiseSpan  = 0.0f;
-    float    _noiseWindow[NOISE_WINDOW_SIZE] = {};
-    uint8_t  _noiseHead  = 0;
-    bool _isTrending(float deadband) const;
+    uint16_t _faderPos = 0;
+    int      _rawLast  = 0;
 };

@@ -28,11 +28,9 @@ void FaderADC::begin() {
     for (int i = 0; i < 10; i++) {
         if (_newData) {
             _newData = false;
-            int raw = _ads.getLastConversionResults();
+            int16_t raw = _ads.getLastConversionResults();
             if (raw < 0) raw = 0;
             _rawLast = raw;
-            _emaValue = (float)raw;
-            for (int i = 0; i < NOISE_WINDOW_SIZE; i++) _noiseWindow[i] = (float)raw;
             _adsLogIdx = 0;
             log_i("[ADC] ADS1115 OK  GAIN_ONE  860SPS  ALERT=IO%d  seed=%d", ADS_ALERT_PIN, _rawLast);
             return;  // Éxito
@@ -52,8 +50,8 @@ void FaderADC::update() {
     if (adcRaw < 0) adcRaw = 0;
 
     // Validar rango esperado (0–27000)
-    if (adcRaw > MOTOR_ADC_MAX) {
-        log_w("[ADC] Valor fuera de rango: %d (máx %d)", adcRaw, MOTOR_ADC_MAX);
+    if (adcRaw < 0 || adcRaw > MOTOR_ADC_MAX) {
+        log_w("[ADC] Valor fuera de rango: %d (esperado %d-%d)", adcRaw, 0, MOTOR_ADC_MAX);
         return;  // Descartar lectura inválida
     }
 
@@ -68,7 +66,8 @@ void FaderADC::measureRange() {
     // Usar SOLO durante boot o diagnóstico, NO durante operación RS485 activa.
     // Si se llama durante calibración en progreso, puede causar timeout.
 
-    int minVal = 32767, maxVal = 0;
+    bool gotData = false;
+    int minVal = 0, maxVal = 0;
 
     log_i("[ADC] measureRange — 5s: mueve fader extremo a extremo");
     uint32_t t0 = millis();
@@ -77,14 +76,19 @@ void FaderADC::measureRange() {
             _newData = false;
             int16_t raw = _ads.getLastConversionResults();
             if (raw < 0) raw = 0;
-            if (raw < minVal) minVal = raw;
-            if (raw > maxVal) maxVal = raw;
+            if (!gotData) {
+                minVal = raw;
+                maxVal = raw;
+                gotData = true;
+            } else {
+                if (raw < minVal) minVal = raw;
+                if (raw > maxVal) maxVal = raw;
+            }
         }
         vTaskDelay(1);  // Cede CPU a otras tareas (RS485, display, etc)
     }
 
-    // Validar que se recibieron datos
-    if (minVal == 32767 || maxVal == 0) {
+    if (!gotData) {
         log_e("[ADC] measureRange FALLÓ — sin datos del ISR en 5s");
         return;
     }
@@ -101,20 +105,4 @@ void FaderADC::dumpAdsLog() {
             _adsLog[i].pos);
     }
     log_i("[ADC] Dump complete");
-}
-
-bool FaderADC::_isTrending(float deadband) const {
-    // Compara primera mitad de la ventana contra segunda
-    // Si el desplazamiento neto es consistente → movimiento real
-    float oldest = _noiseWindow[_noiseHead];
-    float newest = _noiseWindow[(_noiseHead + NOISE_WINDOW_SIZE - 1) % NOISE_WINDOW_SIZE];
-    
-    // Contar cuántas muestras están por encima/debajo de la más antigua
-    uint8_t up = 0, down = 0;
-    for (uint8_t i = 1; i < NOISE_WINDOW_SIZE; i++) {
-        float s = _noiseWindow[(_noiseHead + i) % NOISE_WINDOW_SIZE];
-        if (s > oldest + deadband) up++;
-        else if (s < oldest - deadband) down++;
-    }
-    return (up >= 5 || down >= 5);
 }

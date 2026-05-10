@@ -141,12 +141,14 @@ static uint16_t   _motor_noiseBottomSpan = 0;    // Ruido medido en SETTLE_DOWN
 static bool       _motor_active         = false;
 static int        _motor_currentPWM     = 0;
 
-// ─── FADERTOUCH — detección por varianza ──────────────────────
-static constexpr uint32_t TOUCH_VAR_THRESHOLD      = 150;     // ajustar con plástico puesto
-static constexpr int32_t  TOUCH_DELTA_THRESHOLD    = 40;      // shift de nivel sobre baseline
-static constexpr uint8_t  TOUCH_WIN_SIZE           = 8;       // ventana circular de muestras
-static constexpr uint32_t TOUCH_POLL_MS            = 10;      // intervalo de muestreo
+// ─── FADERTOUCH — detección por sostenimiento ────────────────
+static constexpr uint32_t TOUCH_POLL_MS            = 20;      // intervalo de muestreo (ms)
 static constexpr uint8_t  TOUCH_BASELINE_SAMPS     = 16;      // muestras para baseline inicial
+static constexpr float    TOUCH_THR_TOUCH          = 0.015f;  // 1.5% por encima baseline para tocar
+static constexpr float    TOUCH_THR_RELEASE        = 0.01f;   // 1.0% por encima baseline para liberar
+static constexpr uint8_t  TOUCH_SOSTENIMIENTO      = 6;       // frames (~120ms) para confirmar
+static constexpr uint32_t TOUCH_BASE_MIN_THRESHOLD = 10000;   // baseline mínimo para evitar falsos
+static constexpr uint32_t TOUCH_BASE_MIN_VALUE     = 50;      // valor mínimo inicial de baseline
 
 // --- LED INTEGRADO ---
 #define LED_BUILTIN_PIN 15 // Pin del LED integrado en la Lolin D1 ESP32 S2 (GPIO15)
