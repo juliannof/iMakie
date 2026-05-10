@@ -247,7 +247,7 @@ void loop() {
     // ⚠️ TEMPORAL: Auto-calibración continua a partir de los 6s del arranque (debugging motor)
     static uint32_t bootTime = millis();
     static bool calibStarted = false;
-    static CalibState lastCalibState = CalibState::IDLE;
+    static auto lastCalibState = Motor::CalibState::IDLE;
 
     // A los 6s, iniciar calibración
     if (!calibStarted && millis() - bootTime >= 6000) {
@@ -258,9 +258,9 @@ void loop() {
 
     // Detectar transición a DONE o ERROR y reiniciar
     if (calibStarted) {
-        CalibState currentState = Motor::getCalibState();
-        if ((currentState == CalibState::DONE || currentState == CalibState::ERROR) &&
-            (lastCalibState == CalibState::CALIB_UP || lastCalibState == CalibState::CALIB_DOWN)) {
+        auto currentState = Motor::getCalibState();
+        if ((currentState == Motor::CalibState::DONE || currentState == Motor::CalibState::ERROR) &&
+            (lastCalibState == Motor::CalibState::CALIB_UP || lastCalibState == Motor::CalibState::CALIB_DOWN)) {
             Motor::startCalib();
             log_i("[TEMP] Motor auto-calibración reiniciada");
         }
