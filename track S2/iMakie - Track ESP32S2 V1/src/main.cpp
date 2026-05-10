@@ -244,48 +244,27 @@ void setup() {
 //  loop
 // =============================================================
 void loop() {
-    // ⚠️ TEST SIMPLE: UP/DOWN solo resultado final
+    // ⚠️ TEMPORAL: Auto-calibración continua a partir de los 6s del arranque (debugging motor)
     static uint32_t bootTime = millis();
-    static bool testStarted = false;
-    static uint32_t testPhaseStart = 0;
-    static bool isGoingUp = true;
-    static bool lastPhase = true;
+    static bool calibStarted = false;
+    static auto lastCalibState = Motor::CalibState::IDLE;
 
-    if (!testStarted && millis() - bootTime >= 6000) {
-        testStarted = true;
-        testPhaseStart = millis();
-        isGoingUp = true;
-        log_i("[TEST] START");
+    // A los 6s, iniciar calibración
+    if (!calibStarted && millis() - bootTime >= 6000) {
+        calibStarted = true;
+        Motor::startCalib();
+        log_i("[TEMP] Motor auto-calibración iniciada (ejecución continua)");
     }
 
-    if (testStarted) {
-        uint16_t adc = Motor::getRawADC();
-        bool atLimit = false;
-
-        if (isGoingUp && adc >= FADER_ADC_MAX) {
-            Motor::driveRaw(0);
-            atLimit = true;
-        } else if (!isGoingUp && adc <= FADER_ADC_MIN) {
-            Motor::driveRaw(0);
-            atLimit = true;
+    // Detectar transición a DONE o ERROR y reiniciar
+    if (calibStarted) {
+        auto currentState = Motor::getCalibState();
+        if ((currentState == Motor::CalibState::DONE || currentState == Motor::CalibState::ERROR) &&
+            (lastCalibState == Motor::CalibState::CALIB_UP || lastCalibState == Motor::CalibState::CALIB_DOWN)) {
+            Motor::startCalib();
+            log_i("[TEMP] Motor auto-calibración reiniciada");
         }
-
-        if (!atLimit && millis() - testPhaseStart >= 5000) {
-            isGoingUp = !isGoingUp;
-            testPhaseStart = millis();
-            log_i("[TEST] %s", isGoingUp ? "UP" : "DOWN");
-        }
-
-        if (!atLimit) {
-            Motor::driveRaw(isGoingUp ? 100 : -100);
-        }
-
-        // Log solo cambios cada 5s
-        static uint32_t lastLog = 0;
-        if (millis() - lastLog > 5000) {
-            log_i("[TEST] ADC=%d", adc);
-            lastLog = millis();
-        }
+        lastCalibState = currentState;
     }
 
     // OTA siempre tiene máxima prioridad, incluso si SAT está abierto
