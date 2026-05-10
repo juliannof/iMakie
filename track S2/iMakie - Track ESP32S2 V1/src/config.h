@@ -53,6 +53,15 @@ enum class ConnectionState {
 #define RS485_START_BYTE      0xAA
 #define RS485_RESP_BYTE       0xBB
 
+// ─── ButtonManager — SAT long press ──────────────────────────
+#define SAT_HOLD_MS      3000   // tiempo para abrir SAT
+#define SAT_BAR_SHOW_MS  2500   // tiempo antes de mostrar barra
+#define SAT_BAR_W        180
+#define SAT_BAR_H          8
+#define SAT_BAR_CX       120
+#define SAT_BAR_CY       140
+#define SAT_LABEL_Y      (SAT_BAR_CY - 16)
+
 
 // --- SENSOR TÁCTIL DEL FADER ---
 #define FADER_TOUCH_PIN     T1 // Pin táctil para el fader (GPIO1 en ESP32-S2)
@@ -81,16 +90,6 @@ static uint16_t _posicionMaximaADC       = 0;
 // Calibración (valores aproximados — ajustar con autocalibración)
 #define FADER_ADC_MIN       23  // leer real en 0%
 #define FADER_ADC_MAX      26423   // leer real en 100%
-
-// ─── ButtonManager — SAT long press ──────────────────────────
-#define SAT_HOLD_MS      3000   // tiempo para abrir SAT
-#define SAT_BAR_SHOW_MS  2500   // tiempo antes de mostrar barra
-#define SAT_BAR_W        180
-#define SAT_BAR_H          8
-#define SAT_BAR_CX       120
-#define SAT_BAR_CY       140
-#define SAT_LABEL_Y      (SAT_BAR_CY - 16)
-
 
 
 // ─── FaderADC ─────────────────────────────────────────────────
@@ -145,7 +144,7 @@ static uint16_t   _noiseTopSpan   = 0;
 static bool       _motorActive    = false;
 static int        _currentPWM     = 0;
 
-// ─── FaderTouch — detección por varianza ──────────────────────
+// ─── FADERTOUCH — detección por varianza ──────────────────────
 static constexpr uint32_t TOUCH_VAR_THRESHOLD      = 150;     // ajustar con plástico puesto
 static constexpr int32_t  TOUCH_DELTA_THRESHOLD    = 40;      // shift de nivel sobre baseline
 static constexpr uint8_t  TOUCH_WIN_SIZE           = 8;       // ventana circular de muestras
