@@ -29,6 +29,10 @@
 **Commits a GitHub:**
 - Cuando el usuario dice **"commit"** o **"commitea"** = **git commit + git push** automático
 - No es solo guardar local — es guardar + subir a GitHub en una operación
+- **Fecha/hora en mensajes de commit (2026-05-11 09:00):** antes de hacer commits con timestamp, usar `date` para obtener hora actual del sistema
+  - Nunca asumir la hora — siempre verificar con `date` en bash
+  - Formato: `(YYYY-MM-DD HH:MM)` ejemplo: `(2026-05-11 09:00)`
+  - Esto asegura que la hora en commits es real, no adivinada
 
 **COMPILACIÓN — PROHIBIDO COMPLETAMENTE (2026-05-10 19:30):**
 - **NUNCA compilar bajo ningún concepto ni circunstancia**
