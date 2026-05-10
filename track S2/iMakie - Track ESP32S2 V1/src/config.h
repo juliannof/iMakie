@@ -93,7 +93,7 @@ static constexpr uint16_t MOTOR_ADC_MAX            = 27000;   // > máximo esper
 
 // Motor — control de posición (constantes)
 static constexpr uint8_t  PWM_MIN                  = 100;
-static constexpr uint8_t  PWM_MAX                  = 130;
+static constexpr uint8_t  PWM_MAX                  = 120;  // reducido de 130 para proteger motor (2026-05-10 15:05)
 
 // Motor — spike guard (rechaza cambios > este valor)
 static constexpr uint16_t ADC_SPIKE_GUARD          = 200;     // cuentas máximas entre lecturas
