@@ -74,6 +74,12 @@ enum class ConnectionState {
 #define ADS_ALERT_PIN   17
 #define ADS_I2C_ADDR    0x48
 
+// ─── FaderADC ─────────────────────────────────────────────────
+#define NOISE_WINDOW_SIZE     8
+#define NOISE_K_MOVE          3.0f
+#define NOISE_K_MICRO         0.3f
+#define FADER_EMA_ALPHA_FAST  0.20f
+
 
 // --- MOTOR ---
 #define MOTOR_IN1    18
@@ -81,40 +87,23 @@ enum class ConnectionState {
 #define MOTOR_EN     14
 
 
-// Calibración — estado interno (igual que CalibrationManager)
-static uint32_t _tiempoInicioCalibracion = 0;
-static uint32_t _ultimoTiempoEstable     = 0;
-static int      _ultimoValorEstable      = 0;
-static uint16_t _posicionMaximaADC       = 0;
-
-// Calibración (valores aproximados — ajustar con autocalibración)
-#define FADER_ADC_MIN       23  // leer real en 0%
-#define FADER_ADC_MAX      26423   // leer real en 100%
-
-
-// ─── FaderADC ─────────────────────────────────────────────────
-#define NOISE_WINDOW_SIZE     8
-#define NOISE_K_MOVE          3.0f
-#define NOISE_K_MICRO         0.3f
-#define FADER_EMA_ALPHA_FAST  0.20f
-
-// ─── Motor — calibración ──────────────────────────────────────
-static constexpr uint32_t CALIB_KICK_MS            = 150;     // duración del kick inicial
-static constexpr uint32_t CALIB_SETTLE_MS          = 200;     // espera tras parar motor antes de leer ADC
-static constexpr uint32_t CALIB_TIMEOUT            = 6000;
-static constexpr int      ADC_STABILITY_THRESHOLD  = 700;     // counts — movimiento = cambio > este valor
-static constexpr uint32_t CALIB_STABLE_TIME        = 150;     // ms sin movimiento → tope detectado
-static constexpr uint32_t CALIB_MIN_TRAVEL_MS      = 800;     // mínimo de viaje antes de empezar a buscar tope
-
-// ─── Motor — control de posición ──────────────────────────────
-static constexpr uint8_t  PWM_MIN                  = 65;
+// Motor — control de posición (constantes)
+static constexpr uint8_t  PWM_MIN                  = 100;
 static constexpr uint8_t  PWM_MAX                  = 130;
 static constexpr uint8_t  PWM_SLEW                 = 4;
 static constexpr int      DEAD_ZONE                = 100;
-static constexpr int      ADC_SPIKE_GUARD          = 500;     // salto máximo aceptado en setADC()
-static constexpr uint16_t MIDI_PB_MAX              = 16383;   // pitch bend 14-bit estándar
+static constexpr int      ADC_SPIKE_GUARD          = 500;
+static constexpr uint16_t MIDI_PB_MAX              = 16383;
 
-// ─── Motor — variables de estado (máquina calibración) ────────
+// Motor — calibración (constantes)
+static constexpr uint32_t CALIB_KICK_MS            = 150;
+static constexpr uint32_t CALIB_SETTLE_MS          = 200;
+static constexpr uint32_t CALIB_TIMEOUT            = 6000;
+static constexpr int      ADC_STABILITY_THRESHOLD  = 700;
+static constexpr uint32_t CALIB_STABLE_TIME        = 150;
+static constexpr uint32_t CALIB_MIN_TRAVEL_MS      = 800;
+
+// Motor — maquina de calibración (enum de fases internas)
 enum class CalibPhase {
     IDLE,
     KICK_UP, GOING_UP, SETTLE_UP,
@@ -122,27 +111,28 @@ enum class CalibPhase {
     DONE, ERROR
 };
 
-static CalibPhase _phase          = CalibPhase::IDLE;
-static uint32_t   _phaseStart     = 0;
-static uint32_t   _calibStart     = 0;
-static uint32_t   _calibMinDetect = 0;
-static uint32_t   _stableStart    = 0;
-static int        _stableRef      = 0;
+// Motor — variables de estado (calibración y control)
+static CalibPhase _motor_phase          = CalibPhase::IDLE;
+static uint32_t   _motor_phaseStart     = 0;
+static uint32_t   _motor_calibStart     = 0;
+static uint32_t   _motor_calibMinDetect = 0;
+static uint32_t   _motor_stableStart    = 0;
+static int        _motor_stableRef      = 0;
 
-static uint16_t   _adcTop         = 0;
-static uint16_t   _adcMin         = 0;
-static uint16_t   _adcMax         = 8191;
-static uint16_t   _adcSpan        = 8191;
-static uint16_t   _adcPos         = 0;
-static uint16_t   _targetADC      = 0;
-static uint16_t   _lastMidiTarget = 0;
+static uint16_t   _motor_adcTop         = 0;
+static uint16_t   _motor_adcMin         = 0;
+static uint16_t   _motor_adcMax         = 0;
+static uint16_t   _motor_adcSpan        = 0;
+static uint16_t   _motor_adcPos         = 0;
+static uint16_t   _motor_targetADC      = 0;
+static uint16_t   _motor_lastMidiTarget = 0;
 
-static uint16_t   _settleMin      = 8191;
-static uint16_t   _settleMax      = 0;
-static uint16_t   _noiseTopSpan   = 0;
+static uint16_t   _motor_settleMin      = 8191;
+static uint16_t   _motor_settleMax      = 0;
+static uint16_t   _motor_noiseTopSpan   = 0;
 
-static bool       _motorActive    = false;
-static int        _currentPWM     = 0;
+static bool       _motor_active         = false;
+static int        _motor_currentPWM     = 0;
 
 // ─── FADERTOUCH — detección por varianza ──────────────────────
 static constexpr uint32_t TOUCH_VAR_THRESHOLD      = 150;     // ajustar con plástico puesto

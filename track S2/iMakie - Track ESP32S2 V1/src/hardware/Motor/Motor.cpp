@@ -1,28 +1,7 @@
 #include "Motor.h"
 #include "../../config.h"
 
-// ─── Variables privadas (estado del motor) ─────────────────────
-static CalibPhase _phase          = CalibPhase::IDLE;
-static uint32_t   _phaseStart     = 0;
-static uint32_t   _calibStart     = 0;
-static uint32_t   _calibMinDetect = 0;
-static uint32_t   _stableStart    = 0;
-static int        _stableRef      = 0;
-
-static uint16_t   _adcTop         = 0;
-static uint16_t   _adcMin         = 0;
-static uint16_t   _adcMax         = 8191;
-static uint16_t   _adcSpan        = 8191;
-static uint16_t   _adcPos         = 0;
-static uint16_t   _targetADC      = 0;
-static uint16_t   _lastMidiTarget = 0;
-
-static uint16_t   _settleMin      = 8191;
-static uint16_t   _settleMax      = 0;
-static uint16_t   _noiseTopSpan   = 0;
-
-static bool       _motorActive    = false;
-static int        _currentPWM     = 0;
+// Variables de estado en config.h (extern disponibles aquí via config.h)
 
 // ─── Funciones HW (privadas) ──────────────────────────────────
 static void _hwOff() {
@@ -45,9 +24,9 @@ static void _hwDown(uint8_t pwm) {
 
 // ─── Helper ───────────────────────────────────────────────────
 static bool _isCalibrating() {
-    return _phase != CalibPhase::DONE  &&
-           _phase != CalibPhase::IDLE  &&
-           _phase != CalibPhase::ERROR;
+    return _motor_phase != CalibPhase::DONE  &&
+           _motor_phase != CalibPhase::IDLE  &&
+           _motor_phase != CalibPhase::ERROR;
 }
 
 // ─── Calibración no-bloqueante ────────────────────────────────
@@ -57,19 +36,19 @@ static void _calibUpdate() {
 
     if (now - _calibStart > CALIB_TIMEOUT) {
         _hwOff();
-        _phase = CalibPhase::ERROR;
+        _motor_phase = CalibPhase::ERROR;
         log_e("[CALIB] TIMEOUT");
         return;
     }
 
-    switch (_phase) {
+    switch (_motor_phase) {
 
     case CalibPhase::KICK_UP:
-        if (now - _phaseStart >= CALIB_KICK_MS) {
+        if (now - _motor_phaseStart >= CALIB_KICK_MS) {
             _hwUp(PWM_MAX);
             _stableRef   = pos;
             _stableStart = now;
-            _phase       = CalibPhase::GOING_UP;
+            _motor_phase       = CalibPhase::GOING_UP;
             log_d("[CALIB] GOING_UP");
         }
         break;
@@ -83,8 +62,8 @@ static void _calibUpdate() {
             _hwOff();
             _settleMin  = 8191;
             _settleMax  = 0;
-            _phaseStart = now;
-            _phase      = CalibPhase::SETTLE_UP;
+            _motor_phaseStart = now;
+            _motor_phase      = CalibPhase::SETTLE_UP;
             log_d("[CALIB] SETTLE_UP  pos=%d", pos);
         }
         break;
@@ -93,7 +72,7 @@ static void _calibUpdate() {
         if (_adcPos < _settleMin) _settleMin = _adcPos;
         if (_adcPos > _settleMax) _settleMax = _adcPos;
 
-        if (now - _phaseStart >= CALIB_SETTLE_MS) {
+        if (now - _motor_phaseStart >= CALIB_SETTLE_MS) {
             _adcTop       = _adcPos;
             _noiseTopSpan = _settleMax - _settleMin;
             log_i("[CALIB] Tope superior: %d  noise_span=%d", _adcTop, _noiseTopSpan);
@@ -104,17 +83,17 @@ static void _calibUpdate() {
             _settleMin      = 8191;
             _settleMax      = 0;
             _hwDown(PWM_MAX);
-            _phaseStart     = now;
-            _phase          = CalibPhase::KICK_DOWN;
+            _motor_phaseStart     = now;
+            _motor_phase          = CalibPhase::KICK_DOWN;
         }
         break;
 
     case CalibPhase::KICK_DOWN:
-        if (now - _phaseStart >= CALIB_KICK_MS) {
+        if (now - _motor_phaseStart >= CALIB_KICK_MS) {
             _hwDown(PWM_MAX);
             _stableRef   = pos;
             _stableStart = now;
-            _phase       = CalibPhase::GOING_DOWN;
+            _motor_phase       = CalibPhase::GOING_DOWN;
             log_d("[CALIB] GOING_DOWN");
         }
         break;
@@ -128,8 +107,8 @@ static void _calibUpdate() {
             _hwOff();
             _settleMin  = 8191;
             _settleMax  = 0;
-            _phaseStart = now;
-            _phase      = CalibPhase::SETTLE_DOWN;
+            _motor_phaseStart = now;
+            _motor_phase      = CalibPhase::SETTLE_DOWN;
             log_d("[CALIB] SETTLE_DOWN  pos=%d", pos);
         }
         break;
@@ -138,7 +117,7 @@ static void _calibUpdate() {
         if (_adcPos < _settleMin) _settleMin = _adcPos;
         if (_adcPos > _settleMax) _settleMax = _adcPos;
 
-        if (now - _phaseStart < CALIB_SETTLE_MS) break;
+        if (now - _motor_phaseStart < CALIB_SETTLE_MS) break;
 
         uint16_t adcBot       = _adcPos;
         uint16_t noiseSpanBot = _settleMax - _settleMin;
@@ -155,11 +134,11 @@ static void _calibUpdate() {
             _adcSpan   = _adcMax - _adcMin;
             _targetADC = (uint16_t)map((long)_lastMidiTarget,
                                         0, MIDI_PB_MAX, _adcMin, _adcMax);
-            _phase     = CalibPhase::DONE;
+            _motor_phase     = CalibPhase::DONE;
             log_i("[CALIB] OK  MIN=%d MAX=%d span=%d target=%d",
                   _adcMin, _adcMax, _adcSpan, _targetADC);
         } else {
-            _phase = CalibPhase::ERROR;
+            _motor_phase = CalibPhase::ERROR;
             log_e("[CALIB] ERROR — rango inválido  top=%d bot=%d", _adcTop, adcBot);
         }
         break;
@@ -231,7 +210,7 @@ void init() {
 void update() {
     if (_isCalibrating()) {
         _calibUpdate();
-    } else if (_phase == CalibPhase::DONE) {
+    } else if (_motor_phase == CalibPhase::DONE) {
         _positionTick();
     } else {
         _hwOff();
@@ -247,7 +226,7 @@ void setADC(uint16_t v) {
 
 void setTarget(uint16_t midiPB) {
     _lastMidiTarget = midiPB;
-    if (_phase != CalibPhase::DONE) return;
+    if (_motor_phase != CalibPhase::DONE) return;
     _targetADC = (uint16_t)map((long)midiPB, 0, MIDI_PB_MAX, _adcMin, _adcMax);
     log_d("[TARGET] midi=%d → adc=%d", midiPB, _targetADC);
 }
@@ -293,14 +272,14 @@ void startCalib() {
     _calibMinDetect = millis() + CALIB_MIN_TRAVEL_MS;
     _stableRef      = (int)_adcPos;
     _stableStart    = millis();
-    _phaseStart     = millis();
+    _motor_phaseStart     = millis();
     _hwUp(PWM_MAX);
-    _phase          = CalibPhase::KICK_UP;
+    _motor_phase          = CalibPhase::KICK_UP;
     log_i("[CALIB] Iniciada");
 }
 
 CalibState getCalibState() {
-    switch (_phase) {
+    switch (_motor_phase) {
         case CalibPhase::KICK_UP:
         case CalibPhase::GOING_UP:
         case CalibPhase::SETTLE_UP:
@@ -319,7 +298,7 @@ CalibState getCalibState() {
 }
 
 bool isCalibrated() {
-    return _phase == CalibPhase::DONE && _adcSpan > 100;
+    return _motor_phase == CalibPhase::DONE && _adcSpan > 100;
 }
 
 } // namespace Motor
