@@ -82,6 +82,13 @@ void FaderADC::measureRange() {
         }
         vTaskDelay(1);  // Cede CPU a otras tareas (RS485, display, etc)
     }
+
+    // Validar que se recibieron datos
+    if (minVal == 32767 || maxVal == 0) {
+        log_e("[ADC] measureRange FALLÓ — sin datos del ISR en 5s");
+        return;
+    }
+
     log_i("[ADC] RANGE  min=%d  max=%d  span=%d", minVal, maxVal, maxVal - minVal);
 }
 
