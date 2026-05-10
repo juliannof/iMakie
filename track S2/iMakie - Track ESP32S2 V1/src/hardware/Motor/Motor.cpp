@@ -347,7 +347,7 @@ void testUpDown() {
     uint16_t target25 = 23 + (26423 - 23) * 1 / 4;   // ~6580 (25%)
 
     if (testPhase == 0) {
-        driveRaw(PWM_MAX);
+        _hwUp(PWM_MAX);
         if (millis() - lastLogTime > 500) {
             log_i("[TEST-UP] ADC=%d target75=%d", currentADC, target75);
             lastLogTime = millis();
@@ -358,7 +358,7 @@ void testUpDown() {
             lastLogTime = millis();
         }
     } else {
-        driveRaw(-PWM_MAX);
+        _hwDown(PWM_MAX);
         if (millis() - lastLogTime > 500) {
             log_i("[TEST-DOWN] ADC=%d target25=%d", currentADC, target25);
             lastLogTime = millis();
