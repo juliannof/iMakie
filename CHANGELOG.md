@@ -8,6 +8,15 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 ## [Unreleased]
 
 ### Changed
+- **S2 MOTOR — Test mode + Safety + Compilation fixes (2026-05-10 15:20)**
+  - Test mode automático: calibración + movimiento a 5 posiciones (0%, 25%, 50%, 75%, 100%) cada 2s
+  - Safety: Motor EN (GPIO14) = LOW en setup() ANTES de todo (previene movimiento al boot)
+  - Compilación: agregar MIDI_PB_MAX=16383, renombrar _motorActive→_motor_active, _currentPWM→_motor_currentPWM
+  - Test mode fix: startCalib() se llama UNA sola vez (no loop infinito)
+  - **BLOQUEADOR ENCONTRADO:** Motor no se mueve hacia abajo — calibración falla con `top=3984, bot=3984`
+  - Diagnóstico: Probablemente PWM no llega a IN2 (DOWN control), revisar GPIO16/cable/DRV8833
+  - Commits: `534a13a`, `8c64aa1`, `afc62ac`, `ceed039`, `10ce193`, `deafafa`
+
 - **S2 MOTOR + FADER — Auditoría exhaustiva (2026-05-10 15:02)**
   - Motor.cpp: control ordering crítico, timestamp recapture en transiciones, dinámica PWM mapping
   - FaderADC.cpp: 8 problemas corregidos — variable scope, tipo consistencia, validación de rango completa, bandera gotData
