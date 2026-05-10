@@ -73,8 +73,10 @@ static void _calibUpdate() {
     case CalibPhase::GOING_UP:
         if (now < _motor_calibMinDetect) break;
         if (abs(pos - _motor_stableRef) > ADC_STABILITY_THRESHOLD) {
-            _motor_stableRef   = pos;
-            _motor_stableStart = now;
+            if (pos >= MOTOR_ADC_MIN && pos <= MOTOR_ADC_MAX) {
+                _motor_stableRef   = pos;
+                _motor_stableStart = now;
+            }
         } else if (now - _motor_stableStart >= CALIB_STABLE_TIME) {
             now = millis();  // Recapturar timestamp fresco
             _motor_phase      = CalibPhase::SETTLE_UP;
@@ -121,8 +123,10 @@ static void _calibUpdate() {
     case CalibPhase::GOING_DOWN:
         if (now < _motor_calibMinDetect) break;
         if (abs(pos - _motor_stableRef) > ADC_STABILITY_THRESHOLD) {
-            _motor_stableRef   = pos;
-            _motor_stableStart = now;
+            if (pos >= MOTOR_ADC_MIN && pos <= MOTOR_ADC_MAX) {
+                _motor_stableRef   = pos;
+                _motor_stableStart = now;
+            }
         } else if (now - _motor_stableStart >= CALIB_STABLE_TIME) {
             now = millis();  // Recapturar timestamp fresco
             _motor_phase      = CalibPhase::SETTLE_DOWN;
@@ -138,6 +142,7 @@ static void _calibUpdate() {
         if (_motor_adcPos < _motor_settleMin) _motor_settleMin = _motor_adcPos;
         if (_motor_adcPos > _motor_settleMax) _motor_settleMax = _motor_adcPos;
 
+        now = millis();  // Recapturar timestamp fresco
         if (now - _motor_phaseStart < CALIB_SETTLE_MS) break;
 
         uint16_t adcBot       = _motor_adcPos;
@@ -291,6 +296,10 @@ uint16_t getADCMax() {
 
 void startCalib() {
     if (_isCalibrating()) return;
+    if (_motor_adcPos < MOTOR_ADC_MIN || _motor_adcPos > MOTOR_ADC_MAX) {
+        log_e("[CALIB] Lectura ADC inválida: %d (esperado %d-%d)", _motor_adcPos, MOTOR_ADC_MIN, MOTOR_ADC_MAX);
+        return;
+    }
     uint32_t now = millis();
     _motorActive    = false;
     _currentPWM     = 0;
