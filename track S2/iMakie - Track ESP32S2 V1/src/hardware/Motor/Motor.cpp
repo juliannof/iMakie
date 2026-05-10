@@ -61,6 +61,7 @@ static void _calibUpdate() {
 
     case CalibPhase::KICK_UP:
         if (now - _motor_phaseStart >= CALIB_KICK_MS) {
+            now = millis();  // Recapturar timestamp fresco
             _motor_phase       = CalibPhase::GOING_UP;
             _hwUp(PWM_MAX);
             _motor_stableRef   = pos;
@@ -75,9 +76,10 @@ static void _calibUpdate() {
             _motor_stableRef   = pos;
             _motor_stableStart = now;
         } else if (now - _motor_stableStart >= CALIB_STABLE_TIME) {
+            now = millis();  // Recapturar timestamp fresco
             _motor_phase      = CalibPhase::SETTLE_UP;
             _hwOff();
-            _motor_settleMin  = 8191;
+            _motor_settleMin  = 27000;
             _motor_settleMax  = 0;
             _motor_phaseStart = now;
             log_d("[CALIB] SETTLE_UP  pos=%d", pos);
@@ -93,10 +95,11 @@ static void _calibUpdate() {
             _motor_noiseTopSpan = _motor_settleMax - _motor_settleMin;
             log_i("[CALIB] Tope superior: %d  noise_span=%d", _motor_adcTop, _motor_noiseTopSpan);
 
+            now = millis();  // Recapturar timestamp fresco
             _motor_calibMinDetect = now + CALIB_MIN_TRAVEL_MS;
             _motor_stableRef      = (int)_motor_adcTop;
             _motor_stableStart    = now;
-            _motor_settleMin      = 8191;
+            _motor_settleMin      = 27000;
             _motor_settleMax      = 0;
             _motor_phase          = CalibPhase::KICK_DOWN;
             _hwDown(PWM_MAX);
@@ -106,6 +109,7 @@ static void _calibUpdate() {
 
     case CalibPhase::KICK_DOWN:
         if (now - _motor_phaseStart >= CALIB_KICK_MS) {
+            now = millis();  // Recapturar timestamp fresco
             _motor_phase       = CalibPhase::GOING_DOWN;
             _hwDown(PWM_MAX);
             _motor_stableRef   = pos;
@@ -120,9 +124,10 @@ static void _calibUpdate() {
             _motor_stableRef   = pos;
             _motor_stableStart = now;
         } else if (now - _motor_stableStart >= CALIB_STABLE_TIME) {
+            now = millis();  // Recapturar timestamp fresco
             _motor_phase      = CalibPhase::SETTLE_DOWN;
             _hwOff();
-            _motor_settleMin  = 8191;
+            _motor_settleMin  = 27000;
             _motor_settleMax  = 0;
             _motor_phaseStart = now;
             log_d("[CALIB] SETTLE_DOWN  pos=%d", pos);
@@ -278,16 +283,17 @@ uint16_t getADCMax() {
 
 void startCalib() {
     if (_isCalibrating()) return;
+    uint32_t now = millis();
     _motorActive    = false;
     _currentPWM     = 0;
-    _motor_settleMin      = 8191;
+    _motor_settleMin      = 27000;
     _motor_settleMax      = 0;
     _motor_noiseTopSpan   = 0;
-    _motor_calibStart     = millis();
-    _motor_calibMinDetect = millis() + CALIB_MIN_TRAVEL_MS;
+    _motor_calibStart     = now;
+    _motor_calibMinDetect = now + CALIB_MIN_TRAVEL_MS;
     _motor_stableRef      = (int)_motor_adcPos;
-    _motor_stableStart    = millis();
-    _motor_phaseStart     = millis();
+    _motor_stableStart    = now;
+    _motor_phaseStart     = now;
     _motor_phase          = CalibPhase::KICK_UP;
     _hwUp(PWM_MAX);
     log_i("[CALIB] Iniciada");
