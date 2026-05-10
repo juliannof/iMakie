@@ -244,13 +244,27 @@ void setup() {
 //  loop
 // =============================================================
 void loop() {
-    // ⚠️ TEMPORAL: Auto-calibración a los 30s del arranque (sin S3 — testing)
+    // ⚠️ TEMPORAL: Auto-calibración continua a partir de los 6s del arranque (debugging motor)
     static uint32_t bootTime = millis();
-    static bool calibrated = false;
-    if (!calibrated && millis() - bootTime >= 30000) {
-        calibrated = true;
+    static bool calibStarted = false;
+    static CalibState lastCalibState = CalibState::IDLE;
+
+    // A los 6s, iniciar calibración
+    if (!calibStarted && millis() - bootTime >= 6000) {
+        calibStarted = true;
         Motor::startCalib();
-        log_i("[TEMP] Motor auto-calibración iniciada (30s post-boot)");
+        log_i("[TEMP] Motor auto-calibración iniciada (ejecución continua)");
+    }
+
+    // Detectar transición a DONE o ERROR y reiniciar
+    if (calibStarted) {
+        CalibState currentState = Motor::getCalibState();
+        if ((currentState == CalibState::DONE || currentState == CalibState::ERROR) &&
+            (lastCalibState == CalibState::CALIB_UP || lastCalibState == CalibState::CALIB_DOWN)) {
+            Motor::startCalib();
+            log_i("[TEMP] Motor auto-calibración reiniciada");
+        }
+        lastCalibState = currentState;
     }
 
     // OTA siempre tiene máxima prioridad, incluso si SAT está abierto

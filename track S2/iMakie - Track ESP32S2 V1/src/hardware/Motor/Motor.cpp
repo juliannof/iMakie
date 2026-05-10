@@ -1,30 +1,30 @@
 #include "Motor.h"
 #include "../../config.h"
 
-// ─── Hardware — sin lógica de estado ──────────────────────────
+// ─── Hardware — LEDC Core 3.x API (moderno) ──────────────────
 static void _hwBrake() {
     log_i("[HW] BRAKE");
     digitalWrite(MOTOR_EN, HIGH);
-    analogWrite(MOTOR_IN1, 255);
-    analogWrite(MOTOR_IN2, 255);
+    ledcWrite(MOTOR_IN1, 255);
+    ledcWrite(MOTOR_IN2, 255);
 }
 static void _hwOff() {
     //log_i("[HW] OFF");
     digitalWrite(MOTOR_EN, LOW);
-    analogWrite(MOTOR_IN1, 0);
-    analogWrite(MOTOR_IN2, 0);
+    ledcWrite(MOTOR_IN1, 0);
+    ledcWrite(MOTOR_IN2, 0);
 }
 static void _hwUp(uint8_t pwm) {
     log_i("[HW] UP pwm=%d", pwm);
     digitalWrite(MOTOR_EN, HIGH);
-    analogWrite(MOTOR_IN1, 0);
-    analogWrite(MOTOR_IN2, pwm);
+    ledcWrite(MOTOR_IN1, 0);
+    ledcWrite(MOTOR_IN2, pwm);
 }
 static void _hwDown(uint8_t pwm) {
     log_i("[HW] DOWN pwm=%d", pwm);
     digitalWrite(MOTOR_EN, HIGH);
-    analogWrite(MOTOR_IN2, 0);
-    analogWrite(MOTOR_IN1, pwm);
+    ledcWrite(MOTOR_IN2, 0);
+    ledcWrite(MOTOR_IN1, pwm);
 }
 
 
@@ -197,26 +197,30 @@ static void _positionTick() {
 namespace Motor {
 
 void init() {
-    // ORDEN CRÍTICO: pinMode → frecuencia/resolución → LUEGO attach/duty
+    // ORDEN CRÍTICO: pinMode → ledcAttach → LUEGO ledcWrite (Core 3.x LEDC API)
     pinMode(MOTOR_EN,  OUTPUT);
     pinMode(MOTOR_IN1, OUTPUT);
     pinMode(MOTOR_IN2, OUTPUT);
 
-    // Configurar frecuencia y resolución ANTES de analogWrite
-    // Si analogWrite va primero, hace attach implícito con valores default
-    // y analogWriteFrequency() ya no tiene efecto
-    analogWriteFrequency(MOTOR_IN1, 20000);
-    analogWriteFrequency(MOTOR_IN2, 20000);
-    analogWriteResolution(MOTOR_IN1, 8);
-    analogWriteResolution(MOTOR_IN2, 8);
-
-    // Ahora inicializar PWM/EN en valores default
+    // Estado de seguridad: EN siempre LOW hasta que se habilite
     digitalWrite(MOTOR_EN, LOW);
-    analogWrite(MOTOR_IN1, 0);
-    analogWrite(MOTOR_IN2, 0);
+
+    // LEDC moderne: ledcAttach(pin, frequency_Hz, resolution_bits)
+    // Validar que el attach fue exitoso
+    if (!ledcAttach(MOTOR_IN1, 20000, 8)) {
+        log_e("[MOTOR] Fallo crítico: ledcAttach IN1 (GPIO%d) falló", MOTOR_IN1);
+    }
+    if (!ledcAttach(MOTOR_IN2, 20000, 8)) {
+        log_e("[MOTOR] Fallo crítico: ledcAttach IN2 (GPIO%d) falló", MOTOR_IN2);
+    }
+
+    // Inicializar duty cycle en 0
+    ledcWrite(MOTOR_IN1, 0);
+    ledcWrite(MOTOR_IN2, 0);
 
     _hwOff();
-    log_i("[MOTOR] init OK  IN1=%d IN2=%d EN=%d", MOTOR_IN1, MOTOR_IN2, MOTOR_EN);
+    log_i("[MOTOR] init OK - LEDC Core 3.x - IN1=%d IN2=%d EN=%d freq=20kHz",
+          MOTOR_IN1, MOTOR_IN2, MOTOR_EN);
 }
 
 

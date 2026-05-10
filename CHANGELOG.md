@@ -7,7 +7,26 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### Documentation
+- **Directiva Obligatoria — Código Moderno: Alineación con Stack (2026-05-10 19:45)**
+  - Todos los cambios de código deben usar las MISMAS APIs que las librerías del proyecto
+  - Motor: DEBE usar LEDC (ledcAttach/ledcWrite) — NO analogWrite (incompatible con LovyanGFX)
+  - I2C: DEBE usar Wire moderno (Adafruit BusIO estándar)
+  - Logging: usar log_i/log_e (no Serial legacy)
+  - PROHIBIDO mezclar APIs en mismo subsistema (ej: LEDC + analogWrite = FATAL)
+  - Stack: pioarduino 55.03.37/IDF5 + LovyanGFX 1.2.19 + Adafruit libs
+  - Documentado en CLAUDE.md y memory
+
 ### Changed
+- **S2 MOTOR — Migración a LEDC Core 3.x (2026-05-10 19:50)**
+  - Reemplazado analogWrite (API antigua) por ledcWrite (LEDC moderno)
+  - init(): analogWriteFrequency/Resolution → ledcAttach con validación de retorno
+  - _hwBrake/Off/Up/Down: analogWrite → ledcWrite
+  - Alineación con stack: LovyanGFX usa LEDC internamente, motor ahora compatible
+  - Log mejorado: detecta fallos de ledcAttach en init()
+  - Impacto: PWM 20kHz estable, API moderna, sin conflictos con otras librerías
+  - Estado: listo para compilación y testing
+
 - **S2 MOTOR — _hwUp() y _hwDown() invertidos (2026-05-10 00:15)**
   - Hardware tiene pines invertidos: UP=IN2 PWM, DOWN=IN1 PWM
   - Cambio: invertir lógica en ambas funciones

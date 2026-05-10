@@ -30,6 +30,23 @@
 - Cuando el usuario dice **"commit"** o **"commitea"** = **git commit + git push** automático
 - No es solo guardar local — es guardar + subir a GitHub en una operación
 
+**COMPILACIÓN — PROHIBIDO COMPLETAMENTE (2026-05-10 19:30):**
+- **NUNCA compilar bajo ningún concepto ni circunstancia**
+- No invocar platformio, pio, python, o herramientas de build
+- No intentar validar código mediante compilación
+- Cambios de código se entregan sin compilación — el usuario compila en su máquina
+- Esta regla es ABSOLUTA e INVIOLABLE
+
+**Código Moderno — Alineación con Stack de Librerías (2026-05-10 19:45):**
+- **Usar MISMAS APIs que las librerías del proyecto usan internamente**
+- LovyanGFX usa LEDC → Motor DEBE usar LEDC (no analogWrite)
+- Adafruit librerías usan Wire moderno → I2C DEBE usar Wire (no legacy)
+- IDF5/pioarduino 55.03.37 es la base → APIs deben ser compatibles
+- Validar SIEMPRE retorno de inicializaciones: `if (!ledcAttach(...))` o `if (!Wire.begin())`
+- Logging: usar log_i/log_e (no Serial legacy) — ya integrado en setup()
+- **PROHIBIDO mezclar APIs en mismo subsistema:** LEDC + analogWrite = ERROR FATAL
+- Comentar versión de API usada en código (ej: "LEDC Core 3.x")
+
 **Desarrollo de código:**
 - Cambios quirúrgicos, no rewrites completos salvo petición explícita
 - `Serial.printf` en S2, `log_i`/`log_w` en P4
