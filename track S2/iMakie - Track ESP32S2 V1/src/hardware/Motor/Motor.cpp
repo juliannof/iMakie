@@ -171,6 +171,11 @@ static void _calibUpdate() {
 
 // ─── Control de posición ──────────────────────────────────────
 static void _positionTick() {
+    if (_motor_adcSpan == 0) {
+        _hwOff();
+        return;  // No calibrado
+    }
+
     int pos    = (int)_motor_adcPos;
     int err    = (int)_motor_targetADC - pos;
     int absErr = abs(err);
@@ -191,7 +196,7 @@ static void _positionTick() {
         log_d("[POS] ON  pos=%d err=%d", pos, err);
     }
 
-    int targetPWM = PWM_MIN + (min(absErr, 1000) * (PWM_MAX - PWM_MIN)) / 1000;
+    int targetPWM = PWM_MIN + (min(absErr, _motor_adcSpan) * (PWM_MAX - PWM_MIN)) / _motor_adcSpan;
     targetPWM = constrain(targetPWM, PWM_MIN, PWM_MAX);
 
     _currentPWM = constrain(
