@@ -188,30 +188,30 @@ static void _positionTick() {
     int absErr = abs(err);
 
     if (absErr < DEAD_ZONE) {
-        if (_motorActive) {
-            _motorActive = false;
+        if (_motor_active) {
+            _motor_active = false;
             _hwOff();
-            _currentPWM = 0;
+            _motor_currentPWM = 0;
             log_d("[POS] OFF  pos=%d err=%d", pos, err);
         }
         return;
     }
 
-    if (!_motorActive) {
-        _motorActive = true;
-        _currentPWM  = 0;
+    if (!_motor_active) {
+        _motor_active = true;
+        _motor_currentPWM  = 0;
         log_d("[POS] ON  pos=%d err=%d", pos, err);
     }
 
-    int targetPWM = PWM_MIN + (min(absErr, _motor_adcSpan) * (PWM_MAX - PWM_MIN)) / _motor_adcSpan;
+    int targetPWM = PWM_MIN + (min((uint16_t)absErr, _motor_adcSpan) * (PWM_MAX - PWM_MIN)) / _motor_adcSpan;
     targetPWM = constrain(targetPWM, PWM_MIN, PWM_MAX);
 
-    _currentPWM = constrain(
-        _currentPWM + constrain(targetPWM - _currentPWM, -PWM_SLEW, PWM_SLEW),
+    _motor_currentPWM = constrain(
+        _motor_currentPWM + constrain(targetPWM - _motor_currentPWM, -PWM_SLEW, PWM_SLEW),
         0, PWM_MAX);
 
-    if (err > 0) _hwUp((uint8_t)_currentPWM);
-    else         _hwDown((uint8_t)_currentPWM);
+    if (err > 0) _hwUp((uint8_t)_motor_currentPWM);
+    else         _hwDown((uint8_t)_motor_currentPWM);
 }
 
 // ─── API pública ──────────────────────────────────────────────
@@ -266,14 +266,14 @@ void setTarget(uint16_t midiPB) {
 
 void off() {
     _hwOff();
-    _motorActive = false;
-    _currentPWM = 0;
+    _motor_active = false;
+    _motor_currentPWM = 0;
 }
 
 void stop() {
     _hwOff();
-    _motorActive = false;
-    _currentPWM = 0;
+    _motor_active = false;
+    _motor_currentPWM = 0;
 }
 
 uint16_t getRawADC() {
@@ -301,8 +301,8 @@ void startCalib() {
         return;
     }
     uint32_t now = millis();
-    _motorActive    = false;
-    _currentPWM     = 0;
+    _motor_active    = false;
+    _motor_currentPWM     = 0;
     _motor_settleMin      = 27000;
     _motor_settleMax      = 0;
     _motor_noiseTopSpan   = 0;

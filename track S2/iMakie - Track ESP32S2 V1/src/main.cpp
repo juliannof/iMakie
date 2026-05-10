@@ -47,7 +47,7 @@ static SatMenu* satMenu    = nullptr;
 //  Callbacks SAT
 // ─────────────────────────────────────────────────────────────
 static void _satMotorOff()  { Motor::stop(); _suspended = true;  }
-static void _satMotorOn()   { Motor::begin(); _suspended = false; }
+static void _satMotorOn()   { Motor::init(); _suspended = false; }
 static void _satBrightness(uint8_t b) { setScreenBrightness(b); }
 static void _satRS485Off()  { _suspended = true;  }
 static void _satRS485On()   { _suspended = false; needsTOTALRedraw = true; }
