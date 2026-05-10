@@ -124,7 +124,7 @@ void SatMenu::update() {
     // ADC + Motor frescos en pantallas de motor
     if (_scr == Scr::MOTOR_CALIB || _scr == Scr::MOTOR_POS) {
         faderADC.update();
-        Motor::setADC(faderADC.getFaderPos());
+        /* Motor::setADC(faderADC.getFaderPos()); */
     }
 
     Btn b = _readBtn();
@@ -931,17 +931,18 @@ void SatMenu::showStatus(const char* msg) {
 void SatMenu::_tickMotorCalib(Btn b) {
     int W = _spr.width(), H = _spr.height();
 
-    if (b == Btn::BACK) { Motor::off(); _goto(Scr::MOTOR); return; }
+    if (b == Btn::BACK) { /* Motor::off(); */ _goto(Scr::MOTOR); return; }
     if (b == Btn::UP) {
         log_i("[MOTOR_CALIB] startCalib() disparado");
-        Motor::startCalib();
+        /* Motor::startCalib(); */
     }
 
     //faderADC.update();
-    Motor::setADC(faderADC.getFaderPos());
-    Motor::update();
+    /* Motor::setADC(faderADC.getFaderPos()); */
+    /* Motor::update(); */
 
-    Motor::CalibState cs = Motor::getCalibState();
+    /* Motor::CalibState cs = Motor::getCalibState(); */
+    Motor::CalibState cs = Motor::CalibState::IDLE;  // Placeholder
 
     _spr.fillScreen(C_BG);
     _drawHdr("MOTOR CALIB");
@@ -949,31 +950,35 @@ void SatMenu::_tickMotorCalib(Btn b) {
     int y = SAT_HDR_H + 8;
     char buf[32];
 
-    const char* stateStr = "IDLE";
+    const char* stateStr = "IDLE (Motor reset)";
     uint16_t stateCol = C_GRAY;
-    switch (cs) {
+    /* switch (cs) {
         case Motor::CalibState::CALIB_UP:   stateStr="SUBIENDO";   stateCol=C_CYAN;   break;
         case Motor::CalibState::CALIB_DOWN: stateStr="BAJANDO";    stateCol=C_CYAN;   break;
         case Motor::CalibState::DONE:       stateStr="DONE";       stateCol=C_GREEN;  break;
         case Motor::CalibState::ERROR:      stateStr="ERROR";      stateCol=C_ACCENT; break;
         default: break;
-    }
+    } */
     _spr.setTextColor(stateCol, C_BG); _spr.setTextSize(2);
     _spr.setTextDatum(textdatum_t::middle_center);
     _spr.drawString(stateStr, W/2, y+10); y+=30;
 
-    uint16_t pos = Motor::getRawADC();
-    float pct = Motor::getPosition();
+    /* uint16_t pos = Motor::getRawADC(); */
+    /* float pct = Motor::getPosition(); */
+    uint16_t pos = 0;
+    float pct = 0.0f;
     _spr.setTextSize(1); _spr.setTextColor(C_TEXT, C_BG);
     _spr.setTextDatum(textdatum_t::top_left);
     snprintf(buf, 32, "pos=%d  (%.1f%%)", pos, pct*100.f);
     _spr.drawString(buf, 4, y); y+=14;
     _drawHBar(4, y, W-8, 12, pct, C_CYAN); y+=18;
 
-    snprintf(buf, 32, "min=%d  max=%d", Motor::getADCMin(), Motor::getADCMax());
+    /* snprintf(buf, 32, "min=%d  max=%d", Motor::getADCMin(), Motor::getADCMax()); */
+    snprintf(buf, 32, "min=0  max=0");
     _spr.setTextColor(C_GRAY, C_BG);
     _spr.drawString(buf, 4, y); y+=14;
-    snprintf(buf, 32, "span=%d", Motor::getADCMax() - Motor::getADCMin());
+    /* snprintf(buf, 32, "span=%d", Motor::getADCMax() - Motor::getADCMin()); */
+    snprintf(buf, 32, "span=0");
     _spr.drawString(buf, 4, y);
 
     _drawHints("Calibrar","","Atras","");
@@ -986,16 +991,18 @@ void SatMenu::_tickMotorCalib(Btn b) {
 void SatMenu::_tickMotorPos(Btn b) {
     int W = _spr.width(), H = _spr.height();
 
-    if (b == Btn::BACK)  { Motor::stop(); _goto(Scr::MOTOR); return; }
-    if (b == Btn::UP)    { _motorTarget = (uint16_t)constrain((int)_motorTarget + 100, 0, 8191); Motor::setTarget(_motorTarget); }
-    if (b == Btn::DOWN)  { _motorTarget = (uint16_t)constrain((int)_motorTarget - 100, 0, 8191); Motor::setTarget(_motorTarget); }
+    if (b == Btn::BACK)  { /* Motor::stop(); */ _goto(Scr::MOTOR); return; }
+    if (b == Btn::UP)    { _motorTarget = (uint16_t)constrain((int)_motorTarget + 100, 0, 8191); /* Motor::setTarget(_motorTarget); */ }
+    if (b == Btn::DOWN)  { _motorTarget = (uint16_t)constrain((int)_motorTarget - 100, 0, 8191); /* Motor::setTarget(_motorTarget); */ }
 
     //faderADC.update();
-    Motor::setADC(faderADC.getFaderPos());
-    Motor::update();
+    /* Motor::setADC(faderADC.getFaderPos()); */
+    /* Motor::update(); */
 
-    uint16_t pos    = Motor::getRawADC();
-    float    pct    = Motor::getPosition();
+    /* uint16_t pos    = Motor::getRawADC(); */
+    /* float    pct    = Motor::getPosition(); */
+    uint16_t pos    = 0;
+    float    pct    = 0.0f;
     float    tgtPct = constrain((float)_motorTarget / 8191.f, 0.f, 1.f);
     int      err    = (int)_motorTarget - (int)pos;
 
@@ -1016,10 +1023,10 @@ void SatMenu::_tickMotorPos(Btn b) {
     _spr.drawString(buf, 4, y); y+=14;
     _drawHBar(4, y, W-8, 12, pct, C_GREEN); y+=18;
 
-    if (!Motor::isCalibrated()) {
+    /* if (!Motor::isCalibrated()) {
         _spr.setTextColor(C_ACCENT, C_BG);
         _spr.drawString("!! SIN CALIBRAR !!", 4, y);
-    }
+    } */
 
     _drawHints("tgt+100","tgt-100","Atras","");
     _push();
