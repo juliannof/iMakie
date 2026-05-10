@@ -7,6 +7,14 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### Changed
+- **Versión — 0.4.2 (2026-05-10 20:00)**
+  - Schema: MAJOR.MINOR.PATCH desarrollo
+  - 0 = Debug/Development state
+  - 4 = Subsistemas completos: Display, Botones, LEDs, Fader (100%)
+  - 2 = En desarrollo: Fader + Motor
+  - Actualizado pre_build.py con versión y comentario de schema
+
 ### Documentation
 - **Directiva Obligatoria — Código Moderno: Alineación con Stack (2026-05-10 19:45)**
   - Todos los cambios de código deben usar las MISMAS APIs que las librerías del proyecto
