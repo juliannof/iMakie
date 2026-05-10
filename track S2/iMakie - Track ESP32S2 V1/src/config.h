@@ -135,7 +135,8 @@ static uint16_t   _motor_lastMidiTarget = 0;
 
 static uint16_t   _motor_settleMin      = 27000;  // > máximo rango ADS1115 (26423)
 static uint16_t   _motor_settleMax      = 0;      // < mínimo rango ADS1115 (23)
-static uint16_t   _motor_noiseTopSpan   = 0;
+static uint16_t   _motor_noiseTopSpan   = 0;      // Ruido medido en SETTLE_UP
+static uint16_t   _motor_noiseBottomSpan = 0;    // Ruido medido en SETTLE_DOWN
 
 static bool       _motor_active         = false;
 static int        _motor_currentPWM     = 0;

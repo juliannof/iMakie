@@ -141,15 +141,17 @@ static void _calibUpdate() {
         if (now - _motor_phaseStart < CALIB_SETTLE_MS) break;
 
         uint16_t adcBot       = _motor_adcPos;
-        uint16_t noiseSpanBot = _motor_settleMax - _motor_settleMin;
+        _motor_noiseBottomSpan = _motor_settleMax - _motor_settleMin;
 
-        uint16_t marginBot = max((uint16_t)(noiseSpanBot * 2), (uint16_t)20);
+        uint16_t marginBot = max((uint16_t)(_motor_noiseBottomSpan * 2), (uint16_t)20);
         uint16_t marginTop = max((uint16_t)(_motor_noiseTopSpan * 2), (uint16_t)20);
+        uint16_t minGapRequired = marginBot + marginTop;
 
-        log_i("[CALIB] Tope inferior: %d  noise_span=%d  margin=%d", adcBot, noiseSpanBot, marginBot);
+        log_i("[CALIB] Tope inferior: %d  noise_span=%d  margin=%d", adcBot, _motor_noiseBottomSpan, marginBot);
         log_i("[CALIB] Tope superior: noise_span=%d  margin=%d", _motor_noiseTopSpan, marginTop);
+        log_i("[CALIB] Gap requerido: %d (ruidos: top=%d bot=%d)", minGapRequired, _motor_noiseTopSpan, _motor_noiseBottomSpan);
 
-        if (_motor_adcTop > adcBot + 200) {
+        if (_motor_adcTop > adcBot + minGapRequired) {
             _motor_adcMin    = adcBot + marginBot;
             _motor_adcMax    = _motor_adcTop - marginTop;
             _motor_adcSpan   = _motor_adcMax - _motor_adcMin;
