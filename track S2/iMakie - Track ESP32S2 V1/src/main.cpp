@@ -240,31 +240,57 @@ void setup() {
     log_i("=== BOOT completo | heap libre: %d bytes ===", ESP.getFreeHeap());
 }
 
+// ─── Prueba motor UP/DOWN sin calibración ─────────────────────
+static void testMotorUpDown() {
+    static int testPhase = 0;  // 0 = UP to 75%, 1 = DOWN to 25%
+    static uint32_t lastLogTime = 0;
+
+    uint16_t currentADC = faderADC.getFaderPos();
+    uint16_t target75 = 23 + (26423 - 23) * 3 / 4;   // ~19866 (75%)
+    uint16_t target25 = 23 + (26423 - 23) * 1 / 4;   // ~6580 (25%)
+
+    if (testPhase == 0) {
+        Motor::driveRaw(PWM_MAX);
+        if (millis() - lastLogTime > 500) {
+            log_i("[TEST-UP] ADC=%d target75=%d", currentADC, target75);
+            lastLogTime = millis();
+        }
+        if (currentADC >= target75) {
+            testPhase = 1;
+            log_i("[TEST] ✓ Reached 75%% ADC=%d, switching to DOWN", currentADC);
+            lastLogTime = millis();
+        }
+    } else {
+        Motor::driveRaw(-PWM_MAX);
+        if (millis() - lastLogTime > 500) {
+            log_i("[TEST-DOWN] ADC=%d target25=%d", currentADC, target25);
+            lastLogTime = millis();
+        }
+        if (currentADC <= target25) {
+            testPhase = 0;
+            log_i("[TEST] ✓ Reached 25%% ADC=%d, switching to UP", currentADC);
+            lastLogTime = millis();
+        }
+    }
+}
+
 // =============================================================
 //  loop
 // =============================================================
 void loop() {
-    // ⚠️ TEMPORAL: Auto-calibración continua a partir de los 6s del arranque (debugging motor)
+    // ⚠️ TEMPORAL: Prueba UP/DOWN a partir de los 6s del arranque
     static uint32_t bootTime = millis();
-    static bool calibStarted = false;
-    static auto lastCalibState = Motor::CalibState::IDLE;
+    static bool testStarted = false;
 
-    // A los 6s, iniciar calibración
-    if (!calibStarted && millis() - bootTime >= 6000) {
-        calibStarted = true;
-        Motor::startCalib();
-        log_i("[TEMP] Motor auto-calibración iniciada (ejecución continua)");
+    // A los 6s, iniciar test
+    if (!testStarted && millis() - bootTime >= 6000) {
+        testStarted = true;
+        log_i("[TEST] Iniciando prueba UP/DOWN a los 6s | PWM_MAX=%d", PWM_MAX);
     }
 
-    // Detectar transición a DONE o ERROR y reiniciar
-    if (calibStarted) {
-        auto currentState = Motor::getCalibState();
-        if ((currentState == Motor::CalibState::DONE || currentState == Motor::CalibState::ERROR) &&
-            (lastCalibState == Motor::CalibState::CALIB_UP || lastCalibState == Motor::CalibState::CALIB_DOWN)) {
-            Motor::startCalib();
-            log_i("[TEMP] Motor auto-calibración reiniciada");
-        }
-        lastCalibState = currentState;
+    // Ejecutar test continuamente
+    if (testStarted) {
+        testMotorUpDown();
     }
 
     // OTA siempre tiene máxima prioridad, incluso si SAT está abierto

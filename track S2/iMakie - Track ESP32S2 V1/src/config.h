@@ -108,7 +108,7 @@ static constexpr uint32_t CALIB_MIN_TRAVEL_MS      = 800;     // mínimo de viaj
 
 // ─── Motor — control de posición ──────────────────────────────
 static constexpr uint8_t  PWM_MIN                  = 65;
-static constexpr uint8_t  PWM_MAX                  = 125;
+static constexpr uint8_t  PWM_MAX                  = 130;
 static constexpr uint8_t  PWM_SLEW                 = 4;
 static constexpr int      DEAD_ZONE                = 100;
 static constexpr int      ADC_SPIKE_GUARD          = 500;     // salto máximo aceptado en setADC()
