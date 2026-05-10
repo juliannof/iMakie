@@ -45,6 +45,15 @@
 - Si cambias inicialización de motor: test en bench ANTES de desplegar
 - Resultado: 2 faders dañados, humano en riesgo — CRÍTICO
 
+**🔒 HARDWARE LOCKED — NO CAMBIOS FÍSICOS (2026-05-10 22:00):**
+- **El hardware ES el que ES. Hacerlo funcionar POR SOFTWARE.**
+- **NUNCA proponer cambiar cables, pines, soldaduras, o conexiones físicas**
+- Incluso si "sería más fácil", la respuesta es: invertir lógica/compensar en código
+- Esto incluye: no sugerir intercambiar motores, cambiar DRV8833, resoldear, etc.
+- Ejemplo: cables al revés → invertir _hwUp/_hwDown en software, NO cambiar cables físicos
+- Si diagnosticas problema físico → documentar, no corregir
+- Esta regla es ABSOLUTA — hardware no se toca bajo ninguna circunstancia
+
 **Código Moderno — Alineación con Stack de Librerías (2026-05-10 19:45):**
 - **Usar MISMAS APIs que las librerías del proyecto usan internamente**
 - LovyanGFX usa LEDC → Motor DEBE usar LEDC (no analogWrite)
