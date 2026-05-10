@@ -343,9 +343,9 @@ void testUpDown() {
     }
 
     uint32_t elapsed = millis() - testStartTime;
-    uint32_t cycleTime = elapsed % 20000;  // 20s cycle: 10s UP + 10s DOWN
+    uint32_t cycleTime = elapsed % 60000;  // 60s cycle: 30s UP + 30s DOWN
 
-    if (cycleTime < 10000) {
+    if (cycleTime < 30000) {
         _hwUp(PWM_MIN);
         if (testPhase != 0) {
             testPhase = 0;
