@@ -11,15 +11,15 @@ static void _hwOff() {
 }
 
 static void _hwUp(uint8_t pwm) {
-    digitalWrite(MOTOR_EN, HIGH);
     analogWrite(MOTOR_IN1, pwm);
     analogWrite(MOTOR_IN2, 0);
+    digitalWrite(MOTOR_EN, HIGH);
 }
 
 static void _hwDown(uint8_t pwm) {
-    digitalWrite(MOTOR_EN, HIGH);
     analogWrite(MOTOR_IN1, 0);
     analogWrite(MOTOR_IN2, pwm);
+    digitalWrite(MOTOR_EN, HIGH);
 }
 
 // ─── Helper ───────────────────────────────────────────────────
