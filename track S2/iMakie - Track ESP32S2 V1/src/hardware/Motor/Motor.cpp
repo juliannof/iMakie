@@ -35,8 +35,8 @@ static void _calibUpdate() {
     int      pos = (int)_adcPos;
 
     if (now - _calibStart > CALIB_TIMEOUT) {
-        _hwOff();
         _motor_phase = CalibPhase::ERROR;
+        _hwOff();
         log_e("[CALIB] TIMEOUT");
         return;
     }
@@ -45,10 +45,10 @@ static void _calibUpdate() {
 
     case CalibPhase::KICK_UP:
         if (now - _motor_phaseStart >= CALIB_KICK_MS) {
+            _motor_phase       = CalibPhase::GOING_UP;
             _hwUp(PWM_MAX);
             _stableRef   = pos;
             _stableStart = now;
-            _motor_phase       = CalibPhase::GOING_UP;
             log_d("[CALIB] GOING_UP");
         }
         break;
@@ -59,11 +59,11 @@ static void _calibUpdate() {
             _stableRef   = pos;
             _stableStart = now;
         } else if (now - _stableStart >= CALIB_STABLE_TIME) {
+            _motor_phase      = CalibPhase::SETTLE_UP;
             _hwOff();
             _settleMin  = 8191;
             _settleMax  = 0;
             _motor_phaseStart = now;
-            _motor_phase      = CalibPhase::SETTLE_UP;
             log_d("[CALIB] SETTLE_UP  pos=%d", pos);
         }
         break;
@@ -82,18 +82,18 @@ static void _calibUpdate() {
             _stableStart    = now;
             _settleMin      = 8191;
             _settleMax      = 0;
+            _motor_phase          = CalibPhase::KICK_DOWN;
             _hwDown(PWM_MAX);
             _motor_phaseStart     = now;
-            _motor_phase          = CalibPhase::KICK_DOWN;
         }
         break;
 
     case CalibPhase::KICK_DOWN:
         if (now - _motor_phaseStart >= CALIB_KICK_MS) {
+            _motor_phase       = CalibPhase::GOING_DOWN;
             _hwDown(PWM_MAX);
             _stableRef   = pos;
             _stableStart = now;
-            _motor_phase       = CalibPhase::GOING_DOWN;
             log_d("[CALIB] GOING_DOWN");
         }
         break;
@@ -104,11 +104,11 @@ static void _calibUpdate() {
             _stableRef   = pos;
             _stableStart = now;
         } else if (now - _stableStart >= CALIB_STABLE_TIME) {
+            _motor_phase      = CalibPhase::SETTLE_DOWN;
             _hwOff();
             _settleMin  = 8191;
             _settleMax  = 0;
             _motor_phaseStart = now;
-            _motor_phase      = CalibPhase::SETTLE_DOWN;
             log_d("[CALIB] SETTLE_DOWN  pos=%d", pos);
         }
         break;
@@ -273,8 +273,8 @@ void startCalib() {
     _stableRef      = (int)_adcPos;
     _stableStart    = millis();
     _motor_phaseStart     = millis();
-    _hwUp(PWM_MAX);
     _motor_phase          = CalibPhase::KICK_UP;
+    _hwUp(PWM_MAX);
     log_i("[CALIB] Iniciada");
 }
 
