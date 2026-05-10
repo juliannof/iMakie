@@ -87,12 +87,26 @@ enum class ConnectionState {
 #define MOTOR_EN     14
 
 
+// Motor — rango válido ADC (ADS1115, 16-bit: 23–26423)
+static constexpr uint16_t MOTOR_ADC_MIN            = 20;      // < mínimo esperado
+static constexpr uint16_t MOTOR_ADC_MAX            = 27000;   // > máximo esperado
+
 // Motor — control de posición (constantes)
 static constexpr uint8_t  PWM_MIN                  = 100;
 static constexpr uint8_t  PWM_MAX                  = 130;
 
+// Motor — spike guard (rechaza cambios > este valor)
+static constexpr uint16_t ADC_SPIKE_GUARD          = 200;     // cuentas máximas entre lecturas
 
 // Motor — calibración (constantes)
+static constexpr uint16_t DEAD_ZONE                = 50;      // error < esto → apagar motor
+static constexpr uint16_t ADC_STABILITY_THRESHOLD  = 300;     // cambio máximo para considerar "estable"
+static constexpr uint32_t CALIB_STABLE_TIME        = 500;     // ms para considerar estable
+static constexpr uint32_t CALIB_SETTLE_MS          = 200;     // ms para medir ruido
+static constexpr uint32_t CALIB_KICK_MS            = 150;     // ms para kick inicial
+static constexpr uint32_t CALIB_MIN_TRAVEL_MS      = 300;     // ms mínimo de viaje antes de medir
+static constexpr uint32_t CALIB_TIMEOUT            = 6000;    // ms timeout calibración
+static constexpr uint8_t  PWM_SLEW                 = 5;       // máximo cambio PWM por tick
 
 
 // Motor — maquina de calibración (enum de fases internas)

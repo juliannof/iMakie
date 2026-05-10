@@ -244,6 +244,7 @@ void update() {
 }
 
 void setADC(uint16_t v) {
+    if (v < MOTOR_ADC_MIN || v > MOTOR_ADC_MAX) return;  // Rechazar fuera de rango esperado
     if (_motor_adcPos > 0 &&
         abs((int)v - (int)_motor_adcPos) > ADC_SPIKE_GUARD) return;
     _motor_adcPos = v;
