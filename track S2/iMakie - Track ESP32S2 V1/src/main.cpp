@@ -237,6 +237,33 @@ void setup() {
     log_i("=== BOOT completo | heap libre: %d bytes ===", ESP.getFreeHeap());
 }
 
+// ─── TEST MODE (automático a 3s del boot) ─────────────────
+static unsigned long g_bootTime = 0;
+static bool g_testStarted = false;
+static uint32_t g_testPhaseTime = 0;
+static int g_testPhase = 0;
+
+static void _runMotorTest() {
+    if (millis() - g_testPhaseTime < 2000) return;  // 2s por fase
+    g_testPhaseTime = millis();
+    
+    // Target positions: MIN → 25% → 50% → 75% → MAX → (repeat)
+    uint16_t span = Motor::getADCMax() - Motor::getADCMin();
+    uint16_t targets[] = {
+        Motor::getADCMin(),                      // 0%
+        Motor::getADCMin() + span / 4,           // 25%
+        Motor::getADCMin() + span / 2,           // 50%
+        Motor::getADCMin() + 3 * span / 4,       // 75%
+        Motor::getADCMax(),                      // 100%
+    };
+    
+    int phase = g_testPhase % 5;
+    Motor::setTarget(targets[phase]);
+    log_i("[TEST] Fase %d → ADC target=%d (pos=%.1f%%)", 
+          g_testPhase, targets[phase], (float)phase * 25.0f);
+    g_testPhase++;
+}
+
 // =============================================================
 //  loop
 // =============================================================
@@ -294,6 +321,23 @@ void loop() {
     }
 
     Motor::update();
+
+    // ─── TEST MODE: inicia a 3s del boot ─────────────────────
+    if (!g_testStarted && millis() - g_bootTime > 3000) {
+        if (!Motor::isCalibrated()) {
+            Motor::startCalib();
+            log_i("[TEST] Iniciando calibración automática...");
+        } else {
+            g_testStarted = true;
+            g_testPhaseTime = millis();
+            log_i("[TEST] Motor calibrado. Iniciando test de posiciones...");
+        }
+    }
+
+    // ─── TEST LOOP: mueve motor a distintas posiciones ────────
+    if (g_testStarted) {
+        _runMotorTest();
+    }
     // Log cada 1s para no saturar serial — DESACTIVADO TEMPORALMENTE para diagnóstico
     // if (millis() - lastMotorLog > 1000) {
     //     auto state = Motor::getCalibState();
