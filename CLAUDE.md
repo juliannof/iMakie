@@ -76,6 +76,14 @@
 - Un proyecto PlatformIO por variante MCU — `config.h` de S3/S2 son independientes
 - No tocar código sin ver primero los ficheros reales
 
+**Variables de estado y configuración — SIEMPRE en config.h (2026-05-10 13:43):**
+- **NUNCA** declarar `static` variables de estado/configuración en .cpp archivos
+- Todas las variables `static` deben estar en `config.h` como fuente única de verdad
+- Incluye: constantes PWM, umbrales calibración, variables de estado de hardware (ADC min/max, etc.)
+- Razón: config.h es el punto central de referencia — permite auditoría, debugging, y cambios sin búsquedas de código
+- Excepción: funciones helper privadas file-scope en .cpp (sufijos `_hw`, `_calib`) pueden tener variables locales transitorias
+- Si una variable afecta comportamiento o calibración → va en config.h
+
 **Sincronización Código ↔ CLAUDE.md:**
 - Cuando cambies arquitectura de `loop()`, orden de `init()`, pines GPIO, o tiempos críticos → **actualiza CLAUDE.md con los diagramas/tablas correspondientes**
 - Cambios pequeños (bug fixes, optimizaciones locales) no requieren actualización
