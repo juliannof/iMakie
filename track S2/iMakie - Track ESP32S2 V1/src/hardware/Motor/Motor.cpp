@@ -5,9 +5,9 @@
 
 // ─── Funciones HW (privadas) ──────────────────────────────────
 static void _hwOff() {
-    digitalWrite(MOTOR_EN, LOW);
     analogWrite(MOTOR_IN1, 0);
     analogWrite(MOTOR_IN2, 0);
+    digitalWrite(MOTOR_EN, LOW);
 }
 
 static void _hwUp(uint8_t pwm) {
