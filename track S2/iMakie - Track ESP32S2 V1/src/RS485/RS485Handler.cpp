@@ -41,8 +41,8 @@ void onMasterData(const MasterPacket& pkt) {
         // Neopixels se actualizan en main.cpp DESPUÉS de sendResponse()
     } else {
         // ── Desconexión limpia ────────────────────────────
-        /* Motor::off(); */
-        /* Motor::setTarget(Motor::getRawADC()); */
+        Motor::off();
+        Motor::setTarget(Motor::getRawADC());
         recStates = soloStates = muteStates = selectStates = false;
         vuLevels = vuPeakLevels = 0.0f;
         //setScreenBrightness(0);
@@ -98,11 +98,11 @@ void onMasterData(const MasterPacket& pkt) {
     float newFader = pkt.faderTarget / 16383.0f;
     if (fabsf(faderPositions - newFader) > 0.001f) {
         faderPositions = newFader;
-        /* Motor::setTarget(pkt.faderTarget); */
+        Motor::setTarget(pkt.faderTarget);
     }
 
     if (pkt.flags & FLAG_CALIB) {
-        /* Motor::startCalib(); */
+        Motor::startCalib();
     }
 
     // ── Modo de automatización (bits 5-7) ─────────────────────
@@ -122,16 +122,16 @@ void onMasterData(const MasterPacket& pkt) {
 // =============================================================
 SlavePacket buildResponse(FaderADC& faderADC, SatMenu& satMenu) {
     SlavePacket resp = {};
-    resp.faderPos      = faderADC.getFaderPos(); /* Motor::getRawADC(); */
+    resp.faderPos      = Motor::getRawADC();
     resp.touchState    = FaderTouch::isTouched() ? 1 : 0;
     resp.buttons       = ButtonManager::getButtonFlags();
     resp.encoderDelta  = (int8_t)constrain(Encoder::getCount(), -127, 127);
     resp.encoderButton = ButtonManager::getEncoderButton();
 
-    /* Motor::CalibState cs = Motor::getCalibState(); */
-    /* if (cs == Motor::CalibState::DONE)  resp.buttons |= SLAVE_FLAG_CALIB_DONE; */
-    /* if (cs == Motor::CalibState::ERROR) resp.buttons |= SLAVE_FLAG_CALIB_ERROR; */
-    /* if (!Motor::isCalibrated())         resp.buttons |= SLAVE_FLAG_NOT_CALIBRATED; */
+    Motor::CalibState cs = Motor::getCalibState();
+    if (cs == Motor::CalibState::DONE)  resp.buttons |= SLAVE_FLAG_CALIB_DONE;
+    if (cs == Motor::CalibState::ERROR) resp.buttons |= SLAVE_FLAG_CALIB_ERROR;
+    if (!Motor::isCalibrated())         resp.buttons |= SLAVE_FLAG_NOT_CALIBRATED;
 
     return resp;
 }
@@ -149,8 +149,8 @@ void checkTimeout(unsigned long lastRxTime) {
     }
     if (logicConnectionState != ConnectionState::DISCONNECTED) {
         logicConnectionState = ConnectionState::DISCONNECTED;
-        /* Motor::off(); */
-        /* Motor::setTarget(Motor::getRawADC()); */
+        Motor::off();
+        Motor::setTarget(Motor::getRawADC());
         recStates = soloStates = muteStates = selectStates = false;
         setScreenBrightness(0);
         neoWaitingHandshake = true;

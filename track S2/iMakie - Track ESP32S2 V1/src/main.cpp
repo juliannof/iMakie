@@ -46,8 +46,8 @@ static SatMenu* satMenu    = nullptr;
 // ─────────────────────────────────────────────────────────────
 //  Callbacks SAT
 // ─────────────────────────────────────────────────────────────
-static void _satMotorOff()  { /* Motor::stop(); */ _suspended = true;  }
-static void _satMotorOn()   { /* Motor::begin(); */ _suspended = false; }
+static void _satMotorOff()  { Motor::stop(); _suspended = true;  }
+static void _satMotorOn()   { Motor::begin(); _suspended = false; }
 static void _satBrightness(uint8_t b) { setScreenBrightness(b); }
 static void _satRS485Off()  { _suspended = true;  }
 static void _satRS485On()   { _suspended = false; needsTOTALRedraw = true; }
@@ -116,7 +116,7 @@ static void _satLedsTest(int idx, uint8_t r, uint8_t g, uint8_t b) {
 //  setup
 // =============================================================
 void setup() {
-    /* Motor::init(); */
+    Motor::init();
     Serial.begin(115200);
     Serial.setDebugOutput(true);
     delay(500);
@@ -215,7 +215,7 @@ void setup() {
     ButtonManager::begin(&tft, satMenu);
     log_i("ButtonManager OK");
 
-    /* Motor::begin(); */
+    Motor::begin();
     log_i("Motor OK (comentado - reset en progreso)");
 
     if (psramFound()) {
@@ -226,7 +226,7 @@ void setup() {
     }
 
     uint8_t slaveId = satMenu->getConfig().trackId;  // ← mover aquí arriba
-    /* Motor::off(); */   // ← asegurar motor apagado antes de arrancar RS485
+    Motor::off();   // ← asegurar motor apagado antes de arrancar RS485
 
     log_i("Track ID: %d", slaveId);
     rs485.begin(slaveId);
@@ -256,7 +256,7 @@ void loop() {
 
     // Ejecutar test continuamente
     if (testStarted) {
-        /* Motor::testUpDown(); */
+        Motor::testUpDown();
     }
 
     // OTA siempre tiene máxima prioridad, incluso si SAT está abierto
@@ -303,7 +303,7 @@ void loop() {
     faderADC.update();
     FaderTouch::update();
 
-    /* Motor::setADC(faderADC.getFaderPos()); */
+    Motor::setADC(faderADC.getFaderPos());
 
     static uint32_t lastLog = 0;
     if (millis() - lastLog > 500) {
@@ -311,7 +311,7 @@ void loop() {
         lastLog = millis();
     }
 
-    /* Motor::update(); */
+    Motor::update();
     // Log cada 1s para no saturar serial — DESACTIVADO TEMPORALMENTE para diagnóstico
     // if (millis() - lastMotorLog > 1000) {
     //     auto state = Motor::getCalibState();
