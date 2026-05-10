@@ -90,18 +90,10 @@ enum class ConnectionState {
 // Motor — control de posición (constantes)
 static constexpr uint8_t  PWM_MIN                  = 100;
 static constexpr uint8_t  PWM_MAX                  = 130;
-static constexpr uint8_t  PWM_SLEW                 = 4;
-static constexpr int      DEAD_ZONE                = 100;
-static constexpr int      ADC_SPIKE_GUARD          = 500;
-static constexpr uint16_t MIDI_PB_MAX              = 16383;
+
 
 // Motor — calibración (constantes)
-static constexpr uint32_t CALIB_KICK_MS            = 150;
-static constexpr uint32_t CALIB_SETTLE_MS          = 200;
-static constexpr uint32_t CALIB_TIMEOUT            = 6000;
-static constexpr int      ADC_STABILITY_THRESHOLD  = 700;
-static constexpr uint32_t CALIB_STABLE_TIME        = 150;
-static constexpr uint32_t CALIB_MIN_TRAVEL_MS      = 800;
+
 
 // Motor — maquina de calibración (enum de fases internas)
 enum class CalibPhase {
@@ -127,8 +119,8 @@ static uint16_t   _motor_adcPos         = 0;
 static uint16_t   _motor_targetADC      = 0;
 static uint16_t   _motor_lastMidiTarget = 0;
 
-static uint16_t   _motor_settleMin      = 8191;
-static uint16_t   _motor_settleMax      = 0;
+static uint16_t   _motor_settleMin      = 27000;  // > máximo rango ADS1115 (26423)
+static uint16_t   _motor_settleMax      = 0;      // < mínimo rango ADS1115 (23)
 static uint16_t   _motor_noiseTopSpan   = 0;
 
 static bool       _motor_active         = false;

@@ -48,9 +48,9 @@ static bool _isCalibrating() {
 // ─── Calibración no-bloqueante ────────────────────────────────
 static void _calibUpdate() {
     uint32_t now = millis();
-    int      pos = (int)_adcPos;
+    int      pos = (int)_motor_adcPos;
 
-    if (now - _calibStart > CALIB_TIMEOUT) {
+    if (now - _motor_calibStart > CALIB_TIMEOUT) {
         _motor_phase = CalibPhase::ERROR;
         _hwOff();
         log_e("[CALIB] TIMEOUT");
@@ -63,41 +63,41 @@ static void _calibUpdate() {
         if (now - _motor_phaseStart >= CALIB_KICK_MS) {
             _motor_phase       = CalibPhase::GOING_UP;
             _hwUp(PWM_MAX);
-            _stableRef   = pos;
-            _stableStart = now;
+            _motor_stableRef   = pos;
+            _motor_stableStart = now;
             log_d("[CALIB] GOING_UP");
         }
         break;
 
     case CalibPhase::GOING_UP:
-        if (now < _calibMinDetect) break;
-        if (abs(pos - _stableRef) > ADC_STABILITY_THRESHOLD) {
-            _stableRef   = pos;
-            _stableStart = now;
-        } else if (now - _stableStart >= CALIB_STABLE_TIME) {
+        if (now < _motor_calibMinDetect) break;
+        if (abs(pos - _motor_stableRef) > ADC_STABILITY_THRESHOLD) {
+            _motor_stableRef   = pos;
+            _motor_stableStart = now;
+        } else if (now - _motor_stableStart >= CALIB_STABLE_TIME) {
             _motor_phase      = CalibPhase::SETTLE_UP;
             _hwOff();
-            _settleMin  = 8191;
-            _settleMax  = 0;
+            _motor_settleMin  = 8191;
+            _motor_settleMax  = 0;
             _motor_phaseStart = now;
             log_d("[CALIB] SETTLE_UP  pos=%d", pos);
         }
         break;
 
     case CalibPhase::SETTLE_UP:
-        if (_adcPos < _settleMin) _settleMin = _adcPos;
-        if (_adcPos > _settleMax) _settleMax = _adcPos;
+        if (_motor_adcPos < _motor_settleMin) _motor_settleMin = _motor_adcPos;
+        if (_motor_adcPos > _motor_settleMax) _motor_settleMax = _motor_adcPos;
 
         if (now - _motor_phaseStart >= CALIB_SETTLE_MS) {
-            _adcTop       = _adcPos;
-            _noiseTopSpan = _settleMax - _settleMin;
-            log_i("[CALIB] Tope superior: %d  noise_span=%d", _adcTop, _noiseTopSpan);
+            _motor_adcTop       = _motor_adcPos;
+            _motor_noiseTopSpan = _motor_settleMax - _motor_settleMin;
+            log_i("[CALIB] Tope superior: %d  noise_span=%d", _motor_adcTop, _motor_noiseTopSpan);
 
-            _calibMinDetect = now + CALIB_MIN_TRAVEL_MS;
-            _stableRef      = (int)_adcTop;
-            _stableStart    = now;
-            _settleMin      = 8191;
-            _settleMax      = 0;
+            _motor_calibMinDetect = now + CALIB_MIN_TRAVEL_MS;
+            _motor_stableRef      = (int)_motor_adcTop;
+            _motor_stableStart    = now;
+            _motor_settleMin      = 8191;
+            _motor_settleMax      = 0;
             _motor_phase          = CalibPhase::KICK_DOWN;
             _hwDown(PWM_MAX);
             _motor_phaseStart     = now;
@@ -108,54 +108,54 @@ static void _calibUpdate() {
         if (now - _motor_phaseStart >= CALIB_KICK_MS) {
             _motor_phase       = CalibPhase::GOING_DOWN;
             _hwDown(PWM_MAX);
-            _stableRef   = pos;
-            _stableStart = now;
+            _motor_stableRef   = pos;
+            _motor_stableStart = now;
             log_d("[CALIB] GOING_DOWN");
         }
         break;
 
     case CalibPhase::GOING_DOWN:
-        if (now < _calibMinDetect) break;
-        if (abs(pos - _stableRef) > ADC_STABILITY_THRESHOLD) {
-            _stableRef   = pos;
-            _stableStart = now;
-        } else if (now - _stableStart >= CALIB_STABLE_TIME) {
+        if (now < _motor_calibMinDetect) break;
+        if (abs(pos - _motor_stableRef) > ADC_STABILITY_THRESHOLD) {
+            _motor_stableRef   = pos;
+            _motor_stableStart = now;
+        } else if (now - _motor_stableStart >= CALIB_STABLE_TIME) {
             _motor_phase      = CalibPhase::SETTLE_DOWN;
             _hwOff();
-            _settleMin  = 8191;
-            _settleMax  = 0;
+            _motor_settleMin  = 8191;
+            _motor_settleMax  = 0;
             _motor_phaseStart = now;
             log_d("[CALIB] SETTLE_DOWN  pos=%d", pos);
         }
         break;
 
     case CalibPhase::SETTLE_DOWN: {
-        if (_adcPos < _settleMin) _settleMin = _adcPos;
-        if (_adcPos > _settleMax) _settleMax = _adcPos;
+        if (_motor_adcPos < _motor_settleMin) _motor_settleMin = _motor_adcPos;
+        if (_motor_adcPos > _motor_settleMax) _motor_settleMax = _motor_adcPos;
 
         if (now - _motor_phaseStart < CALIB_SETTLE_MS) break;
 
-        uint16_t adcBot       = _adcPos;
-        uint16_t noiseSpanBot = _settleMax - _settleMin;
+        uint16_t adcBot       = _motor_adcPos;
+        uint16_t noiseSpanBot = _motor_settleMax - _motor_settleMin;
 
         uint16_t marginBot = max((uint16_t)(noiseSpanBot * 2), (uint16_t)20);
-        uint16_t marginTop = max((uint16_t)(_noiseTopSpan * 2), (uint16_t)20);
+        uint16_t marginTop = max((uint16_t)(_motor_noiseTopSpan * 2), (uint16_t)20);
 
         log_i("[CALIB] Tope inferior: %d  noise_span=%d  margin=%d", adcBot, noiseSpanBot, marginBot);
-        log_i("[CALIB] Tope superior: noise_span=%d  margin=%d", _noiseTopSpan, marginTop);
+        log_i("[CALIB] Tope superior: noise_span=%d  margin=%d", _motor_noiseTopSpan, marginTop);
 
-        if (_adcTop > adcBot + 200) {
-            _adcMin    = adcBot + marginBot;
-            _adcMax    = _adcTop - marginTop;
-            _adcSpan   = _adcMax - _adcMin;
-            _targetADC = (uint16_t)map((long)_lastMidiTarget,
-                                        0, MIDI_PB_MAX, _adcMin, _adcMax);
+        if (_motor_adcTop > adcBot + 200) {
+            _motor_adcMin    = adcBot + marginBot;
+            _motor_adcMax    = _motor_adcTop - marginTop;
+            _motor_adcSpan   = _motor_adcMax - _motor_adcMin;
+            _motor_targetADC = (uint16_t)map((long)_motor_lastMidiTarget,
+                                        0, MIDI_PB_MAX, _motor_adcMin, _motor_adcMax);
             _motor_phase     = CalibPhase::DONE;
             log_i("[CALIB] OK  MIN=%d MAX=%d span=%d target=%d",
-                  _adcMin, _adcMax, _adcSpan, _targetADC);
+                  _motor_adcMin, _motor_adcMax, _motor_adcSpan, _motor_targetADC);
         } else {
             _motor_phase = CalibPhase::ERROR;
-            log_e("[CALIB] ERROR — rango inválido  top=%d bot=%d", _adcTop, adcBot);
+            log_e("[CALIB] ERROR — rango inválido  top=%d bot=%d", _motor_adcTop, adcBot);
         }
         break;
     }
@@ -166,8 +166,8 @@ static void _calibUpdate() {
 
 // ─── Control de posición ──────────────────────────────────────
 static void _positionTick() {
-    int pos    = (int)_adcPos;
-    int err    = (int)_targetADC - pos;
+    int pos    = (int)_motor_adcPos;
+    int err    = (int)_motor_targetADC - pos;
     int absErr = abs(err);
 
     if (absErr < DEAD_ZONE) {
@@ -234,16 +234,16 @@ void update() {
 }
 
 void setADC(uint16_t v) {
-    if (_adcPos > 0 &&
-        abs((int)v - (int)_adcPos) > ADC_SPIKE_GUARD) return;
-    _adcPos = v;
+    if (_motor_adcPos > 0 &&
+        abs((int)v - (int)_motor_adcPos) > ADC_SPIKE_GUARD) return;
+    _motor_adcPos = v;
 }
 
 void setTarget(uint16_t midiPB) {
-    _lastMidiTarget = midiPB;
+    _motor_lastMidiTarget = midiPB;
     if (_motor_phase != CalibPhase::DONE) return;
-    _targetADC = (uint16_t)map((long)midiPB, 0, MIDI_PB_MAX, _adcMin, _adcMax);
-    log_d("[TARGET] midi=%d → adc=%d", midiPB, _targetADC);
+    _motor_targetADC = (uint16_t)map((long)midiPB, 0, MIDI_PB_MAX, _motor_adcMin, _motor_adcMax);
+    log_d("[TARGET] midi=%d → adc=%d", midiPB, _motor_targetADC);
 }
 
 void off() {
@@ -259,34 +259,34 @@ void stop() {
 }
 
 uint16_t getRawADC() {
-    return _adcPos;
+    return _motor_adcPos;
 }
 
 float getPosition() {
-    if (_adcSpan == 0) return 0.0f;
-    int pos = (int)_adcPos - (int)_adcMin;
-    return constrain((float)pos / (float)_adcSpan, 0.0f, 1.0f);
+    if (_motor_adcSpan == 0) return 0.0f;
+    int pos = (int)_motor_adcPos - (int)_motor_adcMin;
+    return constrain((float)pos / (float)_motor_adcSpan, 0.0f, 1.0f);
 }
 
 uint16_t getADCMin() {
-    return _adcMin;
+    return _motor_adcMin;
 }
 
 uint16_t getADCMax() {
-    return _adcMax;
+    return _motor_adcMax;
 }
 
 void startCalib() {
     if (_isCalibrating()) return;
     _motorActive    = false;
     _currentPWM     = 0;
-    _settleMin      = 8191;
-    _settleMax      = 0;
-    _noiseTopSpan   = 0;
-    _calibStart     = millis();
-    _calibMinDetect = millis() + CALIB_MIN_TRAVEL_MS;
-    _stableRef      = (int)_adcPos;
-    _stableStart    = millis();
+    _motor_settleMin      = 8191;
+    _motor_settleMax      = 0;
+    _motor_noiseTopSpan   = 0;
+    _motor_calibStart     = millis();
+    _motor_calibMinDetect = millis() + CALIB_MIN_TRAVEL_MS;
+    _motor_stableRef      = (int)_motor_adcPos;
+    _motor_stableStart    = millis();
     _motor_phaseStart     = millis();
     _motor_phase          = CalibPhase::KICK_UP;
     _hwUp(PWM_MAX);
@@ -313,7 +313,7 @@ CalibState getCalibState() {
 }
 
 bool isCalibrated() {
-    return _motor_phase == CalibPhase::DONE && _adcSpan > 100;
+    return _motor_phase == CalibPhase::DONE && _motor_adcSpan > 100;
 }
 
 } // namespace Motor
