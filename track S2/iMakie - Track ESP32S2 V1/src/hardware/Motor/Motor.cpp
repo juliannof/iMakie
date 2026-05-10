@@ -1,36 +1,36 @@
 #include "Motor.h"
 #include "../../config.h"
 
-// ─── Hardware — LEDC Core 3.x API (moderno) ──────────────────
+// ─── Hardware — analogWrite (TEMPORAL: LEDC fallaba) ──────────────────
 static void _hwBrake() {
     log_i("[HW] BRAKE - EN=HIGH IN1=255 IN2=255");
     digitalWrite(MOTOR_EN, HIGH);
-    ledcWrite(MOTOR_IN1, 255);
-    log_d("[HW] ledcWrite IN1=255 OK");
-    ledcWrite(MOTOR_IN2, 255);
-    log_d("[HW] ledcWrite IN2=255 OK");
+    analogWrite(MOTOR_IN1, 255);
+    log_d("[HW] analogWrite IN1=255 OK");
+    analogWrite(MOTOR_IN2, 255);
+    log_d("[HW] analogWrite IN2=255 OK");
 }
 static void _hwOff() {
     log_d("[HW] OFF - EN=LOW IN1=0 IN2=0");
     digitalWrite(MOTOR_EN, LOW);
-    ledcWrite(MOTOR_IN1, 0);
-    ledcWrite(MOTOR_IN2, 0);
+    analogWrite(MOTOR_IN1, 0);
+    analogWrite(MOTOR_IN2, 0);
 }
 static void _hwUp(uint8_t pwm) {
     log_i("[HW] UP - EN=HIGH IN1=0 IN2=%d", pwm);
     digitalWrite(MOTOR_EN, HIGH);
-    ledcWrite(MOTOR_IN1, 0);
-    log_d("[HW] ledcWrite IN1=0 OK");
-    ledcWrite(MOTOR_IN2, pwm);
-    log_d("[HW] ledcWrite IN2=%d OK", pwm);
+    analogWrite(MOTOR_IN1, 0);
+    log_d("[HW] analogWrite IN1=0 OK");
+    analogWrite(MOTOR_IN2, pwm);
+    log_d("[HW] analogWrite IN2=%d OK", pwm);
 }
 static void _hwDown(uint8_t pwm) {
     log_i("[HW] DOWN - EN=HIGH IN2=0 IN1=%d", pwm);
     digitalWrite(MOTOR_EN, HIGH);
-    ledcWrite(MOTOR_IN2, 0);
-    log_d("[HW] ledcWrite IN2=0 OK");
-    ledcWrite(MOTOR_IN1, pwm);
-    log_d("[HW] ledcWrite IN1=%d OK", pwm);
+    analogWrite(MOTOR_IN2, 0);
+    log_d("[HW] analogWrite IN2=0 OK");
+    analogWrite(MOTOR_IN1, pwm);
+    log_d("[HW] analogWrite IN1=%d OK", pwm);
 }
 
 
@@ -203,8 +203,9 @@ static void _positionTick() {
 namespace Motor {
 
 void init() {
-    // ORDEN CRÍTICO: pinMode → ledcAttach → LUEGO ledcWrite (Core 3.x LEDC API)
-    log_i("[MOTOR] init(): iniciando configuración LEDC");
+    // TEMPORAL: Revertir a analogWrite (LEDC fallaba silenciosamente)
+    // ORDEN CRÍTICO: pinMode → frequency/resolution → LUEGO analogWrite
+    log_i("[MOTOR] init(): iniciando configuración analogWrite (TEMPORAL)");
 
     pinMode(MOTOR_EN,  OUTPUT);
     log_i("[MOTOR] pinMode EN (GPIO%d) OK", MOTOR_EN);
@@ -219,33 +220,26 @@ void init() {
     digitalWrite(MOTOR_EN, LOW);
     log_i("[MOTOR] digitalWrite EN=LOW OK");
 
-    // LEDC moderne: ledcAttach(pin, frequency_Hz, resolution_bits)
-    // Validar que el attach fue exitoso
-    log_i("[MOTOR] Attempting ledcAttach IN1 (GPIO%d, 20kHz, 8-bit)...", MOTOR_IN1);
-    bool attach1 = ledcAttach(MOTOR_IN1, 20000, 8);
-    if (!attach1) {
-        log_e("[MOTOR] CRÍTICO: ledcAttach IN1 (GPIO%d) FALLÓ", MOTOR_IN1);
-    } else {
-        log_i("[MOTOR] ledcAttach IN1 OK");
-    }
+    // Configurar frecuencia ANTES de analogWrite
+    log_i("[MOTOR] Configurando analogWriteFrequency IN1/IN2 a 20kHz...");
+    analogWriteFrequency(MOTOR_IN1, 20000);
+    analogWriteFrequency(MOTOR_IN2, 20000);
+    log_i("[MOTOR] analogWriteFrequency OK");
 
-    log_i("[MOTOR] Attempting ledcAttach IN2 (GPIO%d, 20kHz, 8-bit)...", MOTOR_IN2);
-    bool attach2 = ledcAttach(MOTOR_IN2, 20000, 8);
-    if (!attach2) {
-        log_e("[MOTOR] CRÍTICO: ledcAttach IN2 (GPIO%d) FALLÓ", MOTOR_IN2);
-    } else {
-        log_i("[MOTOR] ledcAttach IN2 OK");
-    }
+    log_i("[MOTOR] Configurando analogWriteResolution IN1/IN2 a 8-bit...");
+    analogWriteResolution(MOTOR_IN1, 8);
+    analogWriteResolution(MOTOR_IN2, 8);
+    log_i("[MOTOR] analogWriteResolution OK");
 
     // Inicializar duty cycle en 0
     log_i("[MOTOR] Initializing duty cycles to 0");
-    ledcWrite(MOTOR_IN1, 0);
-    ledcWrite(MOTOR_IN2, 0);
-    log_i("[MOTOR] ledcWrite IN1=0, IN2=0 OK");
+    analogWrite(MOTOR_IN1, 0);
+    analogWrite(MOTOR_IN2, 0);
+    log_i("[MOTOR] analogWrite IN1=0, IN2=0 OK");
 
     _hwOff();
-    log_i("[MOTOR] init COMPLETE - LEDC Core 3.x - EN=%d IN1=%d IN2=%d freq=20kHz SUCCESS=%d,%d",
-          MOTOR_EN, MOTOR_IN1, MOTOR_IN2, (int)attach1, (int)attach2);
+    log_i("[MOTOR] init COMPLETE - analogWrite (TEMPORAL) - EN=%d IN1=%d IN2=%d freq=20kHz",
+          MOTOR_EN, MOTOR_IN1, MOTOR_IN2);
 }
 
 
