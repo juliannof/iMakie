@@ -63,7 +63,7 @@ static void _calibUpdate() {
         if (now - _motor_phaseStart >= CALIB_KICK_MS) {
             now = millis();  // Recapturar timestamp fresco
             _motor_phase       = CalibPhase::GOING_UP;
-            _hwUp(PWM_MAX);
+            _hwUp(PWM_MIN);  // Movimiento controlado hacia el tope
             _motor_stableRef   = pos;
             _motor_stableStart = now;
             log_d("[CALIB] GOING_UP");
@@ -113,7 +113,7 @@ static void _calibUpdate() {
         if (now - _motor_phaseStart >= CALIB_KICK_MS) {
             now = millis();  // Recapturar timestamp fresco
             _motor_phase       = CalibPhase::GOING_DOWN;
-            _hwDown(PWM_MAX);
+            _hwDown(PWM_MIN);  // Movimiento controlado hacia el tope
             _motor_stableRef   = pos;
             _motor_stableStart = now;
             log_d("[CALIB] GOING_DOWN");
