@@ -116,6 +116,10 @@ static void _satLedsTest(int idx, uint8_t r, uint8_t g, uint8_t b) {
 //  setup
 // =============================================================
 void setup() {
+    // ⚠️ SAFETY: Motor EN (GPIO14) MUST be LOW immediately to prevent movement
+    pinMode(MOTOR_EN, OUTPUT);
+    digitalWrite(MOTOR_EN, LOW);
+    delay(10);
     Motor::init();
     Serial.begin(115200);
     Serial.setDebugOutput(true);
