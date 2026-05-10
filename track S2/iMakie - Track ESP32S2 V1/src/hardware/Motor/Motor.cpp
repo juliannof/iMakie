@@ -3,28 +3,34 @@
 
 // ─── Hardware — LEDC Core 3.x API (moderno) ──────────────────
 static void _hwBrake() {
-    log_i("[HW] BRAKE");
+    log_i("[HW] BRAKE - EN=HIGH IN1=255 IN2=255");
     digitalWrite(MOTOR_EN, HIGH);
     ledcWrite(MOTOR_IN1, 255);
+    log_d("[HW] ledcWrite IN1=255 OK");
     ledcWrite(MOTOR_IN2, 255);
+    log_d("[HW] ledcWrite IN2=255 OK");
 }
 static void _hwOff() {
-    //log_i("[HW] OFF");
+    log_d("[HW] OFF - EN=LOW IN1=0 IN2=0");
     digitalWrite(MOTOR_EN, LOW);
     ledcWrite(MOTOR_IN1, 0);
     ledcWrite(MOTOR_IN2, 0);
 }
 static void _hwUp(uint8_t pwm) {
-    log_i("[HW] UP pwm=%d", pwm);
+    log_i("[HW] UP - EN=HIGH IN1=0 IN2=%d", pwm);
     digitalWrite(MOTOR_EN, HIGH);
     ledcWrite(MOTOR_IN1, 0);
+    log_d("[HW] ledcWrite IN1=0 OK");
     ledcWrite(MOTOR_IN2, pwm);
+    log_d("[HW] ledcWrite IN2=%d OK", pwm);
 }
 static void _hwDown(uint8_t pwm) {
-    log_i("[HW] DOWN pwm=%d", pwm);
+    log_i("[HW] DOWN - EN=HIGH IN2=0 IN1=%d", pwm);
     digitalWrite(MOTOR_EN, HIGH);
     ledcWrite(MOTOR_IN2, 0);
+    log_d("[HW] ledcWrite IN2=0 OK");
     ledcWrite(MOTOR_IN1, pwm);
+    log_d("[HW] ledcWrite IN1=%d OK", pwm);
 }
 
 
@@ -198,29 +204,48 @@ namespace Motor {
 
 void init() {
     // ORDEN CRÍTICO: pinMode → ledcAttach → LUEGO ledcWrite (Core 3.x LEDC API)
+    log_i("[MOTOR] init(): iniciando configuración LEDC");
+
     pinMode(MOTOR_EN,  OUTPUT);
+    log_i("[MOTOR] pinMode EN (GPIO%d) OK", MOTOR_EN);
+
     pinMode(MOTOR_IN1, OUTPUT);
+    log_i("[MOTOR] pinMode IN1 (GPIO%d) OK", MOTOR_IN1);
+
     pinMode(MOTOR_IN2, OUTPUT);
+    log_i("[MOTOR] pinMode IN2 (GPIO%d) OK", MOTOR_IN2);
 
     // Estado de seguridad: EN siempre LOW hasta que se habilite
     digitalWrite(MOTOR_EN, LOW);
+    log_i("[MOTOR] digitalWrite EN=LOW OK");
 
     // LEDC moderne: ledcAttach(pin, frequency_Hz, resolution_bits)
     // Validar que el attach fue exitoso
-    if (!ledcAttach(MOTOR_IN1, 20000, 8)) {
-        log_e("[MOTOR] Fallo crítico: ledcAttach IN1 (GPIO%d) falló", MOTOR_IN1);
+    log_i("[MOTOR] Attempting ledcAttach IN1 (GPIO%d, 20kHz, 8-bit)...", MOTOR_IN1);
+    bool attach1 = ledcAttach(MOTOR_IN1, 20000, 8);
+    if (!attach1) {
+        log_e("[MOTOR] CRÍTICO: ledcAttach IN1 (GPIO%d) FALLÓ", MOTOR_IN1);
+    } else {
+        log_i("[MOTOR] ledcAttach IN1 OK");
     }
-    if (!ledcAttach(MOTOR_IN2, 20000, 8)) {
-        log_e("[MOTOR] Fallo crítico: ledcAttach IN2 (GPIO%d) falló", MOTOR_IN2);
+
+    log_i("[MOTOR] Attempting ledcAttach IN2 (GPIO%d, 20kHz, 8-bit)...", MOTOR_IN2);
+    bool attach2 = ledcAttach(MOTOR_IN2, 20000, 8);
+    if (!attach2) {
+        log_e("[MOTOR] CRÍTICO: ledcAttach IN2 (GPIO%d) FALLÓ", MOTOR_IN2);
+    } else {
+        log_i("[MOTOR] ledcAttach IN2 OK");
     }
 
     // Inicializar duty cycle en 0
+    log_i("[MOTOR] Initializing duty cycles to 0");
     ledcWrite(MOTOR_IN1, 0);
     ledcWrite(MOTOR_IN2, 0);
+    log_i("[MOTOR] ledcWrite IN1=0, IN2=0 OK");
 
     _hwOff();
-    log_i("[MOTOR] init OK - LEDC Core 3.x - IN1=%d IN2=%d EN=%d freq=20kHz",
-          MOTOR_IN1, MOTOR_IN2, MOTOR_EN);
+    log_i("[MOTOR] init COMPLETE - LEDC Core 3.x - EN=%d IN1=%d IN2=%d freq=20kHz SUCCESS=%d,%d",
+          MOTOR_EN, MOTOR_IN1, MOTOR_IN2, (int)attach1, (int)attach2);
 }
 
 

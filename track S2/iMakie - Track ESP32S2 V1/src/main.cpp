@@ -321,8 +321,16 @@ void loop() {
 
     if (FaderTouch::isTouched()) {
         Motor::stop();
+        log_d("[LOOP] Motor::stop() — fader touched");
     } else {
+        static uint32_t lastMotorLog = 0;
         Motor::update();
+        // Log cada 1s para no saturar serial
+        if (millis() - lastMotorLog > 1000) {
+            auto state = Motor::getCalibState();
+            log_i("[LOOP] Motor::update() state=%d adc=%d", (int)state, (int)Motor::getRawADC());
+            lastMotorLog = millis();
+        }
     }
 
     updateButtons();
