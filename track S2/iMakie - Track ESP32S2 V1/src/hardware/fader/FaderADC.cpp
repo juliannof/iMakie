@@ -51,6 +51,12 @@ void FaderADC::update() {
     int16_t adcRaw = _ads.getLastConversionResults();
     if (adcRaw < 0) adcRaw = 0;
 
+    // Validar rango esperado (0–27000)
+    if (adcRaw > MOTOR_ADC_MAX) {
+        log_w("[ADC] Valor fuera de rango: %d (máx %d)", adcRaw, MOTOR_ADC_MAX);
+        return;  // Descartar lectura inválida
+    }
+
     _faderPos = (uint16_t)adcRaw;
     _rawLast  = (int)adcRaw;
 
