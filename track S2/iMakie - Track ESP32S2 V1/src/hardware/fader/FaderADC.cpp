@@ -64,23 +64,13 @@ void FaderADC::update() {
 }
 
 void FaderADC::measureRange() {
-    // ⚠️ ADVERTENCIA: Esta función es BLOQUEANTE 5 segundos
-    // S2 es single-core → RS485 se congela, Motor pierde sincronización
-    //
-    // Impacto:
-    // - SAT menu no responde durante 5s
-    // - RS485 no envía respuesta → Master timeout (~20ms poll cycle)
-    // - Master marca slave como NO_CALIBRATED tras 3 reintentos
-    // - Motor aborta calibración en progreso
-    //
-    // Usar SOLO en diagnóstico cuando sea necesario conocer rango ADS real.
-    // NO llamar durante operación normal o calibración activa.
-    //
-    // TODO: Implementar versión no-bloqueante con máquina de estados en SAT menu
+    // ⚠️ ADVERTENCIA: Esta función cede CPU (vTaskDelay) pero bloquea setup
+    // Usar SOLO durante boot o diagnóstico, NO durante operación RS485 activa.
+    // Si se llama durante calibración en progreso, puede causar timeout.
 
     int minVal = 32767, maxVal = 0;
 
-    log_i("[ADC] measureRange — BLOQUEANTE 5s: mueve fader extremo a extremo");
+    log_i("[ADC] measureRange — 5s: mueve fader extremo a extremo");
     uint32_t t0 = millis();
     while (millis() - t0 < 5000) {
         if (_newData) {
@@ -90,6 +80,7 @@ void FaderADC::measureRange() {
             if (raw < minVal) minVal = raw;
             if (raw > maxVal) maxVal = raw;
         }
+        vTaskDelay(1);  // Cede CPU a otras tareas (RS485, display, etc)
     }
     log_i("[ADC] RANGE  min=%d  max=%d  span=%d", minVal, maxVal, maxVal - minVal);
 }
