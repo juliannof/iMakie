@@ -335,34 +335,27 @@ void driveRaw(int pwm) {
 }
 
 void testUpDown() {
-    static int testPhase = 0;  // 0 = UP to 75%, 1 = DOWN to 25%
-    static uint32_t lastLogTime = 0;
+    static uint32_t testStartTime = 0;
+    static int testPhase = 0;  // 0 = UP for 1s, 1 = DOWN for 1s
 
-    uint16_t currentADC = _adcPos;
-    uint16_t target75 = 23 + (26423 - 23) * 3 / 4;   // ~19866 (75%)
-    uint16_t target25 = 23 + (26423 - 23) * 1 / 4;   // ~6580 (25%)
+    if (testStartTime == 0) {
+        testStartTime = millis();
+    }
 
-    if (testPhase == 0) {
-        _hwUp(PWM_MAX);
-        if (millis() - lastLogTime > 500) {
-            log_i("[TEST-UP] ADC=%d target75=%d", currentADC, target75);
-            lastLogTime = millis();
-        }
-        if (currentADC >= target75) {
-            testPhase = 1;
-            log_i("[TEST] ✓ Reached 75%% ADC=%d, switching to DOWN", currentADC);
-            lastLogTime = millis();
+    uint32_t elapsed = millis() - testStartTime;
+    uint32_t cycleTime = elapsed % 2000;  // 2s cycle: 1s UP + 1s DOWN
+
+    if (cycleTime < 1000) {
+        _hwUp(PWM_MIN);
+        if (testPhase != 0) {
+            testPhase = 0;
+            log_i("[TEST] UP — PWM_MIN=%d en IN2", PWM_MIN);
         }
     } else {
-        _hwDown(PWM_MAX);
-        if (millis() - lastLogTime > 500) {
-            log_i("[TEST-DOWN] ADC=%d target25=%d", currentADC, target25);
-            lastLogTime = millis();
-        }
-        if (currentADC <= target25) {
-            testPhase = 0;
-            log_i("[TEST] ✓ Reached 25%% ADC=%d, switching to UP", currentADC);
-            lastLogTime = millis();
+        _hwDown(PWM_MIN);
+        if (testPhase != 1) {
+            testPhase = 1;
+            log_i("[TEST] DOWN — PWM_MIN=%d en IN1", PWM_MIN);
         }
     }
 }
