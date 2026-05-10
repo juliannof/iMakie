@@ -17,16 +17,16 @@ static void _hwOff() {
     analogWrite(MOTOR_IN2, 0);
 }
 static void _hwUp(uint8_t pwm) {
-    log_d("[HW] UP - EN=HIGH IN1=%d IN2=0", pwm);
-    digitalWrite(MOTOR_EN, HIGH);
-    analogWrite(MOTOR_IN1, pwm);
-    analogWrite(MOTOR_IN2, 0);
-}
-static void _hwDown(uint8_t pwm) {
-    log_d("[HW] DOWN - EN=HIGH IN1=0 IN2=%d", pwm);
+    log_d("[HW] UP - EN=HIGH IN1=0 IN2=%d (cables invertidos)", pwm);
     digitalWrite(MOTOR_EN, HIGH);
     analogWrite(MOTOR_IN1, 0);
     analogWrite(MOTOR_IN2, pwm);
+}
+static void _hwDown(uint8_t pwm) {
+    log_d("[HW] DOWN - EN=HIGH IN1=%d IN2=0 (cables invertidos)", pwm);
+    digitalWrite(MOTOR_EN, HIGH);
+    analogWrite(MOTOR_IN1, pwm);
+    analogWrite(MOTOR_IN2, 0);
 }
 
 
