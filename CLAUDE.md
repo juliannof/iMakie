@@ -11,6 +11,13 @@
 
 ## ⚠️ DIRECTIVA OBLIGATORIA
 
+**IDIOMA — Español de España SIEMPRE (2026-05-11 18:30):**
+- Comunicación con el usuario: únicamente en español de España
+- Vosotros, distinción theta-zeta, léxico peninsular
+- Nada de "che", "boludo", "mate" ni otros regionalismos
+- Tono: directo, sin rodeos, profesional
+- Esta regla es VINCULANTE en CADA respuesta
+
 **NUNCA modificar código sin explicar PRIMERO con detalle qué vas a hacer.**
 
 - Antes de tocar cualquier archivo: describe el cambio (qué líneas, por qué, qué efecto tiene)
