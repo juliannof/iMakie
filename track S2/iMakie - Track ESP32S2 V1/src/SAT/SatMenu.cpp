@@ -937,18 +937,17 @@ void SatMenu::showStatus(const char* msg) {
 void SatMenu::_tickMotorCalib(Btn b) {
     int W = _spr.width(), H = _spr.height();
 
-    if (b == Btn::BACK) { /* Motor::off(); */ _goto(Scr::MOTOR); return; }
+    if (b == Btn::BACK) { _goto(Scr::MOTOR); return; }
     if (b == Btn::UP) {
-        log_i("[MOTOR_CALIB] startCalib() disparado");
-        /* Motor::startCalib(); */
+        Motor::startCalib();
+        log_i("[SAT] Calibración motor iniciada (2026-05-11 18:15)");
     }
 
-    //faderADC.update();
-    /* Motor::setADC(faderADC.getFaderPos()); */
-    /* Motor::update(); */
+    faderADC.update();
+    Motor::setADC(faderADC.getFaderPos());
+    Motor::update();
 
-    /* Motor::CalibState cs = Motor::getCalibState(); */
-    Motor::CalibState cs = Motor::CalibState::IDLE;  // Placeholder
+    Motor::CalibState cs = Motor::getCalibState();
 
     _spr.fillScreen(C_BG);
     _drawHdr("MOTOR CALIB");
@@ -956,35 +955,35 @@ void SatMenu::_tickMotorCalib(Btn b) {
     int y = SAT_HDR_H + 8;
     char buf[32];
 
-    const char* stateStr = "IDLE (Motor reset)";
+    const char* stateStr = "IDLE";
     uint16_t stateCol = C_GRAY;
-    /* switch (cs) {
-        case Motor::CalibState::CALIB_UP:   stateStr="SUBIENDO";   stateCol=C_CYAN;   break;
-        case Motor::CalibState::CALIB_DOWN: stateStr="BAJANDO";    stateCol=C_CYAN;   break;
-        case Motor::CalibState::DONE:       stateStr="DONE";       stateCol=C_GREEN;  break;
-        case Motor::CalibState::ERROR:      stateStr="ERROR";      stateCol=C_ACCENT; break;
+    switch (cs) {
+        case Motor::CalibState::KICK_UP:    stateStr="▲ KICK_UP";    stateCol=C_CYAN;   break;
+        case Motor::CalibState::GOING_UP:   stateStr="▲ GOING_UP";   stateCol=C_CYAN;   break;
+        case Motor::CalibState::SETTLE_UP:  stateStr="▲ SETTLE_UP";  stateCol=C_YELLOW; break;
+        case Motor::CalibState::KICK_DOWN:  stateStr="▼ KICK_DOWN";  stateCol=C_CYAN;   break;
+        case Motor::CalibState::GOING_DOWN: stateStr="▼ GOING_DOWN"; stateCol=C_CYAN;   break;
+        case Motor::CalibState::SETTLE_DOWN:stateStr="▼ SETTLE_DN";  stateCol=C_YELLOW; break;
+        case Motor::CalibState::DONE:       stateStr="✓ OK";         stateCol=C_GREEN;  break;
+        case Motor::CalibState::ERROR:      stateStr="✗ ERROR";      stateCol=C_ACCENT; break;
         default: break;
-    } */
+    }
     _spr.setTextColor(stateCol, C_BG); _spr.setTextSize(2);
     _spr.setTextDatum(textdatum_t::middle_center);
     _spr.drawString(stateStr, W/2, y+10); y+=30;
 
-    /* uint16_t pos = Motor::getRawADC(); */
-    /* float pct = Motor::getPosition(); */
-    uint16_t pos = 0;
-    float pct = 0.0f;
+    uint16_t pos = Motor::getRawADC();
+    float pct = Motor::getPosition();
     _spr.setTextSize(1); _spr.setTextColor(C_TEXT, C_BG);
     _spr.setTextDatum(textdatum_t::top_left);
     snprintf(buf, 32, "pos=%d  (%.1f%%)", pos, pct*100.f);
     _spr.drawString(buf, 4, y); y+=14;
     _drawHBar(4, y, W-8, 12, pct, C_CYAN); y+=18;
 
-    /* snprintf(buf, 32, "min=%d  max=%d", Motor::getADCMin(), Motor::getADCMax()); */
-    snprintf(buf, 32, "min=0  max=0");
+    snprintf(buf, 32, "min=%d  max=%d", Motor::getADCMin(), Motor::getADCMax());
     _spr.setTextColor(C_GRAY, C_BG);
     _spr.drawString(buf, 4, y); y+=14;
-    /* snprintf(buf, 32, "span=%d", Motor::getADCMax() - Motor::getADCMin()); */
-    snprintf(buf, 32, "span=0");
+    snprintf(buf, 32, "span=%d", Motor::getADCMax() - Motor::getADCMin());
     _spr.drawString(buf, 4, y);
 
     _drawHints("Calibrar","","Atras","");
