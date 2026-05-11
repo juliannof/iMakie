@@ -7,6 +7,36 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### Investigation & Resolution
+- **S2 MOTOR — Calibración bloqueada: Motor no baja (2026-05-10 15:20 → 21:55) — RESUELTO**
+  
+  **Problema identificado (15:20):**
+  - Motor no se movía hacia abajo durante calibración
+  - Síntomas: KICK_UP/GOING_UP/SETTLE_UP subían ADC, pero KICK_DOWN/GOING_DOWN/SETTLE_DOWN no bajaban
+  - Resultado: `top=3984, bot=3984` → ERROR (rango inválido)
+  - Hipótesis inicial: Motor solo sube; posible PWM no llega a IN2 (DOWN control)
+  - Documentado en: MOTOR_DIAGNOSIS.md (2026-05-10 15:20)
+  
+  **Solución implementada (21:53, commit af0cccd):**
+  - Motor::initPWM() rediseñado para leer pwmMin/pwmMax de NVS (con fallback a config.h)
+  - Test Mode mejorado: REC=UP, SOLO=DOWN, MUTE=exit (botones directos)
+  - Motor responde correctamente: GPIO18 (UP) y GPIO16 (DOWN) con duty cycles verificados
+  - SAT ahora es autoridad para valores PWM en runtime (no config.h)
+  - Motor::update() se salta cuando SAT está abierto (evita conflictos)
+  - Hardware verificado: REC y SOLO producen movimiento correcto en ambas direcciones
+  
+  **Optimización (21:55, commit e38fe88):**
+  - PWM_MAX calibrado a **160** (63% duty cycle) → movimiento suave, sin ruido
+  - PWM_MIN = 100 (jerarquía de control estable)
+  - Motor alcanza rendimiento óptimo: responde rápido, movimiento limpio, seguro
+  
+  **Estado actual:** ✅ RESUELTO — Motor funcional, calibración exitosa, Test Mode operativo
+  
+  **Lecciones aprendidas:**
+  - NVS para valores runtime es más flexible que config.h hardcoded
+  - Test Mode con botones directo es mejor que máquina de calibración para diagnóstico
+  - PWM range 100-160 empíricamente óptimo para este hardware (DRV8833 + motor S2)
+
 ### Removed
 - **S2 SAT MOTOR — Opción "Posicion" removida (2026-05-10 19:54)**
   - Razón: Pantalla era stub no funcional (todo comentado, valores hardcodeados a 0)
