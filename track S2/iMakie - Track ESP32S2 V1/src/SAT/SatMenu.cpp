@@ -958,14 +958,11 @@ void SatMenu::_tickMotorCalib(Btn b) {
     const char* stateStr = "IDLE";
     uint16_t stateCol = C_GRAY;
     switch (cs) {
-        case Motor::CalibState::KICK_UP:    stateStr="▲ KICK_UP";    stateCol=C_CYAN;   break;
-        case Motor::CalibState::GOING_UP:   stateStr="▲ GOING_UP";   stateCol=C_CYAN;   break;
-        case Motor::CalibState::SETTLE_UP:  stateStr="▲ SETTLE_UP";  stateCol=C_YELLOW; break;
-        case Motor::CalibState::KICK_DOWN:  stateStr="▼ KICK_DOWN";  stateCol=C_CYAN;   break;
-        case Motor::CalibState::GOING_DOWN: stateStr="▼ GOING_DOWN"; stateCol=C_CYAN;   break;
-        case Motor::CalibState::SETTLE_DOWN:stateStr="▼ SETTLE_DN";  stateCol=C_YELLOW; break;
-        case Motor::CalibState::DONE:       stateStr="✓ OK";         stateCol=C_GREEN;  break;
-        case Motor::CalibState::ERROR:      stateStr="✗ ERROR";      stateCol=C_ACCENT; break;
+        case Motor::CalibState::IDLE:      stateStr="◯ IDLE";       stateCol=C_GRAY;   break;
+        case Motor::CalibState::CALIB_UP:  stateStr="▲ SUBIENDO";   stateCol=C_CYAN;   break;
+        case Motor::CalibState::CALIB_DOWN:stateStr="▼ BAJANDO";    stateCol=C_CYAN;   break;
+        case Motor::CalibState::DONE:      stateStr="✓ OK";         stateCol=C_GREEN;  break;
+        case Motor::CalibState::ERROR:     stateStr="✗ ERROR";      stateCol=C_ACCENT; break;
         default: break;
     }
     _spr.setTextColor(stateCol, C_BG); _spr.setTextSize(2);

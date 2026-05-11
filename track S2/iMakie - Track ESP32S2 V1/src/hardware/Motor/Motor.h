@@ -33,6 +33,7 @@ namespace Motor {
     // Calibración
     void       startCalib();
     CalibState getCalibState();
+    CalibPhase getCalibPhase();  // Detallado (KICK_UP, GOING_UP, etc.) — para debugging (2026-05-11 18:20)
     bool       isCalibrated();
 
     // Test mode — control directo (2026-05-10 19:54)

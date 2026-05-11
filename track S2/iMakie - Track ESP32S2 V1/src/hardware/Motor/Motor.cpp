@@ -382,6 +382,10 @@ CalibState getCalibState() {
     }
 }
 
+CalibPhase getCalibPhase() {
+    return _motor_phase;  // Detallado: KICK_UP, GOING_UP, SETTLE_UP, etc. (para debugging)
+}
+
 bool isCalibrated() {
     return _motor_phase == CalibPhase::DONE && _motor_adcSpan > 100;
 }
