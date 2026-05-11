@@ -82,11 +82,11 @@ static void _calibUpdate() {
     case CalibPhase::GOING_UP: {
         if (now < _motor_calibMinDetect) break;
 
-        // PWM adaptativo: MAX hasta 26000, luego 70% para refinamiento
-        uint8_t pwmGoing = (pos < 26000) ? _pwm_max : (_pwm_max * 70 / 100);
+        // PWM adaptativo: MAX hasta 26000, luego MIN para refinamiento
+        uint8_t pwmGoing = (pos < 26000) ? _pwm_max : _pwm_min;
         if (_motor_currentPWM != pwmGoing) {
             if (pos < 26000) _hwUp(_pwm_max);
-            else _hwUp(pwmGoing);
+            else _hwUp(_pwm_min);
             _motor_currentPWM = pwmGoing;
         }
 
@@ -157,11 +157,11 @@ static void _calibUpdate() {
     case CalibPhase::GOING_DOWN: {
         if (now < _motor_calibMinDetect) break;
 
-        // PWM adaptativo: MAX hasta 1000, luego 70% para refinamiento
-        uint8_t pwmDown = (pos > 1000) ? _pwm_max : (_pwm_max * 70 / 100);
+        // PWM adaptativo: MAX hasta 1000, luego MIN para refinamiento
+        uint8_t pwmDown = (pos > 1000) ? _pwm_max : _pwm_min;
         if (_motor_currentPWM != pwmDown) {
             if (pos > 1000) _hwDown(_pwm_max);
-            else _hwDown(pwmDown);
+            else _hwDown(_pwm_min);
             _motor_currentPWM = pwmDown;
         }
 
