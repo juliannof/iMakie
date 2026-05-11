@@ -107,8 +107,7 @@ static constexpr uint16_t ADC_SPIKE_GUARD          = 500;     // cuentas máxima
 static constexpr uint16_t DEAD_ZONE                = 50;      // error < esto → apagar motor
 static constexpr uint16_t ADC_STABILITY_THRESHOLD  = 300;     // cambio máximo para considerar "estable"
 static constexpr uint32_t CALIB_STABLE_TIME        = 500;     // ms para considerar estable
-static constexpr uint32_t CALIB_SETTLE_MS          = 200;     // ms para medir ruido
-static constexpr uint32_t CALIB_KICK_MS            = 150;     // ms para kick inicial
+static constexpr uint32_t CALIB_SETTLE_MS          = 200;     // ms para medir ruido (antes 500, era demasiado)
 static constexpr uint32_t CALIB_MIN_TRAVEL_MS      = 300;     // ms mínimo de viaje antes de medir
 static constexpr uint32_t CALIB_TIMEOUT            = 6000;    // ms timeout calibración
 static constexpr uint32_t CALIB_STUCK_TIMEOUT      = 500;     // ms sin movimiento = motor atascado (2026-05-10 19:54)

@@ -68,18 +68,28 @@ static void _calibUpdate() {
     switch (_motor_phase) {
 
     case CalibPhase::KICK_UP:
-        if (now - _motor_phaseStart >= CALIB_KICK_MS) {
+        log_i("[CALIB] KICK_UP adc=%d (t=%ld ms) pwm=%d", pos, now - _motor_phaseStart, _pwm_max);
+        if (pos >= 26000) {
             now = millis();  // Recapturar timestamp fresco
             _motor_phase       = CalibPhase::GOING_UP;
             _hwUp(_pwm_min);  // Movimiento controlado hacia el tope
             _motor_stableRef   = pos;
             _motor_stableStart = now;
-            log_d("[CALIB] GOING_UP");
+            log_i("[CALIB] → GOING_UP");
         }
         break;
 
-    case CalibPhase::GOING_UP:
+    case CalibPhase::GOING_UP: {
         if (now < _motor_calibMinDetect) break;
+
+        // PWM adaptativo: MAX hasta 26000, luego MIN para refinamiento
+        uint8_t pwmGoing = (pos < 26000) ? _pwm_max : _pwm_min;
+        if (_motor_currentPWM != pwmGoing) {
+            if (pos < 26000) _hwUp(_pwm_max);
+            else _hwUp(_pwm_min);
+            _motor_currentPWM = pwmGoing;
+        }
+
         if (abs(pos - _motor_stableRef) > ADC_STABILITY_THRESHOLD) {
             if (pos >= MOTOR_ADC_MIN && pos <= MOTOR_ADC_MAX) {
                 _motor_stableRef   = pos;
@@ -105,7 +115,8 @@ static void _calibUpdate() {
             _motor_settleMin  = 27000;
             _motor_settleMax  = 0;
             _motor_phaseStart = now;
-            log_d("[CALIB] SETTLE_UP  pos=%d", pos);
+            log_i("[CALIB] → SETTLE_UP  pos=%d", pos);
+        }
         }
         break;
 
@@ -116,6 +127,7 @@ static void _calibUpdate() {
         if (now - _motor_phaseStart >= CALIB_SETTLE_MS) {
             _motor_adcTop       = _motor_adcPos;
             _motor_noiseTopSpan = _motor_settleMax - _motor_settleMin;
+            log_i("[CALIB] TOP=%d noise_span=%d", _motor_adcTop, _motor_noiseTopSpan);
             log_i("[CALIB] Tope superior: %d  noise_span=%d", _motor_adcTop, _motor_noiseTopSpan);
 
             now = millis();  // Recapturar timestamp fresco
@@ -131,20 +143,31 @@ static void _calibUpdate() {
         break;
 
     case CalibPhase::KICK_DOWN:
-        if (now - _motor_phaseStart >= CALIB_KICK_MS) {
+        log_i("[CALIB] KICK_DOWN adc=%d (t=%ld ms) pwm=%d", pos, now - _motor_phaseStart, _pwm_max);
+        if (pos <= 1000) {
             now = millis();  // Recapturar timestamp fresco
             _motor_phase       = CalibPhase::GOING_DOWN;
             _hwDown(_pwm_min);  // Movimiento controlado hacia el tope
             _motor_stableRef   = pos;
             _motor_stableStart = now;
-            log_d("[CALIB] GOING_DOWN");
+            log_i("[CALIB] → GOING_DOWN  pwm=%d", _pwm_min);
         }
         break;
 
-    case CalibPhase::GOING_DOWN:
+    case CalibPhase::GOING_DOWN: {
         if (now < _motor_calibMinDetect) break;
+
+        // PWM adaptativo: MAX hasta 1000, luego MIN para refinamiento
+        uint8_t pwmDown = (pos > 1000) ? _pwm_max : _pwm_min;
+        if (_motor_currentPWM != pwmDown) {
+            if (pos > 1000) _hwDown(_pwm_max);
+            else _hwDown(_pwm_min);
+            _motor_currentPWM = pwmDown;
+        }
+
         if (abs(pos - _motor_stableRef) > ADC_STABILITY_THRESHOLD) {
             if (pos >= MOTOR_ADC_MIN && pos <= MOTOR_ADC_MAX) {
+                log_d("[CALIB] GOING_DOWN movimiento detectado: pos=%d (ref=%d)", pos, _motor_stableRef);
                 _motor_stableRef   = pos;
                 _motor_stableStart = now;
             }
@@ -160,7 +183,8 @@ static void _calibUpdate() {
             _motor_settleMin  = 27000;
             _motor_settleMax  = 0;
             _motor_phaseStart = now;
-            log_d("[CALIB] SETTLE_DOWN  pos=%d", pos);
+            log_i("[CALIB] → SETTLE_DOWN  pos=%d", pos);
+        }
         }
         break;
 

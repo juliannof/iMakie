@@ -244,33 +244,9 @@ void setup() {
     log_i("=== BOOT completo | heap libre: %d bytes ===", ESP.getFreeHeap());
 }
 
-// ─── TEST MODE (automático a 3s del boot) ─────────────────
+// ─── AUTO-CALIB (automático a 10s del boot) ──────────────
 static unsigned long g_bootTime = 0;
-static bool g_testStarted = false;
 static bool g_calibStarted = false;
-static uint32_t g_testPhaseTime = 0;
-static int g_testPhase = 0;
-
-static void _runMotorTest() {
-    if (millis() - g_testPhaseTime < 2000) return;  // 2s por fase
-    g_testPhaseTime = millis();
-    
-    // Target positions: MIN → 25% → 50% → 75% → MAX → (repeat)
-    uint16_t span = Motor::getADCMax() - Motor::getADCMin();
-    uint16_t targets[] = {
-        Motor::getADCMin(),                      // 0%
-        Motor::getADCMin() + span / 4,           // 25%
-        Motor::getADCMin() + span / 2,           // 50%
-        Motor::getADCMin() + 3 * span / 4,       // 75%
-        Motor::getADCMax(),                      // 100%
-    };
-    
-    int phase = g_testPhase % 5;
-    Motor::setTarget(targets[phase]);
-    log_i("[TEST] Fase %d → ADC target=%d (pos=%.1f%%)", 
-          g_testPhase, targets[phase], (float)phase * 25.0f);
-    g_testPhase++;
-}
 
 // =============================================================
 //  loop
@@ -284,7 +260,7 @@ void loop() {
 
     // LOG ADC SIEMPRE (incluso en SAT) para diagnosticar si faderADC actualiza
     static uint32_t lastLog = 0;
-    if (millis() - lastLog > 500) {
+    if (millis() - lastLog > 1000) {
         log_i("[ADS] raw=%d pos=%d motor=%d", faderADC.getRawLast(), faderADC.getFaderPos(), Motor::getRawADC());
         lastLog = millis();
     }
@@ -334,29 +310,14 @@ void loop() {
         Motor::update();
     }
 
-    // ─── TEST MODE: inicia a 3s del boot ─────────────────────
-    if (!g_testStarted && millis() - g_bootTime > 3000) {
-        if (!g_calibStarted && !Motor::isCalibrated()) {
+    // ─── AUTO-CALIB: inicia a 10s del boot ────────────────────
+    if (!g_calibStarted && millis() - g_bootTime > 10000) {
+        if (!Motor::isCalibrated()) {
             Motor::startCalib();
             g_calibStarted = true;
-            log_i("[TEST] Iniciando calibración automática...");
-        } else if (Motor::isCalibrated() && !g_testStarted) {
-            g_testStarted = true;
-            g_testPhaseTime = millis();
-            log_i("[TEST] Motor calibrado. Iniciando test de posiciones...");
+            log_i("[AUTOCAL] Iniciando calibración automática...");
         }
     }
-
-    // ─── TEST LOOP: mueve motor a distintas posiciones ────────
-    if (g_testStarted) {
-        _runMotorTest();
-    }
-    // Log cada 1s para no saturar serial — DESACTIVADO TEMPORALMENTE para diagnóstico
-    // if (millis() - lastMotorLog > 1000) {
-    //     auto state = Motor::getCalibState();
-    //     log_i("[LOOP] Motor::update() state=%d adc=%d", (int)state, (int)Motor::getRawADC());
-    //     lastMotorLog = millis();
-    // }
 
     updateButtons();
     updateDisplay();
