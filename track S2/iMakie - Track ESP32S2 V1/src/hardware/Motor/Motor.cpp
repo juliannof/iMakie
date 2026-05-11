@@ -188,11 +188,10 @@ static void _calibUpdate() {
             _motor_adcSpan   = _calibratedFaderMax - _calibratedFaderMin;
             _motor_targetADC = (uint16_t)map((long)_motor_lastMidiTarget,
                                         0, MIDI_PB_MAX, _calibratedFaderMin, _calibratedFaderMax);
-            faderADC._calibratedFaderMin = _calibratedFaderMin;  // Guardar en FaderADC directamente (2026-05-11 18:35)
-            faderADC._calibratedFaderMax = _calibratedFaderMax;
+            faderADC.setCalibration(_calibratedFaderMin, _calibratedFaderMax);
             _motor_phase     = CalibPhase::DONE;
             log_i("[CALIB] OK  MIN=%d MAX=%d span=%d target=%d",
-                  _calibratedFaderMin, _motor_adcMax, _motor_adcSpan, _motor_targetADC);
+                  _calibratedFaderMin, _calibratedFaderMax, _motor_adcSpan, _motor_targetADC);
         } else {
             _motor_phase = CalibPhase::ERROR;
             log_e("[CALIB] ERROR — rango inválido  top=%d bot=%d", _motor_adcTop, adcBot);
@@ -308,7 +307,7 @@ void setADC(uint16_t v) {
 void setTarget(uint16_t midiPB) {
     _motor_lastMidiTarget = midiPB;
     if (_motor_phase != CalibPhase::DONE) return;
-    _motor_targetADC = (uint16_t)map((long)midiPB, 0, MIDI_PB_MAX, _calibratedFaderMin, _motor_adcMax);
+    _motor_targetADC = (uint16_t)map((long)midiPB, 0, MIDI_PB_MAX, _calibratedFaderMin, _calibratedFaderMax);
     log_d("[TARGET] midi=%d → adc=%d", midiPB, _motor_targetADC);
 }
 
@@ -381,10 +380,6 @@ CalibState getCalibState() {
         default:
             return CalibState::IDLE;
     }
-}
-
-CalibPhase getCalibPhase() {
-    return _motor_phase;  // Detallado: KICK_UP, GOING_UP, SETTLE_UP, etc. (para debugging)
 }
 
 bool isCalibrated() {
