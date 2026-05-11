@@ -62,13 +62,8 @@ void FaderADC::update() {
 }
 
 void FaderADC::setCalibration(uint16_t minVal, uint16_t maxVal) {
-    if (minVal >= maxVal) {
-        log_e("[FADER] Calibración inválida: min=%d >= max=%d", minVal, maxVal);
-        return;
-    }
-    _calibMin = minVal;
-    _calibMax = maxVal;
-    log_i("[FADER] Calibración guardada: min=%d max=%d span=%d", minVal, maxVal, maxVal - minVal);
+    _calibratedFaderMin = minVal;
+    _calibratedFaderMax = maxVal;
 }
 
 void FaderADC::dumpAdsLog() {

@@ -183,15 +183,16 @@ static void _calibUpdate() {
         log_i("[CALIB] Gap requerido: %d (ruidos: top=%d bot=%d)", minGapRequired, _motor_noiseTopSpan, _motor_noiseBottomSpan);
 
         if (_motor_adcTop > adcBot + minGapRequired) {
-            _motor_adcMin    = adcBot + marginBot;
-            _motor_adcMax    = _motor_adcTop - marginTop;
-            _motor_adcSpan   = _motor_adcMax - _motor_adcMin;
+            _calibratedFaderMin    = adcBot + marginBot;
+            _calibratedFaderMax    = _motor_adcTop - marginTop;
+            _motor_adcSpan   = _calibratedFaderMax - _calibratedFaderMin;
             _motor_targetADC = (uint16_t)map((long)_motor_lastMidiTarget,
-                                        0, MIDI_PB_MAX, _motor_adcMin, _motor_adcMax);
-            faderADC.setCalibration(_motor_adcMin, _motor_adcMax);  // Guardar calibración en FaderADC (2026-05-11 17:45)
+                                        0, MIDI_PB_MAX, _calibratedFaderMin, _calibratedFaderMax);
+            faderADC._calibratedFaderMin = _calibratedFaderMin;  // Guardar en FaderADC directamente (2026-05-11 18:35)
+            faderADC._calibratedFaderMax = _calibratedFaderMax;
             _motor_phase     = CalibPhase::DONE;
             log_i("[CALIB] OK  MIN=%d MAX=%d span=%d target=%d",
-                  _motor_adcMin, _motor_adcMax, _motor_adcSpan, _motor_targetADC);
+                  _calibratedFaderMin, _motor_adcMax, _motor_adcSpan, _motor_targetADC);
         } else {
             _motor_phase = CalibPhase::ERROR;
             log_e("[CALIB] ERROR — rango inválido  top=%d bot=%d", _motor_adcTop, adcBot);
@@ -307,7 +308,7 @@ void setADC(uint16_t v) {
 void setTarget(uint16_t midiPB) {
     _motor_lastMidiTarget = midiPB;
     if (_motor_phase != CalibPhase::DONE) return;
-    _motor_targetADC = (uint16_t)map((long)midiPB, 0, MIDI_PB_MAX, _motor_adcMin, _motor_adcMax);
+    _motor_targetADC = (uint16_t)map((long)midiPB, 0, MIDI_PB_MAX, _calibratedFaderMin, _motor_adcMax);
     log_d("[TARGET] midi=%d → adc=%d", midiPB, _motor_targetADC);
 }
 
@@ -329,16 +330,16 @@ uint16_t getRawADC() {
 
 float getPosition() {
     if (_motor_adcSpan == 0) return 0.0f;
-    int pos = (int)_motor_adcPos - (int)_motor_adcMin;
+    int pos = (int)_motor_adcPos - (int)_calibratedFaderMin;
     return constrain((float)pos / (float)_motor_adcSpan, 0.0f, 1.0f);
 }
 
 uint16_t getADCMin() {
-    return _motor_adcMin;
+    return _calibratedFaderMin;
 }
 
 uint16_t getADCMax() {
-    return _motor_adcMax;
+    return _calibratedFaderMax;
 }
 
 void startCalib() {

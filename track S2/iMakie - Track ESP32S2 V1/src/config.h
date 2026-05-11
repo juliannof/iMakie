@@ -132,8 +132,8 @@ static uint32_t   _motor_stableStart    = 0;
 static int        _motor_stableRef      = 0;
 
 static uint16_t   _motor_adcTop         = 0;
-static uint16_t   _motor_adcMin         = 0;
-static uint16_t   _motor_adcMax         = 0;
+static uint16_t   _calibratedFaderMin         = 0;
+static uint16_t   _calibratedFaderMax         = 0;
 static uint16_t   _motor_adcSpan        = 0;
 static uint16_t   _motor_adcPos         = 0;
 static uint16_t   _motor_targetADC      = 0;
