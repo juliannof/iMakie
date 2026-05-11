@@ -101,7 +101,7 @@ static constexpr uint8_t  PWM_MIN                  = 100;
 static constexpr uint8_t  PWM_MAX                  = 160;  // calibrado: movimiento correcto sin ruido (2026-05-10 21:55)
 
 // Motor — spike guard (rechaza cambios > este valor)
-static constexpr uint16_t ADC_SPIKE_GUARD          = 200;     // cuentas máximas entre lecturas
+static constexpr uint16_t ADC_SPIKE_GUARD          = 500;     // cuentas máximas entre lecturas (aumentado para Test Mode tolerancia 2026-05-10 22:00)
 
 // Motor — calibración (constantes)
 static constexpr uint16_t DEAD_ZONE                = 50;      // error < esto → apagar motor

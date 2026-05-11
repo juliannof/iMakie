@@ -1081,12 +1081,16 @@ void SatMenu::_tickMotorTest(Btn b) {
     int y = SAT_HDR_H + 8;
     char buf[48];
 
-    // ADC real + posición
+    // ADC real + posición (desde faderADC directamente, no filtrado por Motor)
     _spr.setTextColor(C_CYAN, C_BG);
     _spr.setTextSize(1);
     _spr.setTextDatum(textdatum_t::top_left);
-    uint16_t adc = Motor::getRawADC();
-    float pos = Motor::getPosition();
+    uint16_t adc = faderADC.getFaderPos();
+    uint16_t adcMin = Motor::getADCMin();
+    uint16_t adcMax = Motor::getADCMax();
+    uint16_t adcSpan = (adcMax > adcMin) ? (adcMax - adcMin) : 1;
+    float pos = (adc >= adcMin) ? (float)(adc - adcMin) / adcSpan : 0.0f;
+    pos = constrain(pos, 0.0f, 1.0f);
     snprintf(buf, 48, "ADC=%u (%.1f%%)", adc, pos * 100.0f);
     _spr.drawString(buf, 4, y); y+=18;
 

@@ -277,6 +277,18 @@ static void _runMotorTest() {
 // =============================================================
 void loop() {
     // OTA siempre tiene máxima prioridad, incluso si SAT está abierto
+    // Actualizar ADC SIEMPRE (incluso en SAT) para Test Mode live feedback (2026-05-10 21:57)
+    faderADC.update();
+    FaderTouch::update();
+    Motor::setADC(faderADC.getFaderPos());  // Motor recibe ADC ANTES de SAT check
+
+    // LOG ADC SIEMPRE (incluso en SAT) para diagnosticar si faderADC actualiza
+    static uint32_t lastLog = 0;
+    if (millis() - lastLog > 500) {
+        log_i("[ADS] raw=%d pos=%d motor=%d", faderADC.getRawLast(), faderADC.getFaderPos(), Motor::getRawADC());
+        lastLog = millis();
+    }
+
     if (satMenu && satMenu->isOpen()) {
         satMenu->update();
         return;
@@ -315,17 +327,6 @@ void loop() {
         }
 
         RS485Handler::checkTimeout(lastRxTime);
-    }
-
-    faderADC.update();
-    FaderTouch::update();
-
-    Motor::setADC(faderADC.getFaderPos());
-
-    static uint32_t lastLog = 0;
-    if (millis() - lastLog > 500) {
-        log_i("[ADS] raw=%d pos=%d", faderADC.getRawLast(), faderADC.getFaderPos());
-        lastLog = millis();
     }
 
     // Motor::update() SOLO si SAT no está en Test Mode activo (2026-05-10 20:35)
