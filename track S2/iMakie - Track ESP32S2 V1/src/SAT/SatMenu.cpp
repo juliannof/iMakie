@@ -478,7 +478,7 @@ void SatMenu::_tickTestFader(Btn b) {
         _fadCalMin=8191; _fadCalMax=0;
         _noiseMin=8191;  _noiseMax=0;
         _reported=false; _stopT=0;
-        faderADC.measureRange();  // ⚠️ BLOQUEA 5s — RS485 timeout, motor desincronizado
+        Motor::startCalib();  // Dispara calibración automática del motor (2026-05-11 17:45)
     }
 
     unsigned long now=millis();

@@ -61,39 +61,14 @@ void FaderADC::update() {
     _logReading(adcRaw, _faderPos);
 }
 
-void FaderADC::measureRange() {
-    // ⚠️ ADVERTENCIA: Esta función cede CPU (vTaskDelay) pero bloquea setup
-    // Usar SOLO durante boot o diagnóstico, NO durante operación RS485 activa.
-    // Si se llama durante calibración en progreso, puede causar timeout.
-
-    bool gotData = false;
-    int minVal = 0, maxVal = 0;
-
-    log_i("[ADC] measureRange — 5s: mueve fader extremo a extremo");
-    uint32_t t0 = millis();
-    while (millis() - t0 < 5000) {
-        if (_newData) {
-            _newData = false;
-            int16_t raw = _ads.getLastConversionResults();
-            if (raw < 0) raw = 0;
-            if (!gotData) {
-                minVal = raw;
-                maxVal = raw;
-                gotData = true;
-            } else {
-                if (raw < minVal) minVal = raw;
-                if (raw > maxVal) maxVal = raw;
-            }
-        }
-        vTaskDelay(1);  // Cede CPU a otras tareas (RS485, display, etc)
-    }
-
-    if (!gotData) {
-        log_e("[ADC] measureRange FALLÓ — sin datos del ISR en 5s");
+void FaderADC::setCalibration(uint16_t minVal, uint16_t maxVal) {
+    if (minVal >= maxVal) {
+        log_e("[FADER] Calibración inválida: min=%d >= max=%d", minVal, maxVal);
         return;
     }
-
-    log_i("[ADC] RANGE  min=%d  max=%d  span=%d", minVal, maxVal, maxVal - minVal);
+    _calibMin = minVal;
+    _calibMax = maxVal;
+    log_i("[FADER] Calibración guardada: min=%d max=%d span=%d", minVal, maxVal, maxVal - minVal);
 }
 
 void FaderADC::dumpAdsLog() {

@@ -11,10 +11,12 @@ class FaderADC {
 public:
     void     begin();
     void     update();
-    void     measureRange();    // ⚠️ BLOQUEANTE 5s — RS485 timeout, motor desincronizado
     void     dumpAdsLog();
+    void     setCalibration(uint16_t minVal, uint16_t maxVal);  // Motor llama al terminar calibración
     uint16_t getFaderPos() const { return _faderPos; }
     int      getRawLast()  const { return _rawLast;  }
+    uint16_t getCalibMin() const { return _calibMin; }
+    uint16_t getCalibMax() const { return _calibMax; }
 
 private:
     Adafruit_ADS1115 _ads;
@@ -39,4 +41,6 @@ private:
 
     uint16_t _faderPos = 0;
     int      _rawLast  = 0;
+    uint16_t _calibMin = 0;     // Mínimo real del fader (guardado por Motor al calibrar)
+    uint16_t _calibMax = 27000; // Máximo real del fader (default: máximo teórico)
 };

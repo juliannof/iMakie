@@ -1,6 +1,9 @@
 #include "Motor.h"
 #include "../../config.h"
 #include <Preferences.h>
+#include "../fader/FaderADC.h"
+
+extern FaderADC faderADC;
 
 // ────────────────────────────────────────────────────────────────
 // Motor Control — iMakie PTxx Track S2
@@ -185,6 +188,7 @@ static void _calibUpdate() {
             _motor_adcSpan   = _motor_adcMax - _motor_adcMin;
             _motor_targetADC = (uint16_t)map((long)_motor_lastMidiTarget,
                                         0, MIDI_PB_MAX, _motor_adcMin, _motor_adcMax);
+            faderADC.setCalibration(_motor_adcMin, _motor_adcMax);  // Guardar calibración en FaderADC (2026-05-11 17:45)
             _motor_phase     = CalibPhase::DONE;
             log_i("[CALIB] OK  MIN=%d MAX=%d span=%d target=%d",
                   _motor_adcMin, _motor_adcMax, _motor_adcSpan, _motor_targetADC);
