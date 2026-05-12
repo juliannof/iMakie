@@ -8,6 +8,24 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 ## [Unreleased]
 
 ### Investigation & Resolution
+- **S2 MOTOR — Calibración GOING_UP/DOWN bloqueadas (2026-05-11 20:30) — RESUELTO**
+  
+  **Problema identificado:**
+  - Motor calibración se detenía en fases GOING_UP y GOING_DOWN
+  - Síntomas: KICK_UP (150ms) → GOING_UP (300ms después error "sin movimiento") → BLOQUEO
+  - Causa raíz: Condición `_motor_currentPWM != pwmGoing` era FALSA al entrar GOING_UP
+    - KICK_UP establecía `_motor_currentPWM = _pwm_min` (135)
+    - GOING_UP calculaba `pwmGoing = _pwm_min` (135)
+    - Resultado: if **NO entraba** → `_hwUp()` nunca ejecutada → motor quieto → timeout 500ms
+  
+  **Soluciones implementadas (commits e166b06, 0ec46ee, 212eaf1):**
+  - Commit e166b06: KICK phase rediseñada basada en posición ADC, no timeout
+  - Commit 0ec46ee: GOING phases con 70% PWM en refinamiento (después revertido)
+  - Commit 212eaf1: initPWM() fallback correcto a config.h si NVS inválida
+  - Raíz: La lógica condicional del if debe elimarse; motor debe recibir comando PWM cada iteración en fase activa
+  
+  **Estado actual:** ✅ RESUELTO — Motor calibra completo KICK→GOING→SETTLE en ambas direcciones
+
 - **S2 MOTOR — Calibración bloqueada: Motor no baja (2026-05-10 15:20 → 21:55) — RESUELTO**
   
   **Problema identificado (15:20):**
