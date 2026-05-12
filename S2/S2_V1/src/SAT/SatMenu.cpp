@@ -935,23 +935,16 @@ void SatMenu::showStatus(const char* msg) {
 void SatMenu::_tickMotorCalib(Btn b) {
     int W = _spr.width(), H = _spr.height();
 
-    if (b == Btn::BACK) { _calibStarted = false; _goto(Scr::MOTOR); return; }
+    if (b == Btn::BACK) { _goto(Scr::MOTOR); return; }
 
-    // Reiniciar calibración al presionar UP (2026-05-12 18:36)
+    // UP = Reiniciar calibración (2026-05-12 18:42)
     if (b == Btn::UP) {
         Motor::startCalib();
         _calibRecalib_ms = millis();
-        log_i("[SAT] Recalibrando motor...");
-        return;
+        log_i("[SAT] Motor::startCalib() llamado");
     }
 
-    // Autostart calibración la primera vez que entra a esta pantalla (2026-05-12 00:35)
-    if (!_calibStarted) {
-        _calibStarted = true;
-        Motor::startCalib();
-        log_i("[SAT] Calibración motor iniciada automáticamente");
-    }
-
+    // Ejecutar Motor normalmente CADA FRAME (igual que main.cpp) (2026-05-12 18:42)
     faderADC.update();
     Motor::setADC(faderADC.getFaderPos());
     Motor::update();

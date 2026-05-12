@@ -191,8 +191,7 @@ private:
     unsigned long _stopT      = 0;
     bool          _reported   = false;
 
-    bool          _calibStarted = false;   // Control autostart calibración (2026-05-12 00:35)
-    uint32_t      _calibRecalib_ms = 0;    // Timestamp para mostrar "🔄 RECALIBRANDO" (2026-05-12 18:36)
+    uint32_t      _calibRecalib_ms = 0;    // Timestamp para mostrar "(recalibrado)" 600ms (2026-05-12 18:36)
 
     static const Item _mainItems[];
     static const Item _identItems[];
