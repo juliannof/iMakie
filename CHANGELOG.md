@@ -7,6 +7,40 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### S3 AUDITORÍA — Mapeo de fader Logic 16-bit → ADC 27-bit (2026-05-12 22:28) — PENDIENTE PRÓXIMA SESIÓN
+
+**Arquitectura de conversión (S3 es responsable):**
+```
+Logic Pro (PitchBend)
+    │ 0-16383 (14-bit, máximo real: 0-14848)
+    ▼
+S3 MidiProcessor::processPitchBend()
+    │ Mapea PitchBend → faderTarget
+    ▼
+S3 RS485Master::_sendPacket()
+    │ Envía MasterPacket.faderTarget 0-27000 (escala mapeada)
+    ▼
+S2 Slave recibe
+    │ faderTarget 0-27000 → Motor::setTarget()
+    ▼
+Motor controla ADC 0-27000 (ADS1115 raw)
+```
+
+**Problemas encontrados:**
+- S3 protocol.h línea 68: Aún documenta "0-16383" — debería aclarar que S3 mapea a 0-27000
+- S3 SlavePacket.faderPos línea 80: Documenta "0-8191" — inconsistente con S2 (0-27000)
+- S3/S2 protocol.h duplicados — deberían unificarse
+
+**Pendiente próxima sesión:**
+1. [ ] Actualizar S3 protocol.h: documentar mapeo 16383 → 27000 (S3 lo hace)
+2. [ ] Actualizar SlavePacket.faderPos: unificar a 0-27000 en ambos
+3. [ ] Documentar en CLAUDE.md: "S3 mapea Logic PitchBend a ADC range"
+4. [ ] Considerar: ¿compartir protocol.h o mantener separados (S3 mapea, S2 recibe)?
+
+**Commits relacionados:** 86e8141 (S2 documentado), pendiente S3
+
+---
+
 ### S2 MOTOR — Calibración automática completa (2026-05-12 19:00 → 20:55) — RESUELTO
 
 **Objetivo:** Motor S2 calibra automáticamente al boot y en SAT > Motor > Calibración.
