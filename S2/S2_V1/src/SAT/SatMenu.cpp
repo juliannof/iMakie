@@ -937,6 +937,14 @@ void SatMenu::_tickMotorCalib(Btn b) {
 
     if (b == Btn::BACK) { _calibStarted = false; _goto(Scr::MOTOR); return; }
 
+    // Reiniciar calibración al presionar UP (2026-05-12 18:36)
+    if (b == Btn::UP) {
+        Motor::startCalib();
+        _calibRecalib_ms = millis();
+        log_i("[SAT] Recalibrando motor...");
+        return;
+    }
+
     // Autostart calibración la primera vez que entra a esta pantalla (2026-05-12 00:35)
     if (!_calibStarted) {
         _calibStarted = true;
@@ -969,6 +977,14 @@ void SatMenu::_tickMotorCalib(Btn b) {
     _spr.setTextColor(stateCol, C_BG); _spr.setTextSize(2);
     _spr.setTextDatum(textdatum_t::middle_center);
     _spr.drawString(stateStr, W/2, y+10); y+=30;
+
+    // Mostrar mensaje "🔄 RECALIBRANDO" durante 600ms tras presionar UP (2026-05-12 18:36)
+    uint32_t msElapsed = millis() - _calibRecalib_ms;
+    if (_calibRecalib_ms > 0 && msElapsed < 600) {
+        _spr.setTextSize(1); _spr.setTextColor(C_YELLOW, C_BG);
+        _spr.setTextDatum(textdatum_t::middle_center);
+        _spr.drawString("(recalibrado)", W/2, y-5);
+    }
 
     uint16_t pos = Motor::getRawADC();
     float pct = Motor::getPosition();
