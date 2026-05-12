@@ -1,5 +1,11 @@
 # iMakie — Contexto para Claude Code
 
+🔒 **⚠️ ESTE ARCHIVO NO SE SUBE A REPOSITORIOS PÚBLICOS (2026-05-12 17:50):**
+- Contiene arquitectura sensible, pines GPIO, vulnerabilidades conocidas
+- Si el repo es público → agregar a `.gitignore`
+- Si el repo es privado → OK mantenerlo
+- Comando: `echo "CLAUDE.md" >> .gitignore && git rm --cached CLAUDE.md`
+
 ---
 
 ## 📋 ARQUITECTURA (Consulta directa)
