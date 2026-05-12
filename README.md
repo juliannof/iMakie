@@ -1,6 +1,6 @@
-# iMakie PTxx — Mackie Control Clone on ESP32
+# AITEC-17 — Mackie Control Clone on ESP32
 
-> A DIY Mackie Control surface built on ESP32-S3 (master) and ESP32-S2 Mini (slave) units, communicating over RS485 and interfacing with DAWs via USB MIDI.
+> A DIY Mackie Control surface built on ESP32-P4 (master) + ESP32-S3 (extender) and ESP32-S2 Mini (17 slave) units, communicating over RS485 and interfacing with DAWs via USB MIDI.
 
 ---
 
@@ -20,18 +20,24 @@
 
 ## System Overview
 
-iMakie PTxx emulates a **Mackie Control Universal** surface. It supports up to **17 slave channels** (16 tracks + 1 master) on a single RS485 bus coordinated by one ESP32-S3 master.
+AITEC-17 emulates a **Mackie Control Universal** surface. It supports up to **17 slave channels** (9 on master bus A + 8 on extender bus B) coordinated by one ESP32-P4 master + one ESP32-S3 extender.
 
 ```
 DAW (Logic Pro / macOS)
         │  USB MIDI (Mackie Control protocol)
         ▼
   ┌─────────────┐
-  │  ESP32-S3   │  ◄── Master Unit
+  │  ESP32-P4   │  ◄── Master Unit (Bus A: 9 slaves)
   │  (Master)   │
   └──────┬──────┘
          │  RS485 @ 500 kbaud (half-duplex)
          │  Custom binary protocol + CRC8
+         │
+  ┌─────────────┐
+  │  ESP32-S3   │  ◄── Extender Unit (Bus B: 8 slaves)
+  │ (Extender)  │
+  └──────┬──────┘
+         │
     ┌────┴────────────────────────── ... ──┐
     ▼                                      ▼
 ┌──────────┐                         ┌──────────┐
@@ -46,14 +52,22 @@ Each slave controls one channel strip, independently managing its motorized fade
 
 ## Hardware Architecture
 
-### Master Unit — ESP32-S3
+### Master Unit — ESP32-P4
 
 | Function          | Detail                                      |
 |-------------------|---------------------------------------------|
 | USB MIDI          | Native USB via TinyUSB, Mackie Control HID  |
-| RS485 Bus         | UART + half-duplex, 500 kbaud               |
-| Display           | TFT via TFT_eSPI                            |
+| RS485 Bus A       | UART + half-duplex, 500 kbaud (9 slaves)   |
+| Display           | ST7701S MIPI-DSI 480×800 (LVGL 9)           |
 | DAW Integration   | Logic Pro (tested), compatible with any DAW supporting Mackie Control |
+
+### Extender Unit — ESP32-S3
+
+| Function          | Detail                                      |
+|-------------------|---------------------------------------------|
+| RS485 Bus B       | UART + half-duplex, 500 kbaud (8 slaves)   |
+| Transport LEDs    | REC / PLAY / FF / STOP / RW feedback         |
+| NeoTrellis        | 2× Adafruit seesaw 4×4 button grid (8×4 total) |
 
 ### Slave Units — ESP32-S2 Mini
 
@@ -184,61 +198,7 @@ faderADC.begin();
 
 ---
 
-*Last updated: March 2026 — iMakie PTxx active development phase.*
-| **16** | RS485 GPIO 16 (RX) ◄──── GPIO 0 (TX) Pico envía, ESP recibe | RS485 |  |
-| **17** |  - | - |   |
-| **18** | **Backlight** | Pantalla | **FIJO (Tu elección)** |
-| **19** | USB D- | USB Nativo | Reservado |
-| **20** | USB D+ | USB Nativo | Reservado |
-| **21** | - | - |   |
-| **33-37**| ⛔ **PROHIBIDO** | **PSRAM N16R8** | **NO TOCAR** |
-| **38** | - | - |   |
-| **39** | - | - |   |
-| **40** | - | - |   |
-| **41** | - | - |   |
-| **42** | - | - |   |
+*Last updated: May 2026 — AITEC-17 active development phase.*
 
-
-***
-
-## 🗺️ Mapa de Pines: Unidad de Control S3-2 (Xtender)
-
-Este mapa de pines está optimizado para **ESP32-S3 (N16R8)**, evitando pines reservados por la PSRAM Octal (33-37), USB Nativo (19-20) y Strapping Pins críticos.
-
-| **GPIO** | **Función Asignada** | **Dispositivo** | **Estado** |
-| :--- | :--- | :--- | :--- |
-| **0** | (Libre) | - | Boot |
-| **1** | ENABLE RS485| - |   |
-| **2** |  (Libre) | - |   |
-| **3** | LED 1 TRANSPORTE | - |   |
-| **4** | LED 2 TRANSPORTE | - |   |
-| **5** | LED 3 TRANSPORTE | - |   |
-| **6** | LED 4 TRANSPORTE | - |   |
-| **7** | LED 5 TRANSPORTE | - |   |
-| **8** | BOTON 1 TRANSPORTE  | - |  |
-| **9** | BOTON 2 TRANSPORTE | - |  |
-| **10** |  BOTON 3 TRANSPORTE | - | |
-| **11** |   BOTON 4 TRANSPORTE | - | |
-| **12** |   BOTON 5 TRANSPORTE | - | |
-| **13** | ENCODER 1 PIN3 | | |
-| **14** | ENCODER 1 PIN1 | | |
-| **15** | RS485 ────► GPIO 15 (RX) ESP envía, Pico recibe | RP2040 |  |
-| **16** | RS485 GPIO 16 (RX) ◄──── GPIO 0 (TX) Pico envía, ESP recibe | RP2040 |  |
-| **17** |  - | - |   |
-| **18** | **Backlight** | Pantalla | **FIJO** |
-| **19** | USB D- | USB Nativo | Reservado |
-| **20** | USB D+ | USB Nativo | Reservado |
-| **21** | - | - |   |
-| **33-37**| ⛔ **PROHIBIDO** | **PSRAM N16R8** | **NO TOCAR** |
-| **38** | - | - |   |
-| **39** | - | - |   |
-| **40** | - | - |   |
-| **41** | - | - |   |
-| **42** | - | - |   |
-| **43** | U0TXD | - |  **NO TOCAR** |
-| **44** | U0RXD| - |  **NO TOCAR** |
-| **45** | - | - |   |
-| **46** | - | - |   |
-| **47** | - | - |   |
-
+For detailed pinout and hardware specifications, see [CLAUDE.md](CLAUDE.md).
 
