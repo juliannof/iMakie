@@ -8,7 +8,8 @@
 
 - [System Overview](#system-overview)
 - [Hardware Architecture](#hardware-architecture)
-  - [Master Unit — ESP32-S3](#master-unit--esp32-s3)
+  - [Master Unit — ESP32-P4](#master-unit--esp32-p4)
+  - [Extender Unit — ESP32-S3](#extender-unit--esp32-s3)
   - [Slave Units — ESP32-S2 Mini](#slave-units--esp32-s2-mini)
 - [Communication Protocol — RS485](#communication-protocol--rs485)
 - [Key Hardware Decisions](#key-hardware-decisions)
