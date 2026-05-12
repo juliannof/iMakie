@@ -7,6 +7,36 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### S2 MOTOR — Calibración automática completa (2026-05-12 19:00 → 20:55) — RESUELTO
+
+**Objetivo:** Motor S2 calibra automáticamente al boot y en SAT > Motor > Calibración.
+
+**Ciclo de calibración implementado:**
+- ✅ KICK_UP: 31 → 26226 (250ms, pwm=175)
+- ✅ GOING_UP: refinamiento → SETTLE_UP
+- ✅ KICK_DOWN: 26465 → 71 (260ms, pwm=175)
+- ✅ GOING_DOWN: refinamiento → SETTLE_DOWN
+- ✅ CALIBRATED: MIN=44 MAX=26448 span=26404
+
+**Fixes aplicados (commits 60804af–0f43418):**
+1. FIX GOING_UP/DOWN: PWM adaptativo sin if redundante (línea 88-89, 163-164)
+2. REFACTOR Motor::tick(): API unificada (setADC + update) para limpieza
+3. FIX transiciones: Sincronizar _motor_currentPWM en KICK→GOING
+4. FIX umbral: KICK_DOWN→GOING_DOWN 1000 → 200 (coincide con PWM threshold)
+5. FIX detección: ADC_STABILITY_THRESHOLD 300 → 100 (sensibilidad refinamiento)
+6. FIX timeout: CALIB_STUCK_TIMEOUT 500 → 1000ms (margen para movimiento lento)
+7. FIX SAT: Replicar loop de Motor en SAT > Motor > Calibración (faderADC + tick)
+
+**Hardware:** PWM_MIN=150, PWM_MAX=175 (NVS)
+
+**Pendiente (Producción):**
+- [ ] Validar control de posición: Logic envía targets vía RS485 → Motor sigue
+- [ ] Test completo: Boot → auto-calib → enter SAT/calib → exit → normal operation
+- [ ] Validar sincronización en transiciones SAT ↔ loop normal
+- [ ] Documentar calibración en STATUS.md
+
+---
+
 ### Investigation & Resolution
 - **S2 MOTOR — Calibración GOING_UP/DOWN bloqueadas (2026-05-11 20:30) — RESUELTO**
   
