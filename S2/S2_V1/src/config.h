@@ -92,9 +92,9 @@ enum class ConnectionState {
 #define MOTOR_EN     14
 
 
-// Motor — rango válido ADC (ADS1115, 16-bit: 23–26423)
-static constexpr uint16_t MOTOR_ADC_MIN            = 20;      // < mínimo esperado
-static constexpr uint16_t MOTOR_ADC_MAX            = 27000;   // > máximo esperado
+// Motor — rango válido ADC (Logic 0-14848 mapea a ADS1115 0-27000)
+static constexpr uint16_t MOTOR_ADC_MIN            = 20;      // mínimo esperado
+static constexpr uint16_t MOTOR_ADC_MAX            = 27000;   // máximo esperado
 
 // Motor — control de posición (constantes)
 static constexpr uint8_t  PWM_MIN                  = 100;
