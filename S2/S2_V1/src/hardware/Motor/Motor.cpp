@@ -145,7 +145,7 @@ static void _calibUpdate() {
 
     case CalibPhase::KICK_DOWN:
         log_i("[CALIB] KICK_DOWN adc=%d (t=%ld ms) pwm=%d", pos, now - _motor_phaseStart, _pwm_max);
-        if (pos <= 1000) {
+        if (pos <= 200) {
             now = millis();  // Recapturar timestamp fresco
             _motor_phase       = CalibPhase::GOING_DOWN;
             _hwDown(_pwm_min);  // Movimiento controlado hacia el tope
