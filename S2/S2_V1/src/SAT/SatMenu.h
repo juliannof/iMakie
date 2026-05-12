@@ -67,6 +67,7 @@ public:
     bool isOpen() const { return _open; }
     bool isEncoderConsumed() const { return _encoderConsumed; }
     const SatConfig& getConfig() const { return _cfg; }
+    bool isMotorCalibScreen() const { return _scr == Scr::MOTOR_CALIB; }
 
 private:
     enum class Scr {

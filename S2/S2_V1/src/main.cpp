@@ -271,6 +271,15 @@ void loop() {
     }
 
     ButtonManager::update();
+
+    // REC reinicia calibración en SAT > Motor > Calibración (2026-05-12 19:07)
+    if (satMenu && satMenu->isOpen() && satMenu->isMotorCalibScreen()) {
+        if (ButtonManager::getButtonFlags() & FLAG_REC) {
+            Motor::startCalib();
+            log_i("[MAIN] REC: reiniciando calibración");
+        }
+    }
+
     if (satMenu && satMenu->isOpen()) return;
 
     // ┌─ Procesar encoder ANTES de RS485 para capturar delta actualizado
