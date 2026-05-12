@@ -945,8 +945,12 @@ void SatMenu::_tickMotorCalib(Btn b) {
         log_i("[SAT] Calibración iniciada al entrar");
     }
 
+    // Replicar loop: actualizar FaderADC y Motor cada frame (2026-05-12 20:55)
+    faderADC.update();
+    Motor::tick(faderADC.getFaderPos());
+
     // SAT solo DIBUJA el estado actual
-    // Motor::update() lo maneja main.cpp (evita race condition) (2026-05-12 19:05)
+    // Motor::update() lo maneja aquí en SAT (sincronización) (2026-05-12 20:55)
     Motor::CalibState cs = Motor::getCalibState();
 
     _spr.fillScreen(C_BG);
