@@ -73,6 +73,7 @@ static void _calibUpdate() {
             now = millis();  // Recapturar timestamp fresco
             _motor_phase       = CalibPhase::GOING_UP;
             _hwUp(_pwm_min);  // Movimiento controlado hacia el tope
+            _motor_currentPWM  = _pwm_min;  // Sincronizar estado (2026-05-12 20:15)
             _motor_stableRef   = pos;
             _motor_stableStart = now;
             log_i("[CALIB] → GOING_UP");
@@ -148,6 +149,7 @@ static void _calibUpdate() {
             now = millis();  // Recapturar timestamp fresco
             _motor_phase       = CalibPhase::GOING_DOWN;
             _hwDown(_pwm_min);  // Movimiento controlado hacia el tope
+            _motor_currentPWM  = _pwm_min;  // Sincronizar estado (2026-05-12 20:15)
             _motor_stableRef   = pos;
             _motor_stableStart = now;
             log_i("[CALIB] → GOING_DOWN  pwm=%d", _pwm_min);
