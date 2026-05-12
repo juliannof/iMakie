@@ -170,10 +170,7 @@ private:
     void _tickTestFader(Btn b);
     void _tickTestNeopixel(Btn b);
     void _tickTestTouch(Btn b);
-    
 
-    void _motorStop();
-    void _motorDrive(int pwm);
     void _load();
     void _save();
 
@@ -193,6 +190,8 @@ private:
     int           _lastRaw    = 0;
     unsigned long _stopT      = 0;
     bool          _reported   = false;
+
+    bool          _calibStarted = false;  // Control autostart calibración (2026-05-12 00:35)
 
     static const Item _mainItems[];
     static const Item _identItems[];

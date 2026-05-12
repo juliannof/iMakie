@@ -470,8 +470,6 @@ void SatMenu::_tickTestEncoder(Btn b) {
 // ─────────────────────────────────────────────────────────────
 //  TEST FADER
 // ─────────────────────────────────────────────────────────────
-static int _touchRead() { return (int)touchRead(FADER_TOUCH_PIN); }
-
 void SatMenu::_tickTestFader(Btn b) {
     if (b == Btn::BACK) { _goto(Scr::DIAG); return; }
     if (b == Btn::ENTER) {
@@ -937,10 +935,13 @@ void SatMenu::showStatus(const char* msg) {
 void SatMenu::_tickMotorCalib(Btn b) {
     int W = _spr.width(), H = _spr.height();
 
-    if (b == Btn::BACK) { _goto(Scr::MOTOR); return; }
-    if (b == Btn::UP) {
+    if (b == Btn::BACK) { _calibStarted = false; _goto(Scr::MOTOR); return; }
+
+    // Autostart calibración la primera vez que entra a esta pantalla (2026-05-12 00:35)
+    if (!_calibStarted) {
+        _calibStarted = true;
         Motor::startCalib();
-        log_i("[SAT] Calibración motor iniciada (2026-05-11 18:15)");
+        log_i("[SAT] Calibración motor iniciada automáticamente");
     }
 
     faderADC.update();

@@ -97,6 +97,18 @@
 - Cambios pequeños (bug fixes, optimizaciones locales) no requieren actualización
 - CLAUDE.md es fuente de verdad para decisiones de diseño
 
+**🏗️ ARQUITECTURA DE MÓDULOS — REGLAS A FUEGO (2026-05-12 00:45):**
+- **NUNCA reescribir funciones que existan en módulos de producción**
+- **Módulos de producción:** Motor, FaderADC, FaderTouch, ButtonManager, Encoder, RS485Handler, Display
+- **SatMenu es CONSUMIDOR de módulos, NUNCA reimplementación**
+- **Antes de escribir cualquier función nueva:**
+  1. Verificar si existe en Motor.cpp, FaderADC.cpp, FaderTouch.cpp, ButtonManager.cpp, Encoder.cpp, RS485Handler.cpp, Display
+  2. Si existe → usar directamente (include + llamada a función pública)
+  3. Si NO existe → crear en módulo correspondiente, NO en SatMenu
+- **Si algo es inesperado → preguntar antes de actuar**
+- **Un cambio a la vez, confirmar antes de continuar**
+- Esta regla es ABSOLUTA — evita duplicación de código y mantiene cohesión arquitectónica
+
 ---
 
 ## Qué es esto
