@@ -198,7 +198,20 @@ void RS485Master::_handleResponse() {
     }
 
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(2)) == pdTRUE) {
-        _ch[_currentId].faderPos          = resp->faderPos;
+        // ── Capturar calibración (min/max) si slave está enviando ──
+        if (resp->buttons & SLAVE_FLAG_CALIB_SENDING) {
+            if (resp->buttons & SLAVE_FLAG_CALIB_IS_MIN) {
+                _ch[_currentId].calibratedMin = resp->faderPos;
+                log_i("[RS485] Slave %d: calibratedMin=%d", _currentId, resp->faderPos);
+            } else {
+                _ch[_currentId].calibratedMax = resp->faderPos;
+                log_i("[RS485] Slave %d: calibratedMax=%d ✓", _currentId, resp->faderPos);
+            }
+        } else {
+            // Normal: actualizar posición
+            _ch[_currentId].faderPos = resp->faderPos;
+        }
+
         _ch[_currentId].touchState        = resp->touchState;
         _ch[_currentId].prevButtons       = _ch[_currentId].buttons;
         _ch[_currentId].buttons           = resp->buttons & 0x0F;
@@ -326,7 +339,17 @@ void RS485Master::setFlags(uint8_t id, uint8_t flags) {
 void RS485Master::setFaderTarget(uint8_t id, uint16_t value14bit) {
     if (id < 1 || id > _numSlaves) return;
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        _ch[id].faderTarget = value14bit & 0x3FFF;
+        // Mapeo: Logic 0-14848 → rango calibrado real de slave
+        uint16_t faderTarget;
+        if (_ch[id].calibratedMax > _ch[id].calibratedMin) {
+            // Slave calibrado: mapear a rango real
+            uint16_t span = _ch[id].calibratedMax - _ch[id].calibratedMin;
+            faderTarget = _ch[id].calibratedMin + ((uint32_t)value14bit * span / 14848);
+        } else {
+            // Slave no calibrado aún: usar rango teórico (0-27000)
+            faderTarget = (uint32_t)value14bit * 27000 / 14848;
+        }
+        _ch[id].faderTarget = faderTarget;
         _ch[id].dirty       = true;
         xSemaphoreGive(_mutex);
     }

@@ -121,15 +121,35 @@ void onMasterData(const MasterPacket& pkt) {
 //  buildResponse
 // =============================================================
 SlavePacket buildResponse(FaderADC& faderADC, SatMenu& satMenu) {
+    static uint8_t _calib_send_state = 0;  // 0=normal, 1=enviando min, 2=enviando max
+
     SlavePacket resp = {};
-    resp.faderPos      = Motor::getRawADC();
     resp.touchState    = FaderTouch::isTouched() ? 1 : 0;
     resp.buttons       = ButtonManager::getButtonFlags();
     resp.encoderDelta  = (int8_t)constrain(Encoder::getCount(), -127, 127);
     resp.encoderButton = ButtonManager::getEncoderButton();
 
     Motor::CalibState cs = Motor::getCalibState();
-    if (cs == Motor::CalibState::DONE)  resp.buttons |= SLAVE_FLAG_CALIB_DONE;
+
+    // Máquina de estado: enviar min/max tras calibración
+    if (cs == Motor::CalibState::DONE && _calib_send_state < 2) {
+        if (_calib_send_state == 0) {
+            // Paquete 1: enviar MIN
+            resp.faderPos = Motor::getADCMin();
+            resp.buttons |= SLAVE_FLAG_CALIB_DONE | SLAVE_FLAG_CALIB_SENDING | SLAVE_FLAG_CALIB_IS_MIN;
+            _calib_send_state = 1;
+        } else if (_calib_send_state == 1) {
+            // Paquete 2: enviar MAX
+            resp.faderPos = Motor::getADCMax();
+            resp.buttons |= SLAVE_FLAG_CALIB_DONE | SLAVE_FLAG_CALIB_SENDING;  // sin IS_MIN = es MAX
+            _calib_send_state = 2;
+        }
+    } else {
+        // Normal: enviar posición actual
+        resp.faderPos = Motor::getRawADC();
+        if (cs == Motor::CalibState::DONE)  resp.buttons |= SLAVE_FLAG_CALIB_DONE;
+    }
+
     if (cs == Motor::CalibState::ERROR) resp.buttons |= SLAVE_FLAG_CALIB_ERROR;
     if (!Motor::isCalibrated())         resp.buttons |= SLAVE_FLAG_NOT_CALIBRATED;
 

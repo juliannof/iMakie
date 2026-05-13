@@ -18,9 +18,10 @@
 // bit 4: orden de calibración (one-shot)
 #define FLAG_CALIB  (1 << 4)
 // bits 0-3: botones (FLAG_REC, SOLO, MUTE, SELECT ya definidos)
-#define SLAVE_FLAG_CALIB_DONE  (1 << 4)   // calibración OK
-#define SLAVE_FLAG_CALIB_ERROR (1 << 5)   // calibración fallida
-#define SLAVE_FLAG_NOT_CALIBRATED (1 << 6)   // ← añadir
+#define SLAVE_FLAG_CALIB_DONE      (1 << 4)   // calibración completa
+#define SLAVE_FLAG_CALIB_ERROR     (1 << 5)   // calibración fallida
+#define SLAVE_FLAG_CALIB_SENDING   (1 << 6)   // enviando datos calibración (min/max en faderPos)
+#define SLAVE_FLAG_CALIB_IS_MIN    (1 << 7)   // si SENDING=1: faderPos=MIN (sin flag: faderPos=MAX)
 // bits 5-7: modo de automatización (3 bits = 8 valores)
 #define AUTOMODE_SHIFT  5
 #define AUTOMODE_MASK   (0x07 << AUTOMODE_SHIFT)

@@ -38,7 +38,11 @@ struct ChannelData {
     uint8_t  prevEncoderButton = 0;
     bool     calibrated       = false;
     bool     responded        = false;
-    
+
+    // Calibración — rango ADC de este slave (enviado por slave post-calib)
+    uint16_t calibratedMin    = 0;
+    uint16_t calibratedMax    = 0;
+
 };
 
 class RS485Master {

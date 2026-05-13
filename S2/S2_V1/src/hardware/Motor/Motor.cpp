@@ -330,11 +330,11 @@ void setADC(uint16_t v) {
     _motor_adcPos = v;
 }
 
-void setTarget(uint16_t midiPB) {
-    _motor_lastMidiTarget = midiPB;
+void setTarget(uint16_t target) {
+    _motor_lastMidiTarget = target;
     if (_motor_phase != CalibPhase::DONE) return;
-    _motor_targetADC = (uint16_t)map((long)midiPB, 0, MIDI_PB_MAX, _calibratedFaderMin, _calibratedFaderMax);
-    log_d("[TARGET] midi=%d → adc=%d", midiPB, _motor_targetADC);
+    _motor_targetADC = target;  // S3 ya mapeó al rango calibrado — usar directamente
+    log_d("[TARGET] %d → adc=%d", target, _motor_targetADC);
 }
 
 void off() {

@@ -7,6 +7,26 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### S3/S2 MAPEO — Logic 0-14848 → Rango calibrado (2026-05-13 00:30) — RESUELTO
+
+**Arquitectura completada:**
+- S3 mapea PitchBend 0-14848 → rango calibrado real de cada S2
+- S2 recibe valor final, NO calcula (O(1), compatible single-core)
+- Calibración: S2 envía min/max via SlavePacket con flags CALIB_SENDING/CALIB_IS_MIN
+- S3 almacena calibratedMin/Max en ChannelData, usa para mapeos posteriores
+
+**Cambios implementados:**
+1. **protocol.h** (S2): Agregar SLAVE_FLAG_CALIB_SENDING (bit 6), SLAVE_FLAG_CALIB_IS_MIN (bit 7)
+2. **RS485Handler.cpp** (S2): Máquina de estado en buildResponse() — enviar min (paquete 1), max (paquete 2)
+3. **RS485.h** (S3): Agregar calibratedMin, calibratedMax en ChannelData
+4. **RS485.cpp** (S3): Capturar min/max en _handleResponse() cuando flags CALIB_SENDING activos
+5. **setFaderTarget()** (S3): Mapear 0-14848 → rango real si calibrado, sino teórico (0-27000)
+6. **Motor::setTarget()** (S2): Usar target directamente (sin map) — S3 ya mapeó
+
+**Beneficio:** S2 single-core ahora tiene setTarget() O(1) sin cálculos. Timing RS485 mejorado.
+
+---
+
 ### S3 AUDITORÍA — Mapeo de fader Logic 16-bit → ADC 27-bit (2026-05-12 22:28) — PENDIENTE PRÓXIMA SESIÓN
 
 **Arquitectura de conversión (S3 es responsable):**
