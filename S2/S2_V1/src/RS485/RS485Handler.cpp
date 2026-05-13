@@ -26,6 +26,12 @@ namespace RS485Handler {
 //  onMasterData
 // =============================================================
 void onMasterData(const MasterPacket& pkt) {
+    // Log no bloqueante cada 1s — diagnóstico RS485 recepción
+    static unsigned long lastLog = 0;
+    if (millis() - lastLog > 1000) {
+        log_i("[RS485 RX] Master packet: id=%d target=%d connected=%d", pkt.id, pkt.faderTarget, pkt.connected);
+        lastLog = millis();
+    }
 
     // ── Conexión ──────────────────────────────────────────────
     ConnectionState newState = pkt.connected ?
@@ -151,7 +157,7 @@ SlavePacket buildResponse(FaderADC& faderADC, SatMenu& satMenu) {
     }
 
     if (cs == Motor::CalibState::ERROR) resp.buttons |= SLAVE_FLAG_CALIB_ERROR;
-    if (!Motor::isCalibrated())         resp.buttons |= SLAVE_FLAG_NOT_CALIBRATED;
+    // NOT_CALIBRATED no se necesita — CALIB_DONE lo indica suficientemente
 
     return resp;
 }

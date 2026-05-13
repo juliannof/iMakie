@@ -947,7 +947,7 @@ void SatMenu::_tickMotorCalib(Btn b) {
 
     // Replicar loop: actualizar FaderADC y Motor cada frame (2026-05-12 20:55)
     faderADC.update();
-    Motor::tick(faderADC.getFaderPos());
+    Motor::update();
 
     // SAT solo DIBUJA el estado actual
     // Motor::update() lo maneja aquí en SAT (sincronización) (2026-05-12 20:55)

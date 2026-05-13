@@ -64,6 +64,12 @@ void RS485Master::runTask() {
     _stateTimer = micros();
     uint32_t _cycleCount = 0;
     for (;;) {
+        extern uint8_t g_logicConnected;
+        if (!g_logicConnected) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+
         switch (_busState) {
 
             case BusState::SEND:
@@ -244,7 +250,7 @@ void RS485Master::_handleResponse() {
 
         bool calibDone     = resp->buttons & SLAVE_FLAG_CALIB_DONE;
         bool calibError    = resp->buttons & SLAVE_FLAG_CALIB_ERROR;
-        bool notCalibrated = resp->buttons & SLAVE_FLAG_NOT_CALIBRATED;
+        // notCalibrated no se usa en S3 (solo en S2)
 
         // [ANTIGUO] Lógica de calibración — comentada por desactivación hardware
         // if (calibDone) {
