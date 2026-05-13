@@ -1,4 +1,4 @@
-# AITEC-17 — Mackie Control Clone on ESP32
+# AITEC-17 — Mackie Control protocol on ESP32
 
 > A DIY Mackie Control surface built on ESP32-P4 (master) + ESP32-S3 (extender) and ESP32-S2 Mini (17 slave) units, communicating over RS485 and interfacing with DAWs via USB MIDI.
 
