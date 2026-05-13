@@ -201,5 +201,3 @@ faderADC.begin();
 
 *Last updated: May 2026 — AITEC-17 active development phase.*
 
-For detailed pinout and hardware specifications, see [CLAUDE.md](CLAUDE.md).
-
