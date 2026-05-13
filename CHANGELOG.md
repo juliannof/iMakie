@@ -7,6 +7,31 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### S3 BOOT CALIBRATION — Escaneo secuencial automático de slaves (2026-05-13 17:10) — IMPLEMENTADO
+
+**Arquitectura completada:**
+- Core0 (taskCore0): chequea esclavos sin calibrar cada iteración (non-blocking)
+- Si hay sin calibrar: dispara `rs485.setCalibrate(id)` inmediatamente
+- Core1 (rs485.runTask): envía FLAG_CALIB en siguiente ciclo normal
+- Slave recibe → calibra → responde con CALIB_DONE + min/max
+- S3 captura datos en _handleResponse() → marca `calibrated=true`
+- Secuencial: una calibración a la vez (break después de setCalibrate)
+
+**Cambios implementados:**
+1. **main.cpp (S3 taskCore0):** Agregar loop escaneo post-DISCONNECT check (líneas 142-150)
+2. **RS485.cpp (S3):** Reactivar lógica CALIB_DONE/CALIB_ERROR (líneas 251-270) — estaba comentada por desactivación hardware temporal
+3. **memory/:** Documentar en s3_boot_calibration.md
+
+**Eficiencia:**
+- Core0 NO bloquea (sin delays, sin timeouts pasivos)
+- Dispara FLAG_CALIB one-shot, continúa procesando MIDI
+- Core1 maneja RS485 naturalmente (timing intact)
+- Reintentos agresivos: si falla, siguiente iteración Core0 reintenta
+
+**Beneficio:** S3 valida automáticamente que todos los slaves responden y tienen rango calibrado antes de recibir targets de Logic.
+
+---
+
 ### S3/S2 MAPEO — Logic 0-14848 → Rango calibrado (2026-05-13 00:30) — RESUELTO
 
 **Arquitectura completada:**

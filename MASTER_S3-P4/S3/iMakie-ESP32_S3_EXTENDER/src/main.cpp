@@ -142,10 +142,10 @@ void taskCore0(void* pvParameters) {
         // ── Calibración automática: dispara FLAG_CALIB a esclavos sin calibrar ──
         for (uint8_t id = 1; id <= NUM_SLAVES; id++) {
             const ChannelData& ch = rs485.getChannel(id);
-            if (!ch.calibrated) {
+            if (!ch.calibrated && !ch.calibrating) {
                 rs485.setCalibrate(id);
-                log_i("[CALIB] Slave %d (intentando)...", id);
-                break;  // Una a la vez
+                log_i("[CALIB] Slave %d (iniciando calibración)...", id);
+                break;  // Una a la vez, esperar a que complete
             }
         }
 

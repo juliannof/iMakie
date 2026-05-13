@@ -71,9 +71,23 @@ if (!_calibrating) {
 }
 ```
 
-### Validación
+### Implementación Completada (2026-05-13 17:10)
 
-- [ ] Implementar automático en Core1
-- [ ] Test: S3 boot → escanea 1 slave → completa → escanea siguiente
-- [ ] Verificar no afecta timing RS485
-- [ ] Log progress: `[BOOT] Slave 1: MIN=44 MAX=26448 ✓`
+✅ **Commits:**
+- `1a60a97` FEAT S3: Calibración automática secuencial de slaves en boot
+
+✅ **Archivos modificados:**
+- main.cpp (S3): taskCore0 loop escaneo (líneas 142-150)
+- RS485.cpp (S3): _handleResponse() reactivado CALIB_DONE/ERROR (líneas 251-270)
+
+✅ **Documentación:**
+- CHANGELOG.md actualizado
+- memory/s3_boot_calibration.md (este archivo)
+
+### Validación (Próxima sesión)
+
+- [ ] Test: S3 boot → dispara FLAG_CALIB slave 1 → responde con MIN/MAX → marca calibrated=true
+- [ ] Verificar logs: `[CALIB] Slave 1 (intentando)...` + `[RS485] Slave 1 CALIBRADO OK: MIN=44 MAX=26448`
+- [ ] Test: Siguiente escaneo a slave 2 tras completar slave 1
+- [ ] Timing RS485: no debe afectar (Core0 no bloqueante, Core1 intacto)
+- [ ] Comportamiento: reintentos agresivos si alguno falla
