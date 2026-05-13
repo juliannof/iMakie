@@ -1,0 +1,2 @@
+- [S3 Boot Calibration Sequence](s3_boot_calibration.md) — Escaneo secuencial de slaves en boot
+- [RS485 Flags Architecture](rs485_calibration_flags.md) — Secuencia de flags de calibración

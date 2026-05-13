@@ -252,39 +252,26 @@ void RS485Master::_handleResponse() {
         bool calibError    = resp->buttons & SLAVE_FLAG_CALIB_ERROR;
         // notCalibrated no se usa en S3 (solo en S2)
 
-        // [ANTIGUO] Lógica de calibración — comentada por desactivación hardware
-        // if (calibDone) {
-        //     _ch[_currentId].calibrating = false;
-        //     if (!_ch[_currentId].calibrated) {
-        //         _ch[_currentId].calibrated = true;
-        //         _ch[_currentId].dirty      = true;
-        //         log_i("[RS485] Slave %d calibrado OK", _currentId);
-        //     }
-        // }
-        // if (calibError) {
-        //     _ch[_currentId].calibrating  = false;
-        //     _ch[_currentId].calibRetries++;
-        //     log_w("[RS485] Slave %d ERROR calibracion (intento %d)",
-        //           _currentId, _ch[_currentId].calibRetries);
-        // }
-        // if (notCalibrated && !_ch[_currentId].calibrating) {
-        //     _ch[_currentId].calibrated   = false;
-        //     _ch[_currentId].calibRetries = 0;
-        // }
-        // if (!_ch[_currentId].calibrated &&
-        //     !_ch[_currentId].calibrating &&
-        //     _ch[_currentId].calibRetries < 3) {
-        //     _ch[_currentId].calibrate   = true;
-        //     _ch[_currentId].dirty       = true;
-        //     _ch[_currentId].calibrating = true;
-        //     log_i("[RS485] Slave %d sin calibrar — disparando (intento %d)",
-        //           _currentId, _ch[_currentId].calibRetries + 1);
-        // }
-
-        // [ACTUAL] Bypass: marcar todo como calibrado (motor no disponible)
-        _ch[_currentId].calibrated   = true;
-        _ch[_currentId].calibrating  = false;
-        _ch[_currentId].calibRetries = 0;
+        // ── Lógica de calibración — REACTIVADA (2026-05-13) ──
+        if (calibDone) {
+            _ch[_currentId].calibrating = false;
+            if (!_ch[_currentId].calibrated) {
+                _ch[_currentId].calibrated = true;
+                _ch[_currentId].dirty      = true;
+                log_i("[RS485] Slave %d CALIBRADO OK: MIN=%d MAX=%d",
+                      _currentId, _ch[_currentId].calibratedMin, _ch[_currentId].calibratedMax);
+            }
+        } else if (calibError) {
+            _ch[_currentId].calibrating  = false;
+            _ch[_currentId].calibRetries++;
+            log_w("[RS485] Slave %d ERROR calibración (intento %d)",
+                  _currentId, _ch[_currentId].calibRetries);
+        } else {
+            // Normal: no está en calibración, marcar como no-calibrando
+            if (_ch[_currentId].calibrating) {
+                _ch[_currentId].calibrating = false;
+            }
+        }
 
         xSemaphoreGive(_mutex);
     }

@@ -139,6 +139,16 @@ void taskCore0(void* pvParameters) {
             // Aquí iría el cambio de UI a offline (cuando se implemente pantalla)
         }
 
+        // ── Calibración automática: dispara FLAG_CALIB a esclavos sin calibrar ──
+        for (uint8_t id = 1; id <= NUM_SLAVES; id++) {
+            const ChannelData& ch = rs485.getChannel(id);
+            if (!ch.calibrated) {
+                rs485.setCalibrate(id);
+                log_i("[CALIB] Slave %d (intentando)...", id);
+                break;  // Una a la vez
+            }
+        }
+
         tickCalibracion();
 
         // ← LOG DE ESTADO (DENTRO DEL LOOP):
