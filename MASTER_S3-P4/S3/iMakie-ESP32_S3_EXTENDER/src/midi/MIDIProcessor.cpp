@@ -25,12 +25,14 @@ namespace {
     static const unsigned long MIDI_TIMEOUT_MS = 0;
     static const int DISCONNECT_THRESHOLD = 9;
     static const unsigned long DISCONNECT_WINDOW_MS = 150;
+    static const int16_t PITCHBEND_DEADBAND = 150;  // ~1% movimiento físico discernible
 
     static int8_t  g_selectedChannel    = -1;
     static unsigned long connectedSinceTime  = 0;
     static const unsigned long CONNECT_GRACE_MS = 1500;
     static uint8_t  _calibPendingFrom = 0;
     static uint32_t _calibNextTime    = 0;
+    static int16_t lastSentPitchBend[9] = {INT16_MIN, INT16_MIN, INT16_MIN, INT16_MIN, INT16_MIN, INT16_MIN, INT16_MIN, INT16_MIN, INT16_MIN};
 }
 
 void processMidiByte(byte b);
@@ -596,7 +598,13 @@ void processPitchBend(byte channel, int bendValue) {
 
     if (channel < 9) {
         uint16_t fader14bit = (uint16_t)bendValue;
-        if (channel < 8) rs485.setFaderTarget(channel + 1, fader14bit);
+        if (channel < 8) {
+            // Deadband: solo enviar si cambio > 150 cuentas (evita retroalimentación por ruido ADC)
+            if (abs((int16_t)fader14bit - lastSentPitchBend[channel]) > PITCHBEND_DEADBAND) {
+                rs485.setFaderTarget(channel + 1, fader14bit);
+                lastSentPitchBend[channel] = (int16_t)fader14bit;
+            }
+        }
         float faderPositionNormalized = (float)fader14bit / 16383.0f;
         if (abs(faderPositions[channel] - faderPositionNormalized) > 0.001f) {
             faderPositions[channel] = faderPositionNormalized;
