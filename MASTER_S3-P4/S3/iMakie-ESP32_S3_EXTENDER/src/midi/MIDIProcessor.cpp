@@ -25,7 +25,7 @@ namespace {
     static const unsigned long MIDI_TIMEOUT_MS = 0;
     static const int DISCONNECT_THRESHOLD = 9;
     static const unsigned long DISCONNECT_WINDOW_MS = 150;
-    static const int16_t PITCHBEND_DEADBAND = 150;  // ~1% movimiento físico discernible
+    static const int16_t PITCHBEND_DEADBAND = 80;  // ~0.5% rango, filtra ruido ±5 con margen seguro
 
     static int8_t  g_selectedChannel    = -1;
     static unsigned long connectedSinceTime  = 0;
