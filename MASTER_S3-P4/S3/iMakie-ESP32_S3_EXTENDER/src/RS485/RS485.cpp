@@ -215,8 +215,11 @@ void RS485Master::_handleResponse() {
                 log_i("[RS485] Slave %d: calibratedMax=%d ✓", _currentId, resp->faderPos);
             }
         } else {
-            // Normal: actualizar posición
-            _ch[_currentId].faderPos = resp->faderPos;
+            // Normal: actualizar posición con EMA filter (0.15 smoothing)
+            const float FADER_EMA_ALPHA = 0.15f;
+            _filteredFaderPos[_currentId] = _filteredFaderPos[_currentId] +
+                (int16_t)((int32_t)resp->faderPos - _filteredFaderPos[_currentId]) * FADER_EMA_ALPHA;
+            _ch[_currentId].faderPos = _filteredFaderPos[_currentId];
         }
 
         _ch[_currentId].touchState        = resp->touchState;

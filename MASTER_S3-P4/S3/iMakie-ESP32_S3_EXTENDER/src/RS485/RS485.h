@@ -79,6 +79,7 @@ private:
     uint8_t           _currentId  = 1;
     SemaphoreHandle_t _mutex      = nullptr;
     ChannelData       _ch[NUM_SLAVES + 1];
+    uint16_t          _filteredFaderPos[NUM_SLAVES + 1] = {0};
 
     enum class BusState : uint8_t { SEND, WAIT_RESP, GAP };
     BusState _busState   = BusState::SEND;
