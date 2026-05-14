@@ -597,7 +597,7 @@ void processPitchBend(byte channel, int bendValue) {
     }
 
     if (channel < 9) {
-        uint16_t fader14bit = (uint16_t)bendValue;
+        uint16_t fader14bit = ((uint32_t)bendValue * 14848 / 16383);
         if (channel < 8) {
             // Deadband: solo enviar si cambio > 150 cuentas (evita retroalimentación por ruido ADC)
             if (abs((int16_t)fader14bit - lastSentPitchBend[channel]) > PITCHBEND_DEADBAND) {

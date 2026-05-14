@@ -73,7 +73,7 @@ static void processSlaveResponse(uint8_t slaveId) {
     // --- Fader → Pitch Bend ---
     // NO ENVIAR si slave está en calibración (CALIB_SENDING activo) — valores raw no son válidos para Logic
     if (ch.touchState && !(ch.buttons & SLAVE_FLAG_CALIB_SENDING)) {
-        uint16_t pb  = ch.faderPos & 0x3FFF;
+        uint16_t pb  = ((uint32_t)ch.faderPos * 14848 / 27000) & 0x3FFF;
         byte msg[3]  = { (byte)(0xE0 | midiCh), (byte)(pb & 0x7F), (byte)(pb >> 7) };
         sendMIDIBytes(msg, 3);
     }
