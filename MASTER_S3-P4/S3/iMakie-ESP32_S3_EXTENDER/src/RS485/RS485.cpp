@@ -221,7 +221,7 @@ void RS485Master::_handleResponse() {
 
         _ch[_currentId].touchState        = resp->touchState;
         _ch[_currentId].prevButtons       = _ch[_currentId].buttons;
-        _ch[_currentId].buttons           = resp->buttons & 0x0F;
+        _ch[_currentId].buttons           = resp->buttons;  // FIX: guardar todos los bits (incluyendo CALIB_*) para que Logic no vea valores calibración
         _ch[_currentId].encoderDelta      = resp->encoderDelta;
         _ch[_currentId].prevEncoderButton = _ch[_currentId].encoderButton;
         _ch[_currentId].encoderButton     = resp->encoderButton;
