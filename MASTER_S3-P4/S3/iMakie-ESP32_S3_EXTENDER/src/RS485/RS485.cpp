@@ -41,8 +41,9 @@ void RS485Master::startTask() {
 void RS485Master::setCalibrate(uint8_t id) {
     if (id < 1 || id > _numSlaves) return;
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-        _ch[id].calibrate = true;
-        _ch[id].dirty     = true;
+        _ch[id].calibrate  = true;
+        _ch[id].calibrating = true;  // FIX (2026-05-14): evita retries infinitos — Core0 verifica !calibrating
+        _ch[id].dirty      = true;
         xSemaphoreGive(_mutex);
     }
 }

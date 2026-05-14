@@ -58,6 +58,13 @@ void onMasterData(const MasterPacket& pkt) {
         // Neopixels se actualizan en main.cpp DESPUÉS de sendResponse()
     }
 }
+
+    // ── Calibración — SIEMPRE se procesa, incluso sin Logic conectado (2026-05-14) ──
+    // Hardware calibration no depende de Logic — debe poder ocurrir en boot
+    if (pkt.flags & FLAG_CALIB) {
+        Motor::startCalib();
+    }
+
     if (logicConnectionState != ConnectionState::CONNECTED) return;
 
     // ── Nombre de pista ───────────────────────────────────────
@@ -105,10 +112,6 @@ void onMasterData(const MasterPacket& pkt) {
     if (fabsf(faderPositions - newFader) > 0.001f) {
         faderPositions = newFader;
         Motor::setTarget(pkt.faderTarget);
-    }
-
-    if (pkt.flags & FLAG_CALIB) {
-        Motor::startCalib();
     }
 
     // ── Modo de automatización (bits 5-7) ─────────────────────
