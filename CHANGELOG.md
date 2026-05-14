@@ -7,6 +7,30 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### S3 EMA FILTER — Suavizado de ruido faderPos en RS485 (2026-05-14 17:04) — IMPLEMENTADO
+
+**Mejora de precisión:** Eliminar oscilaciones residuales en envío a Logic
+- Problema: faderPos oscilaba ±1 unidad → PitchBend -8179/-8180 alternando
+- Solución: EMA filter (alpha=0.15) en recepción RS485, no en envío
+- Ubicación correcta: RS485.cpp _handleResponse(), donde se recibe dato de S2
+
+**Cambios implementados (commit fd2799f):**
+- RS485.h: Agregar `uint16_t _filteredFaderPos[NUM_SLAVES + 1]` en private
+- RS485.cpp: Aplicar filtro EMA antes de asignar a `_ch[id].faderPos`
+- Fórmula: `filtered = filtered + (raw - filtered) * 0.15`
+
+**Ventajas:**
+- Suaviza ruido ADC sin crear "zonas muertas" de deadband
+- Centraliza filtrado en la fuente (RS485), no en salida (MIDI)
+- Mantiene responsividad a movimientos reales del fader
+- Método estándar en firmware para reducción de ruido
+
+**Efecto esperado:**
+- Valores de PitchBend más estables (-8179 sin oscilación)
+- Movimiento continuo y suave sin saltos
+
+---
+
 ### S3 MAPEO PITCHBEND — Fader bidireccional Logic ↔ Hardware (2026-05-14 16:34) — ✅ VALIDADO EN HARDWARE
 
 **Problema identificado en validación hardware:**
