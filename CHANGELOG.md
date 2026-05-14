@@ -7,6 +7,31 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### S3 MAPEO PITCHBEND — Fader bidireccional Logic ↔ Hardware (2026-05-14 16:34) — RESUELTO
+
+**Problema identificado:** MIDI monitor mostraba valores erráticos en fader
+- Posición 0%: PitchBend -8189 a -8187 (debería ~0)
+- Posición 50%: PitchBend 7843 a 7848 (debería ~7424)
+- Posición 100%: PitchBend 1895 a 1901 (debería ~14848)
+
+**Causa raíz — DOS mapeos rotos en S3:**
+1. **Entrada (Logic → S2):** bendValue (0-16383 MIDI raw) enviado directamente sin convertir a 0-14848
+   - MIDIProcessor.cpp línea 600: `fader14bit = bendValue` → `fader14bit = (bendValue * 14848 / 16383)`
+2. **Salida (S2 → Logic):** faderPos (0-27000 ADC raw) enviado sin mapear a 0-14848
+   - main.cpp línea 76: `pb = ch.faderPos & 0x3FFF` → `pb = ((uint32_t)ch.faderPos * 14848 / 27000) & 0x3FFF`
+
+**Cambios implementados (commit 60f8798):**
+- MIDIProcessor.cpp: Mapeo entrada con casting a uint32_t para evitar overflow
+- main.cpp: Mapeo salida con mismo patrón
+
+**Validación pendiente:**
+- [ ] Fader 0% → PitchBend ~0
+- [ ] Fader 50% → PitchBend ~7424
+- [ ] Fader 100% → PitchBend ~14848
+- [ ] Logic envía targets → S2 recibe valores correctamente mapeados
+
+---
+
 ### S3 BOOT CALIBRATION — Escaneo secuencial automático de slaves (2026-05-13 17:10) — IMPLEMENTADO
 
 **Arquitectura completada:**
