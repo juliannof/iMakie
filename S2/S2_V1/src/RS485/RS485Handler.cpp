@@ -131,6 +131,7 @@ void onMasterData(const MasterPacket& pkt) {
 // =============================================================
 SlavePacket buildResponse(FaderADC& faderADC, SatMenu& satMenu) {
     static uint8_t _calib_send_state = 0;  // 0=normal, 1=enviando min, 2=enviando max
+    static Motor::CalibState _last_cs = Motor::CalibState::IDLE;
 
     SlavePacket resp = {};
     resp.touchState    = FaderTouch::isTouched() ? 1 : 0;
@@ -139,6 +140,12 @@ SlavePacket buildResponse(FaderADC& faderADC, SatMenu& satMenu) {
     resp.encoderButton = ButtonManager::getEncoderButton();
 
     Motor::CalibState cs = Motor::getCalibState();
+
+    // Detección: si volvemos a calibración desde DONE, resetear estado de envío
+    if (cs != Motor::CalibState::DONE && _last_cs == Motor::CalibState::DONE) {
+        _calib_send_state = 0;  // Reset para próxima calibración
+    }
+    _last_cs = cs;
 
     // Máquina de estado: enviar min/max tras calibración
     if (cs == Motor::CalibState::DONE && _calib_send_state < 2) {
