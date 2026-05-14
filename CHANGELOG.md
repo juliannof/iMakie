@@ -7,25 +7,97 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
-### S3 TRÁFICO MIDI — Optimización PITCHBEND_DEADBAND (2026-05-14 17:08) — ⏳ PENDIENTE
+### S3 TRÁFICO MIDI — Filtrado "send-only-on-change" en processSlaveResponse (2026-05-14 17:35) — ⏳ IMPLEMENTAR MAÑANA
 
-**Problema identificado en validación:** Tráfico MIDI excesivo sin EMA filter deployado
-- Con 17 faders: 17 × 50 updates/s = **850 mensajes MIDI/s**
-- Datos muestran -8180 repetiéndose cada 20ms (sin cambio real)
-- Impacto: Congestión USB, latencia, posible pérdida de mensajes
+**Problema identificado (2026-05-14 17:08):**
+- Tráfico MIDI excesivo: 17 faders × 50 updates/s = **850 mensajes MIDI/s**
+- Síntoma: MIDI monitor muestra -8180 repetiéndose cada 20ms (valor NO cambió)
+- Causa: `processSlaveResponse()` envía a Logic CADA dato que recibe de S2, aunque sea igual
 
-**Solución:** Aumentar PITCHBEND_DEADBAND para filtrar cambios menores
-- **Ubicación:** MIDIProcessor.cpp línea 28
-- **Cambio:** `PITCHBEND_DEADBAND = 80` → `PITCHBEND_DEADBAND = 150`
-- **Efecto:** Reduce tráfico 60-70% (solo envía cambios > 150 cuentas)
+**Arquitectura correcta (División de responsabilidades):**
 
-**Validación requerida (PRÓXIMA SESIÓN):**
-- [ ] Compilar con DEADBAND=150
+| Capa | Responsabilidad | Complejidad | Acción |
+|------|-----------------|------------|--------|
+| **S2 (single-core)** | Recolectar ADC raw | Mínima | Envía cada 20ms sin filtrado |
+| **S3 (dual-core)** | Filtrar + inteligencia | Máxima | Aplica EMA + "send-only-on-change" |
+| **P4 (triple-core)** | Maestro | N/A | Futuro: 300 slaves |
+
+**Implementación (MAÑANA):**
+
+**Archivo:** `main.cpp` función `processSlaveResponse()` línea 69
+
+**ANTES (envía CADA dato):**
+```cpp
+static void processSlaveResponse(uint8_t slaveId) {
+    const ChannelData& ch = rs485.getChannel(slaveId);
+    uint8_t midiCh = slaveId - 1;
+
+    if (ch.touchState && !(ch.buttons & SLAVE_FLAG_CALIB_SENDING)) {
+        uint16_t pb  = ((uint32_t)filteredFaderPos[slaveId] * 14848 / 27000) & 0x3FFF;
+        byte msg[3]  = { (byte)(0xE0 | midiCh), (byte)(pb & 0x7F), (byte)(pb >> 7) };
+        sendMIDIBytes(msg, 3);  // ← ENVÍA SIEMPRE
+    }
+}
+```
+
+**DESPUÉS (envía SOLO si cambió):**
+```cpp
+static uint16_t lastSentPb[9] = {0};  // ← AGREGAR AL INICIO
+
+static void processSlaveResponse(uint8_t slaveId) {
+    const ChannelData& ch = rs485.getChannel(slaveId);
+    uint8_t midiCh = slaveId - 1;
+
+    if (ch.touchState && !(ch.buttons & SLAVE_FLAG_CALIB_SENDING)) {
+        uint16_t pb  = ((uint32_t)filteredFaderPos[slaveId] * 14848 / 27000) & 0x3FFF;
+        
+        if (pb != lastSentPb[slaveId]) {  // ← NUEVO CHECK
+            byte msg[3]  = { (byte)(0xE0 | midiCh), (byte)(pb & 0x7F), (byte)(pb >> 7) };
+            sendMIDIBytes(msg, 3);
+            lastSentPb[slaveId] = pb;     // ← GUARDAR ÚLTIMO ENVIADO
+        }
+    }
+}
+```
+
+**Cambios exactos:**
+1. Línea ~75: Agregar `static uint16_t lastSentPb[9] = {0};` al inicio de función o namespace
+2. Línea ~76-78: Envolver `sendMIDIBytes()` en bloque `if (pb != lastSentPb[slaveId])`
+3. Línea +1: Agregar `lastSentPb[slaveId] = pb;` después de `sendMIDIBytes()`
+
+**Impacto esperado:**
+- Tráfico MIDI: 850 msgs/s → **~50-100 msgs/s** (solo cambios reales)
+- Resolución: **Sin pérdida** (solo filtra repetidos, no trunca)
+- Responsividad: **Inmediata** (envía en el ciclo 20ms siguiente al cambio)
+- Comportamiento: Fader parado = 0 mensajes; fader movido = cambios en tiempo real
+
+**Validación requerida (MAÑANA):**
+- [ ] Implementar código exacto arriba
+- [ ] Compilar (verificar sin errores)
 - [ ] Deploy en hardware
-- [ ] Verificar tráfico MIDI (debería bajar significativamente)
-- [ ] Confirmar fader responsivo (sin "zonas muertas")
+- [ ] MIDI monitor: Fader parado NO debe mostrar repeticiones
+- [ ] MIDI monitor: Fader movido debe mostrar cambios suavemente
+- [ ] Medir tráfico: Debería bajar 80%+ (850 → <100 msgs/s)
+- [ ] Confirmar sin "lag" o delay en movimiento
 
-**Nota:** Se realiza DESPUÉS de deployer EMA filter en RS485.cpp
+**Notas arquitectónicas:**
+- **EMA filter ya está en S3** (RS485.cpp línea 221) ✅
+- **Mapeo 0-14848 ya está** (main.cpp línea 76) ✅
+- **Solo falta:** Este "send-only-on-change" en S3
+- **S2 NO se toca:** Mantiene envío simple cada 20ms (single-core, sin cálculos)
+- **P4:** Hereda automáticamente (mismo código, escala a 300 slaves)
+
+**Commit esperado:**
+```
+ADD S3: Send-only-on-change en processSlaveResponse — reducir tráfico MIDI (2026-05-15 HH:MM)
+
+- Agregar lastSentPb[9] array para trackear último PitchBend enviado
+- Enviar a Logic SOLO si pb != lastSentPb[slaveId]
+- Reduce 850 msgs/s → ~50-100 msgs/s sin pérdida de resolución
+- S2 mantiene simple (raw ADC cada 20ms), S3 filtra inteligentemente
+
+Impacto: 80%+ reducción tráfico MIDI, responsividad inmediata
+```
 
 ---
 
