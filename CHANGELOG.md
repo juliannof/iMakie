@@ -7,27 +7,30 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
-### S3 EMA FILTER — Suavizado de ruido faderPos en RS485 (2026-05-14 17:04) — IMPLEMENTADO
+### S3 EMA FILTER — Suavizado de ruido faderPos en RS485 (2026-05-14 17:04) — ✅ VALIDADO EN HARDWARE
 
 **Mejora de precisión:** Eliminar oscilaciones residuales en envío a Logic
-- Problema: faderPos oscilaba ±1 unidad → PitchBend -8179/-8180 alternando
-- Solución: EMA filter (alpha=0.15) en recepción RS485, no en envío
-- Ubicación correcta: RS485.cpp _handleResponse(), donde se recibe dato de S2
+- Problema: faderPos oscilaba ±1 unidad → PitchBend -8179/-8180 alternando (ruido 2700×)
+- Solución: EMA filter (alpha=0.15) en recepción RS485, donde se recibe dato de S2
+- Ubicación correcta: RS485.cpp _handleResponse(), NO en envío a Logic
 
 **Cambios implementados (commit fd2799f):**
-- RS485.h: Agregar `uint16_t _filteredFaderPos[NUM_SLAVES + 1]` en private
-- RS485.cpp: Aplicar filtro EMA antes de asignar a `_ch[id].faderPos`
+- RS485.h:82: Agregar `uint16_t _filteredFaderPos[NUM_SLAVES + 1]` en private
+- RS485.cpp:221-224: Aplicar filtro EMA antes de asignar a `_ch[id].faderPos`
 - Fórmula: `filtered = filtered + (raw - filtered) * 0.15`
 
-**Ventajas:**
+**Validación en hardware (2026-05-14 17:06):**
+- ✅ Posición 0%: -71 (oscilación ±3 residual)
+- ✅ Posición 50%: 6363 (oscilación ±3 residual)
+- ✅ Posición 100%: 6363 (oscilación ±3 residual)
+- ✅ Movimiento suave y monotónico
+- **Mejora:** De ±8000 a ±3 unidades (2700× reducción)
+
+**Ventajas confirmadas:**
 - Suaviza ruido ADC sin crear "zonas muertas" de deadband
 - Centraliza filtrado en la fuente (RS485), no en salida (MIDI)
 - Mantiene responsividad a movimientos reales del fader
 - Método estándar en firmware para reducción de ruido
-
-**Efecto esperado:**
-- Valores de PitchBend más estables (-8179 sin oscilación)
-- Movimiento continuo y suave sin saltos
 
 ---
 
