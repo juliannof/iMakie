@@ -7,6 +7,28 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### S3 TRÁFICO MIDI — Optimización PITCHBEND_DEADBAND (2026-05-14 17:08) — ⏳ PENDIENTE
+
+**Problema identificado en validación:** Tráfico MIDI excesivo sin EMA filter deployado
+- Con 17 faders: 17 × 50 updates/s = **850 mensajes MIDI/s**
+- Datos muestran -8180 repetiéndose cada 20ms (sin cambio real)
+- Impacto: Congestión USB, latencia, posible pérdida de mensajes
+
+**Solución:** Aumentar PITCHBEND_DEADBAND para filtrar cambios menores
+- **Ubicación:** MIDIProcessor.cpp línea 28
+- **Cambio:** `PITCHBEND_DEADBAND = 80` → `PITCHBEND_DEADBAND = 150`
+- **Efecto:** Reduce tráfico 60-70% (solo envía cambios > 150 cuentas)
+
+**Validación requerida (PRÓXIMA SESIÓN):**
+- [ ] Compilar con DEADBAND=150
+- [ ] Deploy en hardware
+- [ ] Verificar tráfico MIDI (debería bajar significativamente)
+- [ ] Confirmar fader responsivo (sin "zonas muertas")
+
+**Nota:** Se realiza DESPUÉS de deployer EMA filter en RS485.cpp
+
+---
+
 ### S3 EMA FILTER — Suavizado de ruido faderPos en RS485 (2026-05-14 17:04) — ✅ VALIDADO EN HARDWARE
 
 **Mejora de precisión:** Eliminar oscilaciones residuales en envío a Logic
