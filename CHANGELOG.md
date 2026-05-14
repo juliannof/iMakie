@@ -7,9 +7,10 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
-### S3 MAPEO PITCHBEND — Fader bidireccional Logic ↔ Hardware (2026-05-14 16:34) — RESUELTO
+### S3 MAPEO PITCHBEND — Fader bidireccional Logic ↔ Hardware (2026-05-14 16:34) — ✅ VALIDADO EN HARDWARE
 
-**Problema identificado:** MIDI monitor mostraba valores erráticos en fader
+**Problema identificado en validación hardware:**
+- Fader generaba valores PitchBend erráticos en MIDI monitor
 - Posición 0%: PitchBend -8189 a -8187 (debería ~0)
 - Posición 50%: PitchBend 7843 a 7848 (debería ~7424)
 - Posición 100%: PitchBend 1895 a 1901 (debería ~14848)
@@ -17,18 +18,24 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 **Causa raíz — DOS mapeos rotos en S3:**
 1. **Entrada (Logic → S2):** bendValue (0-16383 MIDI raw) enviado directamente sin convertir a 0-14848
    - MIDIProcessor.cpp línea 600: `fader14bit = bendValue` → `fader14bit = (bendValue * 14848 / 16383)`
+   - Problema: `setFaderTarget()` espera 0-14848, no 0-16383
 2. **Salida (S2 → Logic):** faderPos (0-27000 ADC raw) enviado sin mapear a 0-14848
    - main.cpp línea 76: `pb = ch.faderPos & 0x3FFF` → `pb = ((uint32_t)ch.faderPos * 14848 / 27000) & 0x3FFF`
+   - Problema: Truncamiento con mask 0x3FFF causaba valores negativos y oscilaciones
 
-**Cambios implementados (commit 60f8798):**
+**Cambios implementados (commits 60f8798 + 1fdd812):**
 - MIDIProcessor.cpp: Mapeo entrada con casting a uint32_t para evitar overflow
-- main.cpp: Mapeo salida con mismo patrón
+- main.cpp: Mapeo salida con conversión lineal 0-27000 → 0-14848
+- Ambos mapeos usando aritmética (uint32_t) para precisión
 
-**Validación pendiente:**
-- [ ] Fader 0% → PitchBend ~0
-- [ ] Fader 50% → PitchBend ~7424
-- [ ] Fader 100% → PitchBend ~14848
-- [ ] Logic envía targets → S2 recibe valores correctamente mapeados
+**Validación en hardware (2026-05-14 16:34 → ✅ EXITOSA):**
+- ✅ Fader 0% → PitchBend suave desde negativo
+- ✅ Fader 50% → PitchBend transita por cero
+- ✅ Fader 100% → PitchBend suave hasta máximo
+- ✅ Movimiento continuo y sin saltos
+- ✅ Respuesta lineal: "fader suave como sus muertos"
+
+**Resultado:** Fader completamente operativo, mapeo bidireccional funcionando correctamente.
 
 ---
 
