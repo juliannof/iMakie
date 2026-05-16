@@ -7,6 +7,30 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### DOCUMENTACIÓN — Centralizar en carpeta docs/ (2026-05-16 08:59) — ✅ COMPLETADO
+
+**Cambios realizados:**
+- Crear carpeta `docs/` en raíz del proyecto
+- Mover 8 archivos de documentación técnica:
+  - docs/FADER.md (ADS1115, calibración, mapping)
+  - docs/MOTOR.md (DRV8833, máquina estados, SAT)
+  - docs/RS485.md (protocolo binario, timing, paquetes)
+  - docs/WIFI.md (provisioning, OTA, ElegantOTA)
+  - docs/BUTTONS.md (debounce, ButtonManager, MIDI)
+  - docs/DISPLAY.md (ST7789V3, sprites PSRAM, layout)
+  - docs/ENCODER.md (ISR Gray code, sequenciamiento, SAT)
+  - docs/LEDS.md (WS2812B NeoPixel, asignación, estados)
+- Actualizar todas las referencias en CLAUDE.md: `[FILE.md](FILE.md)` → `[FILE.md](docs/FILE.md)`
+- Agregar CLAUDE.md a tracking de git (remover de .gitignore)
+- CLAUDE.md comentar directiva "no subir a GitHub"
+
+**Resultado:**
+- Documentación técnica centralizada y organizada
+- CLAUDE.md contiene solo directivas vinculantes + referencias
+- CLAUDE.md disponible online en GitHub
+
+---
+
 ### S3 PITCHBEND MAPEO — Fix signed 14-bit (-8192..+8191) → ADC 0..27000 (2026-05-16 08:05) — ✅ IMPLEMENTADO
 
 **Problema identificado (2026-05-16 08:00):**
