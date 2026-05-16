@@ -6,11 +6,18 @@
 #include "midi/MIDIProcessor.h"
 #include "RS485/RS485.h"
 #include "hardware/Transporte.h"
+#include <Adafruit_NeoPixel.h>
 
 // ====================================================================
 // --- MIDI ---
 // ====================================================================
 USBMIDI MIDI;
+
+// ====================================================================
+// --- Boot LED (2026-05-16 19:50) ---
+// ====================================================================
+extern Adafruit_NeoPixel pixels;  // Definido en RS485.cpp
+static uint32_t bootLEDTime = 0;  // Timestamp cuando encender LED verde
 
 // ====================================================================
 // --- ESTADO GLOBAL ---
@@ -124,8 +131,15 @@ static void processSlaveResponse(uint8_t slaveId) {
 void taskCore0(void* pvParameters) {
     log_e("MIDI task arrancando en Core %d", xPortGetCoreID());
     static unsigned long lastStatusLog = 0;  // ← MOVER AQUÍ
-    
+
     for (;;) {
+        // ── Apagar LED verde después de 1s (2026-05-16 19:50) ──
+        if (bootLEDTime > 0 && millis() - bootLEDTime > 1000) {
+            pixels.setPixelColor(0, pixels.Color(0, 0, 0));  // Apagar
+            pixels.show();
+            bootLEDTime = 0;  // Reset
+        }
+
         uint8_t rx_buf[64];
         uint32_t count = tud_midi_stream_read(rx_buf, sizeof(rx_buf));
         if (count > 0) {
@@ -224,6 +238,11 @@ void setup() {
     xTaskCreatePinnedToCore(taskCore1, "TRANSP", 4096, NULL, 1, &taskCore1Handle, 1);
     rs485.startTask();
     log_i("   Tareas creadas");
+
+    // ── LED verde por 1s (no bloqueante) (2026-05-16 19:50) ──
+    pixels.setPixelColor(0, pixels.Color(0, 255, 0));  // Verde
+    pixels.show();
+    bootLEDTime = millis();  // Guardar timestamp
 
     log_i("=== S3-02 Extender ACTIVO. Slaves: %d ===", NUM_SLAVES);
 }
