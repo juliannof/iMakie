@@ -440,8 +440,11 @@ void update() {
 
 void setADC(uint16_t v) {
     if (v < MOTOR_ADC_MIN || v > MOTOR_ADC_MAX) return;  // Rechazar fuera de rango esperado
-    // Durante calibración, permitir cambios grandes (fader puede moverse rápido)
-    if (!_isCalibrating() && _motor_adcPos > 0 &&
+    // Permitir cambios grandes DURANTE calibración O cuando bajando a mínimo (para iniciar calibración)
+    bool inCalibFlow = _isCalibrating() ||
+                       _motor_state == MotorState::GOING_TO_MIN ||
+                       _motor_state == MotorState::WAITING_FOR_CALIB;
+    if (!inCalibFlow && _motor_adcPos > 0 &&
         abs((int)v - (int)_motor_adcPos) > ADC_SPIKE_GUARD) return;
     _motor_adcPos = v;
 }
@@ -580,6 +583,14 @@ void goToMin() {
 void requestCalibration() {
     // S3 ordena FLAG_CALIB → GoToMin es MASTER, garantiza fader en 0, luego calibra (2026-05-16 18:55)
     // Arquitectura: fader SIEMPRE baja a 0 antes de calibración (FADER.md 1.1 escrupuloso)
+    // Guardia: FLAG_CALIB viene en CADA paquete RS485, procesar UNA sola vez
+    if (_pendingCalib ||
+        _motor_state == MotorState::GOING_TO_MIN ||
+        _motor_state == MotorState::WAITING_FOR_CALIB ||
+        _motor_state == MotorState::CALIBRATING) {
+        return;  // Ya en flujo calibración — ignorar FLAG_CALIB repetido
+    }
+
     if (_motor_adcPos <= (MOTOR_ADC_MIN + 10)) {
         // Ya en 0 → calibra directamente
         _motor_state = MotorState::CALIBRATING;
