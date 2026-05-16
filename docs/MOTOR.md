@@ -589,25 +589,34 @@ Motor::requestCalibration()  ← NUEVA FUNCIÓN — reemplaza startCalib()
          └─ startCalib() se ejecuta en siguiente ciclo
 ```
 
-**Código requestCalibration() — implementación (2026-05-16):**
+**Código requestCalibration() — implementación idempotente (2026-05-16 19:26):**
 ```cpp
 void requestCalibration() {
-    // S3 ordena FLAG_CALIB → si fader en 0, calibra; si no, baja primero
+    // S3 ordena FLAG_CALIB cada ciclo → evalúa estado ACTUAL, NO persistente
+    // IDEMPOTENTE: sin _pendingCalib, evalúa cada llamada (no se bloquea)
     if (_motor_adcPos <= (MOTOR_ADC_MIN + 10)) {
-        // Ya en 0 → calibra directamente
-        _motor_state = MotorState::CALIBRATING;
-        startCalib();
-        log_i("[MOTOR] requestCalibration: fader ya en 0, calibrando");
+        // Ya en 0 → calibra directamente (si no ya calibrando)
+        if (_motor_state != MotorState::CALIBRATING) {
+            _motor_state = MotorState::CALIBRATING;
+            startCalib();
+            log_i("[MOTOR] requestCalibration: fader ya en 0, calibrando");
+        }
     } else {
-        // No en 0 → baja primero, luego calibra
-        _motor_state = MotorState::GOING_TO_MIN;
-        _pendingCalib = true;           ← FLAG para startCalib() en siguiente ciclo
-        _motor_goingToMin = true;
-        _hwDown(_pwm_max);
-        log_i("[MOTOR] requestCalibration: bajando a 0 primero, luego calibrar");
+        // No en 0 → baja primero, luego calibra (si no ya bajando)
+        if (_motor_state != MotorState::GOING_TO_MIN) {
+            _motor_state = MotorState::GOING_TO_MIN;
+            goToMin();
+            log_i("[MOTOR] requestCalibration: bajando a 0 primero, luego calibrar");
+        }
     }
 }
 ```
+
+**CRÍTICO:** Sin `_pendingCalib` — S3 llama cada ciclo:
+- S3: FLAG_CALIB=1 → llama `Motor::requestCalibration()`
+- S2 evalúa **estado actual SIEMPRE**: ¿ADC en 0? → calibra; ¿No? → baja
+- No se bloquea: si fader no llega a 0 por fricción → Motor sigue intentando
+- Si estado ya alcanzado (GOING_TO_MIN/CALIBRATING) → no reinicia, no spam
 
 **Manual (SAT menu):**
 ```

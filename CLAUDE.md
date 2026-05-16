@@ -224,13 +224,8 @@ MÍNIMA:  Sin comando: Motor idle en posición actual
    - `setTargetFromS3()` tiene guard: `if (_motor_manualTouchDetected || FaderTouch::isTouched()) return;`
    - S3 targets ignorados mientras usuario toque (debounce 200ms tras soltar)
 
-5. **S3 error handling calibración (2026-05-16 19:26)**
-   - `MAX_CALIBRATION_RETRIES = 5` en config.h
-   - Si TIMEOUT > 5 reintentos: marca `calibrating=false`, salta a siguiente slave
-   - Resultado: Secuencia de calibración no se bloquea en slave defectuoso
-
 5. **Calibración es independiente de Logic (2026-05-16 19:24)**
-   - FLAG_CALIB procesado ANTES de checar pkt.connected
+   - FLAG_CALIB procesado ANTES de checar pkt.connected en RS485Handler::onMasterData()
    - Motor puede calibrar sin Logic conectado
    - S3 envía calibración secuencial al boot (todos los slaves)
    - Propósito: ADC mapeado ANTES de que Logic tome control
@@ -240,19 +235,54 @@ MÍNIMA:  Sin comando: Motor idle en posición actual
    - Si DISCONNECTED: Motor baja a 0 indefinidamente (goToMin loop)
 
 **Implementación v3 (2026-05-16 18:45 → 19:26):**
-- Motor.cpp: función `Motor::requestCalibration()` — NUEVA
-- Motor.cpp: `Motor::goToMin()` — MASTER ABSOLUTO si `!_connected`
-- Motor.cpp: `setADCDelta()` — usuario detection
-- Motor.cpp: `setTargetFromS3()` — con guards usuario
-- RS485Handler.cpp línea 36 (ANTES línea 67): **CAMBIO CRÍTICO (2026-05-16 19:24)**
-  - FLAG_CALIB procesado ANTES de procesar desconexión
-  - Motor está activo cuando `Motor::requestCalibration()` lo ordena
-  - Calibración independiente de Logic (pkt.connected)
-- RS485.cpp (S3): **Error handling (2026-05-16 19:26)**
-  - config.h: `MAX_CALIBRATION_RETRIES = 5`
-  - runTask(): Límite de reintentos en timeout
-  - Si timeout > 5: marca `calibrating=false`, log error, pasa a siguiente slave
-- Documentación: MOTOR.md + FADER.md + RS485.md + CLAUDE.md actualizados (2026-05-16 19:26)
+
+*S2 (Slave):*
+- `Motor.cpp`: función `Motor::requestCalibration()` (línea ~580) — NUEVA, idempotente
+  - Evalúa estado ACTUAL cada llamada: `if (ADC <= MIN+10) → CALIBRATING else → GOING_TO_MIN`
+  - NO guarda estado `_pendingCalib` — S3 llama cada ciclo sin bloqueo
+- `Motor.cpp`: `Motor::goToMin()` — MASTER ABSOLUTO si `!_connected`
+- `Motor.cpp`: `setADCDelta()` (línea ~441) — usuario detection con `inCalibFlow` guard
+  - Permite cambios ADC grandes durante GOING_TO_MIN/CALIBRATING
+- `Motor.cpp`: `setTargetFromS3()` — con guards usuario touch
+- `RS485Handler.cpp` (línea 36): **CAMBIO CRÍTICO**
+  - FLAG_CALIB procesado **ANTES** de procesar pkt.connected/desconexión
+  - Motor::requestCalibration() ejecuta SIEMPRE que FLAG_CALIB=1
+  - Calibración independiente de Logic state
+
+*S3 (Extender):*
+- `config.h` (línea ~52): `#define MAX_CALIBRATION_RETRIES 5`
+- `RS485.cpp` (línea ~9): `extern Adafruit_NeoPixel pixels` — globales
+- `RS485.cpp::begin()` (línea ~18): Initialize NeoPixel azul (aguardando conexión)
+- `RS485.cpp::runTask()` (línea ~103): Timeout handling con contador
+  - Si `_consecutiveTimeouts > MAX_CALIBRATION_RETRIES`:
+    - NeoPixel **ROJO** (error crítico)
+    - Log error: `[CALIB] ✗ FALLO CRÍTICO Slave X`
+    - Sistema entra en **halt infinito** (requiere reset manual)
+  - Si timeout ≤ 5: salta a siguiente slave, log warning
+- `main.cpp` (línea ~20): `static uint32_t bootLEDTime = 0;` — boot LED tracking
+- `main.cpp::setup()` (línea ~240): Verde LED por 1s
+  - `pixels.setPixelColor(0, pixels.Color(0, 255, 0)); bootLEDTime = millis();`
+- `main.cpp::taskCore0()` (línea ~137): Non-blocking LED off
+  - `if (bootLEDTime > 0 && millis() - bootLEDTime > 1000) → apagar`
+
+- Documentación: MOTOR.md + FADER.md + RS485.md + README.md (S3) actualizados (2026-05-16 19:26)
+
+**🔴 NeoPixel Status LED — S3 Error Handling (2026-05-16 19:50):**
+
+| Estado | Color | Situación | Acción |
+|--------|-------|-----------|--------|
+| **Init** | Azul | S3 arranca, esperando comunicación Logic | Sistema operacional, en espera |
+| **Boot OK** | Verde 1s | S3 init completado, LED enciende no-bloqueante | Timer auto-apaga tras 1s |
+| **Calibración activa** | Gris apagado | S3 ordena calibración a slaves | LED apagado durante ciclos normal |
+| **Error crítico** | **Rojo fijo** | TIMEOUT > 5 reintentos en slave → calibración irrecuperable | **Sistema HALTED** — loop infinito, requiere reset manual |
+
+**Detalles error crítico:**
+- Evento: S3 timeout en slave X durante calibración → contador llega a `MAX_CALIBRATION_RETRIES = 5`
+- LED: `pixels.setPixelColor(0, pixels.Color(255, 0, 0))` — ROJO
+- Log: `[CALIB] ✗ FALLO CRÍTICO Slave X — comunicación perdida. Sistema DETENIDO.`
+- Sistema: `while(1) delay(1000);` — loop infinito (evita continuar con slave borrado)
+- Recuperación: Reset manual S3 (botón reset o power cycle)
+- Propósito: Alertar operador de fallo de hardware S2 — no continuar calibración sin comunicación
 
 **Test mínimo requerido:**
 - [ ] Boot: fader baja a 0 (Motor::goToMin() en setup)
