@@ -342,21 +342,6 @@ loop() {
 
 **→ [Ver STATUS.md](STATUS.md)** para bugs conocidos y pendientes.
 
-## Protocolo RS485
-
-**→ [Ver documentación completa en STATUS.md](STATUS.md)**
-
-RS485 es el bus serial que conecta master (P4 o S3) con slaves (S2):
-- **Baudrate:** 500 kbaud, 8N1
-- **Protocolo:** Binario custom, CRC8, topología star
-- **Timing:** Ciclo ~20ms para 8 slaves, timeouts críticos en microsegundos
-- **Bus A (P4):** 9 slaves, TX=GPIO50, RX=GPIO51, EN=GPIO52
-- **Bus B (S3):** 8 slaves, TX=GPIO15, RX=GPIO16, EN=GPIO1
-- **Slaves (S2):** TX=GPIO8, RX=GPIO9, EN=GPIO35
-
-Toda la especificación de paquetes (MasterPacket, SlavePacket), máquina de estados, timing, CRC, troubleshooting y optimizaciones históricas está en STATUS.md.
-
-Ver también: **→ [STATUS.md](STATUS.md)** para auditoría RS485 y métricas de timing.
 
 ---
 
