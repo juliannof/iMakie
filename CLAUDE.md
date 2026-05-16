@@ -52,6 +52,19 @@
 - **Cambios que afecten RS485, Motor, FaderADC, calibración → revisar TODOS los MCU**
 - Formato: tabla con MCU | Archivo | Línea | Cambio | Razón | Estado
 
+**config.h es FUENTE ÚNICA DE VERDAD (2026-05-16 20:15):**
+- **Cada MCU tiene su propio config.h**
+  - `S2/S2_V1/src/config.h` — configuración S2
+  - `MASTER_S3-P4/S3/iMakie-ESP32_S3_EXTENDER/src/config.h` — configuración S3
+  - `MASTER_S3-P4/P4/src/config.h` — configuración P4
+- **NUNCA asumir valores** — verificar config.h ANTES de hacer cambios
+- **NUM_SLAVES y pines GPIO están SIEMPRE en config.h**, no en memoria u otro lado
+- **Ejemplo actual (2026-05-16):**
+  - S3: `NUM_SLAVES = 1` (controla 1 esclavo en bus B) ← correcto
+  - P4: `NUM_SLAVES = 9` (controla 9 esclavos en bus A) ← correcto
+- **Si cambias config.h, el cambio afecta compilación y comportamiento en hardware**
+- Esta regla es VINCULANTE — config.h resuelve ambigüedades de arquitectura
+
 **Tabla de Impacto por MCU (referencia):**
 
 | Subsistema | S2 (Slave) | S3 (Extender) | P4 (Master) | Notas |
@@ -62,6 +75,7 @@
 | FLAG_CALIB | ✅ Recibe en onMasterData | ✅ Envía setCalibrate | ✅ Envía setCalibrate | S2 recibe, S3/P4 envían |
 | Calibración | ✅ Motor::requestCalibration | ❌ No tiene motor | ❌ No tiene motor | Solo S2 calibra |
 | protocol.h | ✅ S2 version | ✅ S3 version | ✅ P4 version | 3 copias independientes |
+| NUM_SLAVES | ✅ Definido en config.h | ✅ Definido en config.h | ✅ Definido en config.h | Ver config.h, nunca asumir |
 
 **Protocolo de Informe (obligatorio para CADA sesión con cambios):**
 
