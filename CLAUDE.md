@@ -321,7 +321,8 @@ loop() {
 ## Hardware S3 (Extender) — 📌 Ver MASTER_S3-P4/S3/iMakie-ESP32_S3_EXTENDER/README.md
 
 **Documentación exhaustiva:**
-→ **[MASTER_S3-P4/S3/iMakie-ESP32_S3_EXTENDER/README.md](MASTER_S3-P4/S3/iMakie-ESP32_S3_EXTENDER/README.md)** (pinout, RS485 bus B, transport buttons, MIDI notas, handshake Mackie, timing)
+- **Pinout y RS485:** [MASTER_S3-P4/S3/iMakie-ESP32_S3_EXTENDER/README.md](MASTER_S3-P4/S3/iMakie-ESP32_S3_EXTENDER/README.md) (pinout, RS485 bus B, timing, handshake)
+- **Transport (RW/FF/STOP/PLAY/REC):** [docs/Transport.md](docs/Transport.md) (MIDI notas, flujo bidireccional, feedback)
 
 ---
 
