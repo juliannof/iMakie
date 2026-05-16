@@ -7,7 +7,51 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
-### S3 TRÁFICO MIDI — Filtrado "send-only-on-change" en processSlaveResponse (2026-05-14 17:35) — ⏳ IMPLEMENTAR MAÑANA
+### S2 MOTOR CALIBRACIÓN — Guard cooldown + desactivación auto-calib (2026-05-16 07:48) — ✅ IMPLEMENTADO
+
+**Problema identificado (2026-05-16 07:45):**
+- Calibración estaba en bucle infinito: completaba (DONE) → siguiente paquete RS485 con FLAG_CALIB → reiniciaba
+- Síntoma: 3-4 calibraciones seguidas en los logs, cada una completa pero sin estabilizarse
+- Causa 1: Master enviaba FLAG_CALIB continuamente; startCalib() permitía reiniciar si `_motor_phase == DONE`
+- Causa 2: Auto-calibración a 10s del boot conflictaba con FLAG_CALIB de S3
+
+**Soluciones implementadas:**
+
+1. **Guard de cooldown en Motor::startCalib()**
+   - Agregar constante `CALIB_COOLDOWN_MS = 2000` en config.h
+   - Agregar variable `_motor_lastCalibDone` para registrar timestamp al completar
+   - Guard 2: chequea `now - _motor_lastCalibDone < CALIB_COOLDOWN_MS` antes de permitir reinicio
+   - Si cooldown activo: log warning y retorna sin reiniciar
+
+2. **Desactivar auto-calibración en main.cpp**
+   - Comentar bloque AUTO-CALIB (línea 322-329)
+   - Razón: Arquitectura maestro-esclavo — S3 es autoridad única
+   - S2 SOLO calibra si S3 lo ordena explícitamente (RS485 FLAG_CALIB)
+
+**Cambios exactos:**
+1. config.h línea 113: Constante CALIB_COOLDOWN_MS = 2000
+2. config.h línea 129: Variable `static uint32_t _motor_lastCalibDone = 0`
+3. Motor.cpp línea 218: `_motor_lastCalibDone = millis();` cuando DONE
+4. Motor.cpp línea 372-384: Guard 2 con chequeo de cooldown en startCalib()
+5. main.cpp línea 322-329: Comentar bloque AUTO-CALIB (con explicación)
+
+**Impacto esperado:**
+- Calibración inicia SOLO si S3 lo ordena (arquitectura limpia)
+- Si S3 ordena múltiples veces en <2s: rechazado, log warning
+- Después de 2s: nueva calibración permitida (si falla, reintento seguro)
+- Sin conflictos entre auto-calib y FLAG_CALIB
+
+**Validación requerida:**
+- [ ] Compilar sin errores
+- [ ] Deploy en S2
+- [ ] Boot: S2 espera comando de S3 (no auto-calibra)
+- [ ] S3 boot: ordena FLAG_CALIB → S2 calibra una sola vez
+- [ ] MIDI monitor: fader responde smoothly, sin lag
+- [ ] Log: "Iniciada" aparece UNA sola vez en boot
+
+---
+
+### S3 TRÁFICO MIDI — Filtrado "send-only-on-change" en processSlaveResponse (2026-05-14 17:35) — ⏳ IMPLEMENTAR PRÓXIMA SESIÓN
 
 **Problema identificado (2026-05-14 17:08):**
 - Tráfico MIDI excesivo: 17 faders × 50 updates/s = **850 mensajes MIDI/s**
