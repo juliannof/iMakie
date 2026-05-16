@@ -326,46 +326,17 @@ loop() {
 
 ---
 
-## Hardware P4 (master)
+## Hardware P4 (master) — 📌 Ver MASTER_S3-P4/P4/README.md
 
-**Placa:** GUITION JC4880P433C (ESP32-P4)
+**Documentación exhaustiva:**
+→ **[MASTER_S3-P4/P4/README.md](MASTER_S3-P4/P4/README.md)** (pinout, subsistemas diferenciados)
 
-### Pinout definitivo P4
-
-| Función | GPIO |
-|---|---|
-| RS485 TX | 50 |
-| RS485 RX | 51 |
-| RS485 EN | 52 |
-| NeoTrellis SDA | 33 |
-| NeoTrellis SCL | 31 |
-| Touch SDA (GT911) | 7 |
-| Touch SCL (GT911) | 8 |
-| Display MIPI-DSI | Integrado placa |
-
-### Display
-- ST7701S MIPI-DSI 2-lane, 480×800 portrait
-- LVGL v9
-- **Solo inicializa en portrait** — landscape por rotación software
-- Rotación de widgets: `lv_obj_set_style_transform_rotation(obj, 900, 0)`, coordenadas X/Y intercambiadas mentalmente
-
-### Touch
-- GT911 en I2C_NUM_1 (SDA=GPIO7, SCL=GPIO8)
-
-### NeoTrellis
-- Adafruit seesaw, dos tiles 4×4 en I2C_NUM_0
-- Direcciones `0x2F` (izquierda) y `0x2E` (derecha) → matriz 4×8
-- Pines: SDA=GPIO33, SCL=GPIO31
-
-### RS485 P4
-- Transceiver externo (no el integrado de la placa)
-- TX=GPIO50, RX=GPIO51, EN=GPIO52
-- 9 slaves en bus A
-
-### Arquitectura tareas P4
-- `taskCore0` / `taskCore1` dual-core
-- Flags de cambio de página: `volatile bool g_switchToPage3/3A/3B/Offline`
-- Race conocido en `vuLevels[]`: Core 0 escribe, Core 1 lee en `handleVUMeterDecay` — sin mutex actualmente
+**Subsistemas P4 (documentados por MCU):**
+- **Display P4:** [docs/DISPLAY_P4.md](docs/DISPLAY_P4.md)
+- **Touch:** [docs/TOUCH.md](docs/TOUCH.md)
+- **NeoTrellis:** [docs/NEOTRELLLIS.md](docs/NEOTRELLLIS.md)
+- **RS485 P4:** [docs/RS485_P4.md](docs/RS485_P4.md)
+- **Arquitectura Tareas:** [docs/ARCHITECTURE_P4.md](docs/ARCHITECTURE_P4.md)
 
 ---
 
