@@ -266,6 +266,8 @@ void loop() {
     static uint32_t lastLog = 0;
     if (millis() - lastLog > 1000) {
         log_i("[ADS] raw=%d pos=%d motor=%d", faderADC.getRawLast(), faderADC.getFaderPos(), Motor::getRawADC());
+        // DIAGNÓSTICO RS485 (2026-05-16 18:55)
+        rs485.printStats();
         lastLog = millis();
     }
 
