@@ -702,6 +702,40 @@ Motor controla ADC 0-27000 (ADS1115 raw)
 
 ---
 
+## Historial de Sesiones de Debugging
+
+### SESION (2026-05-10 22:00-22:05) — S2 Test Mode ADC Real-Time
+
+**Objetivo:** Fix SAT Test Mode pantalla — Motor::getRawADC() siempre devolvía valor de entrada, nunca se actualizaba.
+
+**Root cause:** Motor::setADC() rechazaba deltas > 200 (SPIKE_GUARD) cuando SAT abría.
+
+**Cambios implementados:**
+1. config.h: ADC_SPIKE_GUARD 200 → 500 (línea 104)
+2. main.cpp: Motor::setADC() movido antes SAT check (línea 283) — ejecuta cada frame incluso en Test Mode
+3. SatMenu.cpp _tickMotorTest(): Lee directo faderADC.getFaderPos() en lugar Motor::getRawADC() (línea 1088)
+
+**Estado actual:** 
+- ✅ ADC obtiene valor correcto de faderADC en tiempo real
+- ❌ **Pantalla no se redibuja en tiempo real** — MOTOR_TEST no está en lista `live` en SatMenu::update() línea 113-119
+  - Solución pendiente: agregar `_scr == Scr::MOTOR_TEST` a lista live
+  - Esto hará que _render() se ejecute cada frame
+
+**Por hacer próxima sesión:**
+- Agregar MOTOR_TEST a lista `live` en SatMenu.cpp líneas 113-119
+- Verificar que pantalla Test Mode redibuja cada frame
+
+---
+
+### SESION (2026-05-04)
+
+- STATUS.md reorganizado: S2, S3, P4, Cross-system con estructura MAYÚSCULAS + NEGRITA
+- Subsecciones Bugs/Pendientes/Detalles técnicos en cada componente
+- 7 bugs críticos documentados en S2 (RS485 pérdida, Display brillo, Botones lentos, Fader no funciona, FaderTouch con plástico, Motor no funciona, Encoder solo SAT)
+- WiFi/OTA: ArduinoOTA muerto → ElegantOTA funciona
+
+---
+
 ## Formato de Versión
 
 - **[vYYYY-MM-DD]** — snapshot de estado en fecha
