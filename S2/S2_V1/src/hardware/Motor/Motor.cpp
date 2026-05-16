@@ -379,26 +379,11 @@ void update() {
         // Bajando a 0. Detectar llegada.
         if (_motor_adcPos <= (MOTOR_ADC_MIN + 10)) {  // Llegó a 0
             _hwOff();
-            if (_pendingCalib) {
-                // Esperar que startCalib() se ejecute (FLAG_CALIB en espera)
-                _motor_state = MotorState::WAITING_FOR_CALIB;
-                log_d("[MOTOR-STATE] GOING_TO_MIN → WAITING_FOR_CALIB");
-            } else {
-                // Usuario soltó fader en 0 (no FLAG_CALIB)
-                _motor_state = MotorState::AT_TARGET;
-                _atTargetStartTime = millis();
-                log_d("[MOTOR-STATE] GOING_TO_MIN → AT_TARGET (user drop at 0)");
-            }
-        }
-        break;
-
-    case MotorState::WAITING_FOR_CALIB:
-        // En 0, esperando que FLAG_CALIB inicie calibración
-        if (_pendingCalib) {
-            _pendingCalib = false;
-            _motor_state = MotorState::CALIBRATING;
-            startCalib();  // Ahora SÍ inicia calibración
-            log_d("[MOTOR-STATE] WAITING_FOR_CALIB → CALIBRATING");
+            // En 0: S3 enviará FLAG_CALIB en próximo ciclo para calibrar
+            // Mientras tanto, queda en AT_TARGET esperando siguiente comando
+            _motor_state = MotorState::AT_TARGET;
+            _atTargetStartTime = millis();
+            log_d("[MOTOR-STATE] GOING_TO_MIN → AT_TARGET (llegó a 0)");
         }
         break;
 
@@ -581,27 +566,25 @@ void goToMin() {
 
 // ─── Máquina de estados v2 (2026-05-16) ──────────────────────
 void requestCalibration() {
-    // S3 ordena FLAG_CALIB → GoToMin es MASTER, garantiza fader en 0, luego calibra (2026-05-16 18:55)
-    // Arquitectura: fader SIEMPRE baja a 0 antes de calibración (FADER.md 1.1 escrupuloso)
-    // Guardia: FLAG_CALIB viene en CADA paquete RS485, procesar UNA sola vez
-    if (_pendingCalib ||
-        _motor_state == MotorState::GOING_TO_MIN ||
-        _motor_state == MotorState::WAITING_FOR_CALIB ||
-        _motor_state == MotorState::CALIBRATING) {
-        return;  // Ya en flujo calibración — ignorar FLAG_CALIB repetido
-    }
+    // S3 MASTER de calibración (2026-05-16 19:30)
+    // Flujo: S3 envía FLAG_CALIB cada ciclo → S2 evalúa estado ACTUAL → ejecuta acción necesaria
+    // S2 reporta CALIB_DONE vía SlavePacket → S3 detecta y pasa a siguiente slave
+    // SIN estado pendiente, SIN bloqueos, evaluación PURA de estado actual
 
     if (_motor_adcPos <= (MOTOR_ADC_MIN + 10)) {
-        // Ya en 0 → calibra directamente
-        _motor_state = MotorState::CALIBRATING;
-        startCalib();
-        log_i("[MOTOR] requestCalibration: fader ya en 0, calibrando");
+        // Fader EN 0 → calibrar directamente
+        if (_motor_state != MotorState::CALIBRATING) {
+            _motor_state = MotorState::CALIBRATING;
+            startCalib();
+            log_i("[MOTOR] requestCalibration: EN 0, iniciando startCalib()");
+        }
     } else {
-        // No en 0 → GoToMin MASTER baja a 0, luego calibra
-        _motor_state = MotorState::GOING_TO_MIN;      // Establecer estado para Motor::update()
-        _pendingCalib = true;                         // Flag para startCalib() cuando llegue a 0
-        goToMin();                                     // MASTER absoluto — baja sin excepciones
-        log_i("[MOTOR] requestCalibration: GoToMin baja a 0, _pendingCalib esperando...");
+        // Fader ≠ 0 → bajar a 0 (S3 reintentará próximo ciclo)
+        if (_motor_state != MotorState::GOING_TO_MIN) {
+            _motor_state = MotorState::GOING_TO_MIN;
+            goToMin();
+            log_i("[MOTOR] requestCalibration: ≠ 0, goToMin() bajando...");
+        }
     }
 }
 
