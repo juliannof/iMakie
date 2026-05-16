@@ -230,7 +230,7 @@ void setup() {
     }
 
     uint8_t slaveId = satMenu->getConfig().trackId;  // ← mover aquí arriba
-    Motor::off();   // ← asegurar motor apagado antes de arrancar RS485
+    Motor::goToMin();   // ← baja a posición 0, espera calibración S3
 
     log_i("Track ID: %d", slaveId);
     rs485.begin(slaveId);
@@ -256,6 +256,7 @@ void loop() {
     // Actualizar ADC SIEMPRE (incluso en SAT) para Test Mode live feedback (2026-05-10 21:57)
     faderADC.update();
     FaderTouch::update();
+    Motor::setADCDelta(faderADC.getFaderPos());  // Detecta movimiento manual (delta ADC rápido) — 2026-05-16
     Motor::setADC(faderADC.getFaderPos());  // Motor recibe ADC ANTES de SAT check
 
     // LOG ADC SIEMPRE (incluso en SAT) para diagnosticar si faderADC actualiza

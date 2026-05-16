@@ -148,6 +148,13 @@ static uint16_t   _motor_noiseBottomSpan = 0;    // Ruido medido en SETTLE_DOWN
 static bool       _motor_active         = false;
 static int        _motor_currentPWM     = 0;
 
+// Motor — detección movimiento manual (delta ADC rápido)
+static uint16_t   _motor_lastADCForDelta = 0;  // ADC anterior para calcular delta
+static bool       _motor_manualTouchDetected = false;  // Flag toque manual en curso
+static uint32_t   _motor_manualTouchStartTime = 0;  // Cuándo inició movimiento manual
+static constexpr uint16_t MANUAL_TOUCH_THRESHOLD = 500;  // umbral delta para detectar movimiento (cuentas)
+static constexpr uint32_t MANUAL_TOUCH_DEBOUNCE_MS = 200;  // esperar estable antes de reanudar (ms)
+
 // ─── FADERTOUCH — detección por sostenimiento ────────────────
 static constexpr uint32_t TOUCH_POLL_MS            = 20;      // intervalo de muestreo (ms)
 static constexpr uint8_t  TOUCH_BASELINE_SAMPS     = 16;      // muestras para baseline inicial

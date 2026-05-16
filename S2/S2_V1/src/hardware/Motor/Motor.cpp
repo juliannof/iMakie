@@ -27,6 +27,9 @@ extern FaderADC faderADC;
 static uint8_t _pwm_min = 0;
 static uint8_t _pwm_max = 0;
 
+// ─── goToMin: flag para bajar a posición 0 ────────────────────
+static bool _motor_goingToMin = false;
+
 // ─── Funciones HW (privadas) ──────────────────────────────────
 static void _hwOff() {
     analogWrite(MOTOR_IN1, 0);
@@ -315,6 +318,18 @@ void initPWM() {
 }
 
 void update() {
+    // ⚠️ goToMin: bajando a posición 0 (prior a calibración)
+    if (_motor_goingToMin) {
+        if (_motor_adcPos <= (MOTOR_ADC_MIN + 10)) {  // Llegó al fondo (ADC ≈ 20-30)
+            _hwOff();
+            _motor_goingToMin = false;
+            log_i("[MOTOR] goToMin: llegó a 0 (ADC=%d)", _motor_adcPos);
+            return;
+        }
+        return;  // Sigue bajando, sin ejecutar otro código
+    }
+
+    // Lógica normal
     if (_isCalibrating()) {
         _calibUpdate();
     } else if (_motor_phase == CalibPhase::DONE) {
@@ -330,6 +345,27 @@ void setADC(uint16_t v) {
     if (!_isCalibrating() && _motor_adcPos > 0 &&
         abs((int)v - (int)_motor_adcPos) > ADC_SPIKE_GUARD) return;
     _motor_adcPos = v;
+}
+
+void setADCDelta(uint16_t currentADC) {
+    // Detecta movimiento manual del fader por delta ADC rápido
+    // Si delta > umbral → motor no puede haberlo causado → toque manual
+    uint16_t delta = abs((int)currentADC - (int)_motor_lastADCForDelta);
+    _motor_lastADCForDelta = currentADC;
+
+    if (delta > MANUAL_TOUCH_THRESHOLD) {
+        // Movimiento rápido detectado — es toque manual
+        _motor_manualTouchDetected = true;
+        _motor_manualTouchStartTime = millis();
+        Motor::stop();
+        log_w("[MOTOR] Manual touch detected: delta=%d", delta);
+    } else if (_motor_manualTouchDetected) {
+        // Esperando a que se estabilice
+        if (millis() - _motor_manualTouchStartTime > MANUAL_TOUCH_DEBOUNCE_MS) {
+            _motor_manualTouchDetected = false;
+            log_i("[MOTOR] Manual touch released");
+        }
+    }
 }
 
 void setTarget(uint16_t target) {
@@ -400,6 +436,24 @@ void startCalib() {
     _motor_phase          = CalibPhase::KICK_UP;
     _hwUp(_pwm_max);
     log_i("[CALIB] Iniciada");
+}
+
+void goToMin() {
+    // Guard: no reiniciar si ya está en movimiento
+    if (_isCalibrating()) {
+        return;
+    }
+
+    // ADC debe tener lectura válida
+    if (_motor_adcPos < MOTOR_ADC_MIN || _motor_adcPos > MOTOR_ADC_MAX) {
+        log_e("[MOTOR] goToMin: ADC inválido: %d", _motor_adcPos);
+        return;
+    }
+
+    // Iniciar movimiento hacia abajo
+    _motor_goingToMin = true;
+    _hwDown(_pwm_max);  // Motor baja con PWM máximo
+    log_i("[MOTOR] goToMin: bajando a posición 0...");
 }
 
 CalibState getCalibState() {

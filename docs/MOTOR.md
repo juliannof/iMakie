@@ -62,20 +62,21 @@ setup() {
   
   // ... más hardware ...
   
-  // LÍNEA 233: Motor apagado ANTES de RS485
-  Motor::off();
+  // LÍNEA 233: Motor baja a posición 0 ANTES de RS485
+  Motor::goToMin();  // ← Baja fader, espera órdenes S3
   
-  // LÍNEA 236: RS485 init — ÚLTIMO (Motor listo, ADC listo)
+  // LÍNEA 236: RS485 init — ÚLTIMO (Motor bajando, ADC listo)
   rs485.begin(slaveId);
 }
 ```
 
 **Estado final tras setup():**
-- Motor EN (GPIO14) = LOW (deshabilitado)
+- Motor EN (GPIO14) = activo, bajando hacia posición 0
 - PWM range = cargado de NVS (si SAT calibró previamente)
 - ADC = listo (FaderADC inicializado)
+- Fader = bajando, llegará a 0 en loop() dentro de ~1-2 segundos
 - RS485 = escuchando a S3
-- Fase motor = `CalibPhase::IDLE` (espera FLAG_CALIB de S3)
+- Motor esperará orden de calibración (FLAG_CALIB) de S3
 
 **¿Por qué este orden?**
 
@@ -83,7 +84,7 @@ setup() {
 2. **Motor::init() ANTES de Serial:** Configura PWM sin debug output
 3. **Motor::initPWM() DESPUÉS de Serial:** Lee NVS (requiere log output si hay error)
 4. **faderADC.begin() ANTES de SAT init:** Motor necesita feedback ADC en loop()
-5. **Motor::off() ANTES de RS485:** Asegura motor inerte cuando comienza comunicación
+5. **Motor::goToMin() ANTES de RS485:** Garantiza fader en posición 0 al recibir órdenes S3
 6. **RS485 init ÚLTIMO:** Todos los módulos listos para procesar MasterPackets (incluyendo FLAG_CALIB)
 
 ---
@@ -96,7 +97,8 @@ setup() {
 // Inicialización (setup)
 Motor::init()              // Configura pines (EN→LOW, IN1/IN2 PWM 20kHz)
 Motor::initPWM()           // Lee pwmMin/Max de NVS (SAT las guarda)
-Motor::off()               // Apaga motor (before RS485.begin())
+Motor::goToMin()           // Baja fader a posición 0, espera órdenes S3
+Motor::off()               // Apaga motor (emergencia)
 
 // Calibración
 Motor::startCalib()        // Inicia máquina calibración (KICK_UP → DONE)
@@ -222,61 +224,63 @@ static constexpr float    FADER_EMA_ALPHA_FAST     = 0.20f; // 75% histórico, 2
 
 ---
 
-## 2.4 Comportamiento Inicial (Boot) — Estado Motor (2026-05-16)
+## 2.4 Comportamiento Inicial (Boot) — Motor::goToMin() (2026-05-16 10:45)
 
-**Tras completar setup():**
+**Flujo de setup() → loop():**
+
+```
+setup() LÍNEA 233: Motor::goToMin()
+  ↓
+_motor_goingToMin = true
+_hwDown(_pwm_max)  ← Motor comienza a bajar
+log: "goToMin: bajando a posición 0..."
+  ↓
+setup() termina, entra a loop()
+  ↓
+loop() tick 1-N: Motor::update() ejecuta lógica goToMin:
+  if (_motor_adcPos <= MOTOR_ADC_MIN + 10) {  // ADC ≈ 20-30
+    _hwOff()           ← Motor se apaga
+    _motor_goingToMin = false
+    log: "goToMin: llegó a 0 (ADC=XX)"
+    return
+  }
+  ↓
+Fader en 0, motor apagado, esperando órdenes S3
+```
+
+**Duración:** ~1-2 segundos (solo baja, no mide ruido)
+
+**Estado tras goToMin() DONE:**
 
 | Estado | Valor | Notas |
 |--------|-------|-------|
-| Fase motor | `CalibPhase::IDLE` | Espera FLAG_CALIB de S3 |
-| Motor habilitado | NO (EN=LOW) | Deshabilitado hasta FLAG_CALIB |
-| PWM_MIN/MAX | Cargado NVS o fallback config.h | De SAT o constantes |
-| ADC | Listo (FaderADC activo) | Puede leer pero motor no se mueve |
-| Target | indeterminado | Se establece cuando S3 envía MasterPacket |
-| Posición fader | Física actual (donde esté) | No hay garantía de posición específica |
+| Fader posición | ADC ≈ 20-30 (posición 0) | Físicamente abajo |
+| Motor | Apagado (EN=LOW) | No consume corriente |
+| Fase motor | `CalibPhase::IDLE` | Listo para calibración |
+| PWM_MIN/MAX | Cargado de NVS | Conoce su rango PWM |
+| ADC | Listo (FaderADC activo) | Leyendo continuamente |
 
-**¿Cómo hace el fader para ir a 0 al boot?**
+**Siguiente paso:** Espera FLAG_CALIB de S3 para calibración completa
 
-Hay dos flujos posibles:
-
-**Flujo A: Calibración automática (S3 ordena FLAG_CALIB)**
 ```
-S3 boot → envía MasterPacket con FLAG_CALIB
+S3 envía MasterPacket con FLAG_CALIB
   ↓
 RS485Handler::onMasterData() detecta FLAG_CALIB
   ↓
 Motor::startCalib() → transición IDLE → KICK_UP
   ↓
-loop() tick N: Motor::update() ejecuta máquina calibración
+~8 segundos: calibración completa (sube, baja, mide ruido)
   ↓
-~8 segundos después → _motor_phase = DONE
+Motor::update() → DONE
   ↓
-Fader automáticamente en 0 (posición mínima calibrada)
+Fader listo para recibir PitchBend de Logic
 ```
-**Duración:** ~8 segundos  
-**Ventaja:** Fader queda calibrado y conoce su rango  
-**Desventaja:** Requiere esperar a que S3 ordene (no automático en S2)
 
-**Flujo B: Posicionamiento directo sin calibración**
-```
-setup() → agregar Motor::setTarget(MOTOR_ADC_MIN)
-  ↓
-Intenta mover a 0, pero Motor::setTarget() ignora si _motor_phase != DONE
-  ↓
-Fader NO se mueve (requiere calibración previa)
-```
-**Duración:** Instantáneo  
-**Ventaja:** Muy rápido  
-**Desventaja:** Requiere que fader ya esté calibrado  
-
-**Recomendación (2026-05-16):**
-- **Opción A (calibración):** Implementar si S3 NO envía FLAG_CALIB automáticamente
-- Agregar en setup() después Motor::initPWM():
-  ```cpp
-  Motor::startCalib();  // Inicia calibración automática
-  ```
-- Motor estará listo (en 0) después de ~8 segundos
-- Fader conoce su rango y está listo para recibir Logic PitchBend
+**Ventajas de goToMin():**
+- ✅ Fader garantizado en 0 al boot
+- ✅ Rápido (~1-2s) vs calibración (~8s)
+- ✅ Posición conocida antes de calibración
+- ✅ Motor listo para órdenes S3 inmediatamente
 
 ---
 

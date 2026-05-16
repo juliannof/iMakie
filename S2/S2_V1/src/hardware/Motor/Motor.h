@@ -18,6 +18,7 @@ namespace Motor {
 
     // Entrada ADC (desde FaderADC)
     void setADC(uint16_t raw);
+    void setADCDelta(uint16_t currentADC);  // detecta movimiento manual por delta rápido, detiene motor si >500 cuentas
 
     // Control
     void setTarget(uint16_t midiPB14);  // 0-16383, mapea internamente a ADC
@@ -32,6 +33,7 @@ namespace Motor {
 
     // Calibración
     void       startCalib();
+    void       goToMin();  // Baja motor a posición 0 (mínimo), espera órdenes de S3
     CalibState getCalibState();
     bool       isCalibrated();
 
