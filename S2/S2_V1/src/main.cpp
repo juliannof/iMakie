@@ -319,7 +319,12 @@ void loop() {
         Motor::update();
     }
 
-    // ─── AUTO-CALIB: inicia a 10s del boot ────────────────────
+    // ─── AUTO-CALIB DESACTIVADO — S3 ordena vía RS485 FLAG_CALIB (2026-05-16 07:48) ───
+    // Razón: Arquitectura maestro-esclavo — S3 es autoridad única para calibración
+    // Antes: S2 calibraba automáticamente a 10s, conflicto con FLAG_CALIB de S3
+    // Ahora: S2 SOLO calibra si S3 lo ordena explícitamente en boot handshake
+    // Guard de cooldown (Motor.cpp) previene reinicios involuntarios
+    /*
     if (!g_calibStarted && millis() - g_bootTime > 10000) {
         if (!Motor::isCalibrated()) {
             Motor::startCalib();
@@ -327,6 +332,7 @@ void loop() {
             log_i("[AUTOCAL] Iniciando calibración automática...");
         }
     }
+    */
 
     updateButtons();
     updateDisplay();
