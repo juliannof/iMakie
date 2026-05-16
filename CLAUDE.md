@@ -316,47 +316,10 @@ loop() {
 
 ---
 
-## Hardware S3 (Extender)
+## Hardware S3 (Extender) — 📌 Ver MASTER_S3-P4/S3/iMakie-ESP32_S3_EXTENDER/README.md
 
-**Chip:** ESP32-S3 | **Familia Mackie:** 0x14 | **Slaves:** 8 (IDs 1–8)
-
-### Pinout definitivo S3
-
-| Función | GPIO |
-|---|---|
-| RS485 TX | 15 |
-| RS485 RX | 16 |
-| RS485 EN | 1 |
-| LED REC | 12 |
-| BTN REC | 11 |
-| LED PLAY | 10 |
-| BTN PLAY | 9 |
-| LED FF | 8 |
-| BTN FF | 7 |
-| LED STOP | 6 |
-| BTN STOP | 5 |
-| LED RW | 4 |
-| BTN RW | 3 |
-
-### RS485 (bus B)
-- 500 kbaud, CRC8 (ver Pinout: TX=GPIO15, RX=GPIO16, EN=GPIO1)
-- Controla 8 slaves S2 (IDs 1–8)
-- Timing: TX_EN=30µs, TX_DONE=30µs, RESP_TIMEOUT=3000µs, GAP=300µs, POLL_CYCLE=20ms
-
-### Transporte — Botones y LEDs
-(Ver Pinout definitivo S3 para asignación GPIO de REC/PLAY/FF/STOP/RW)
-
-### Notas MIDI Transporte
-| Función | Nota (hex) | Decimal |
-|---------|-----------|---------|
-| RW | 0x5B | 91 |
-| FF | 0x5C | 92 |
-| STOP | 0x5D | 93 |
-| PLAY | 0x5E | 94 |
-| REC | 0x5F | 95 |
-
-- Recibe feedback de Logic vía MIDI handshake familia `0x14`
-- LEDs controlados por `Transporte::setLedByNote()` con velocidad 127 (on) / 0 (off)
+**Documentación exhaustiva:**
+→ **[MASTER_S3-P4/S3/iMakie-ESP32_S3_EXTENDER/README.md](MASTER_S3-P4/S3/iMakie-ESP32_S3_EXTENDER/README.md)** (pinout, RS485 bus B, transport buttons, MIDI notas, handshake Mackie, timing)
 
 ---
 
