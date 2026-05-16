@@ -51,6 +51,11 @@ extern volatile ConnectionState logicConnectionState;
 // --- Calibración (2026-05-16 19:25) ---
 #define MAX_CALIBRATION_RETRIES 5    // máx reintentos antes de fallar slave
 
+// --- NeoPixel Status LED (2026-05-16 19:40) ---
+#define NEOPIXEL_PIN 48              // GPIO 48 (WS2812B RGB)
+#define NEOPIXEL_COUNT 1             // 1 LED
+#define NEOPIXEL_BRIGHTNESS 255      // 0-255
+
 // ====================================================================
 // --- TRANSPORTE ---
 // ====================================================================

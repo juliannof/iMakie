@@ -18,6 +18,7 @@ Controlador Mackie MCU extendido para Logic Pro. Controla 8 tracks S2 adicionale
 | **RS485 TX (bus B)** | 15 | UART TX |
 | **RS485 RX (bus B)** | 16 | UART RX |
 | **RS485 EN (driver enable)** | 1 | GPIO output |
+| **NeoPixel (status RGB)** | 48 | WS2812B (Adafruit) |
 | **LED REC** | 12 | GPIO output (PWM capable) |
 | **BTN REC** | 11 | GPIO input (activo LOW) |
 | **LED PLAY** | 10 | GPIO output (PWM capable) |
@@ -55,6 +56,25 @@ Controlador Mackie MCU extendido para Logic Pro. Controla 8 tracks S2 adicionale
 - S2 recibe timeout → LED11=rojo, motor suspendido
 
 **Referencia:** [docs/RS485.md](../../../../docs/RS485.md) — especificación completa de protocolo, paquetes, máquina de estados
+
+---
+
+## NeoPixel Status LED (2026-05-16 19:40)
+
+**GPIO:** 48 (WS2812B RGB)  
+**Librería:** Adafruit_NeoPixel  
+
+**Estados:**
+- **Verde (normal):** Comunicación OK, calibración en progreso
+- **Azul (info):** Aguardando conexión Logic
+- **Rojo (error):** ✗ FALLO CRÍTICO en calibración — Sistema detenido
+
+**Comportamiento en error calibración:**
+- Después de MAX_CALIBRATION_RETRIES (5) timeouts en slave
+- NeoPixel brilla rojo fijo
+- Log error: `[CALIB] ✗ FALLO CRÍTICO Slave X — comunicación perdida. Sistema DETENIDO.`
+- Sistema entra en loop infinito (requiere reset manual)
+- Propósito: Alertar operador de fallo de hardware S2
 
 ---
 

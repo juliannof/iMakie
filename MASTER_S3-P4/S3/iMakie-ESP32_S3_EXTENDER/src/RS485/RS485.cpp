@@ -3,8 +3,10 @@
 // ============================================================
 #include "RS485.h"
 #include "Profiler.h"
+#include <Adafruit_NeoPixel.h>
 
 RS485Master rs485;
+Adafruit_NeoPixel pixels(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 void RS485Master::begin(uint8_t numSlaves) {
     _numSlaves = numSlaves;
@@ -14,6 +16,12 @@ void RS485Master::begin(uint8_t numSlaves) {
 
     Serial1.setRxBufferSize(256);   // ← ANTES del begin (fix bug anterior)
     Serial1.begin(RS485_BAUD, SERIAL_8N1, RS485_RX_PIN, RS485_TX_PIN);
+
+    // Inicializar NeoPixel (2026-05-16 19:40)
+    pixels.begin();
+    pixels.setBrightness(NEOPIXEL_BRIGHTNESS);
+    pixels.setPixelColor(0, pixels.Color(0, 0, 255));  // Azul inicial (esperando)
+    pixels.show();
 
     _mutex = xSemaphoreCreateMutex();
     configASSERT(_mutex);
@@ -100,16 +108,20 @@ void RS485Master::runTask() {
 
                     // ── Límite de reintentos (2026-05-16 19:25) ──
                     if (_consecutiveTimeouts > MAX_CALIBRATION_RETRIES) {
-                        // Calibración falló después de máx reintentos
+                        // ✗ FALLO CRÍTICO: Calibración falló después de máx reintentos (2026-05-16 19:40)
+                        pixels.setPixelColor(0, pixels.Color(255, 0, 0));  // Rojo puro
+                        pixels.show();
                         if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(2)) == pdTRUE) {
-                            _ch[_currentId].calibrating = false;  // Libera para siguiente slave
+                            _ch[_currentId].calibrating = false;
                             _ch[_currentId].responded = false;
-                            log_e("[RS485] Slave %d ERROR calibración (TIMEOUT máx %u reintentos)",
-                                  _currentId, MAX_CALIBRATION_RETRIES);
+                            log_e("[CALIB] ✗ FALLO CRÍTICO Slave %d — comunicación perdida. Sistema DETENIDO.",
+                                  _currentId);
                             xSemaphoreGive(_mutex);
                         }
-                        _consecutiveTimeouts = 0;
-                        _nextSlave();  // Pasar a siguiente slave
+                        // SISTEMA DETENIDO: loop infinito (requiere reset manual)
+                        while(1) {
+                            delay(1000);  // Espera infinita
+                        }
                     } else {
                         // Continuar esperando
                         if (xSemaphoreTake(_mutex, 0) == pdTRUE) {
