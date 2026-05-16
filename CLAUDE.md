@@ -167,24 +167,42 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 │   ├── ENCODER.md                    ← ISR Gray code, sequenciamiento, SAT (2026-05-16)
 │   ├── LEDS.md                       ← NeoPixels WS2812B, asignación, estados (2026-05-16)
 │   ├── SAT.md                        ← Sistema Auto-Test, navegación, integración (2026-05-16)
-│   └── Transport.md                  ← Control transport RW/FF/STOP/PLAY/REC, MIDI (2026-05-16)
+│   ├── Transport.md                  ← Control transport RW/FF/STOP/PLAY/REC, MIDI (2026-05-16)
+│   ├── DISPLAY_P4.md                 ← ST7701S MIPI-DSI 480×800, LVGL v9 (2026-05-16)
+│   ├── TOUCH.md                      ← GT911 capacitivo I2C, calibración (2026-05-16)
+│   ├── NEOTRELLLIS.md                ← 2× seesaw 4×4 RGB, I2C (2026-05-16)
+│   ├── RS485_P4.md                   ← Bus A GPIO50-52, 9 slaves (2026-05-16)
+│   └── ARCHITECTURE_P4.md            ← Dual-core FreeRTOS, race conditions (2026-05-16)
 ├── CHANGELOG.md                       ← Historial de cambios
 ├── README.md                          ← Intro repo
 └── platformio.ini                     ← Índice de subproyectos
 ```
 
 **📌 DOCUMENTACIÓN CENTRALIZADA (2026-05-16):**
+
+**Subsistemas S2 (Slave):**
 - **FADER.md** — ADS1115 ADC, calibración bidireccional, mapping Logic↔ADC
 - **MOTOR.md** — DRV8833, máquina de estados, guard cooldown, SAT calibración
-- **RS485.md** — Protocolo binario, timing, paquetes, máquina estados
-- **WIFI.md** — Provisioning credenciales, OTA, ElegantOTA, NVS
 - **BUTTONS.md** — Debounce, ButtonManager, mapeo MIDI, troubleshooting
 - **DISPLAY.md** — ST7789V3, sprites PSRAM, layout, LovyanGFX
 - **ENCODER.md** — ISR Gray code, sequenciamiento, SAT, VPot ring
 - **LEDS.md** — WS2812B NeoPixel, asignación LEDs, estados, brillo
+
+**Sistemas Compartidos (S2/S3/P4):**
+- **RS485.md** — Protocolo binario, timing, paquetes, máquina estados (Buses A y B)
+- **WIFI.md** — Provisioning credenciales, OTA, ElegantOTA, NVS
 - **SAT.md** — Sistema Auto-Test, navegación menú, integración módulos
-- **Transport.md** — Controles transport, MIDI notas, handshake Mackie, bidireccional
-- CLAUDE.md — Directivas vinculantes únicamente (no duplicar)
+- **Transport.md** — Controles transport (S3), MIDI notas, handshake Mackie, bidireccional
+
+**Subsistemas P4 (Master MCU):**
+- **DISPLAY_P4.md** — ST7701S MIPI-DSI 480×800, LVGL v9, portrait/landscape
+- **TOUCH.md** — GT911 capacitivo I2C, calibración, LVGL integration
+- **NEOTRELLLIS.md** — 2× seesaw 4×4 RGB, I2C control
+- **RS485_P4.md** — Bus A (GPIO50-52), 9 slaves, vs Bus B timing
+- **ARCHITECTURE_P4.md** — Dual-core FreeRTOS, race conditions, sincronización
+
+**Directivas:**
+- **CLAUDE.md** — Directivas vinculantes únicamente (no duplicar técnica)
 
 ---
 
