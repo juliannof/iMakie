@@ -7,6 +7,131 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### 🔄 PENDIENTES (próxima sesión)
+
+- [ ] **Actualizar P4 config.h con detalles PSRAM 32MB y periféricos**
+  - Añadir comentarios sobre PSRAM abundante para LVGL
+  - Documentar periféricos: MIPI-CSI, I2S audio, TWAI (CAN)
+  - Aceleradores multimedia: JPEG, PPA, ISP, H.264
+  - Ubicación: `MASTER_S3-P4/P4/src/config.h`
+
+- [ ] **MIDI Traffic Optimization: PitchBend deadband 150 cuentas**
+  - Reducir tráfico 850→~100 msgs/s en S3
+  - Ubicación: `MASTER_S3-P4/S3/iMakie-ESP32_S3_EXTENDER/src/main.cpp` línea 85
+  - Requiere validación hardware en rig S3-Logic
+
+- [ ] **Validación hardware S3 flujo completo**
+  - [ ] Handshake Mackie: Logic 0x21 → S3 echo + conexión
+  - [ ] RS485 polling: 300µs ciclo (NUM_SLAVES=1)
+  - [ ] Calibración automática: cascada, timeout handling
+  - [ ] Fader: PitchBend bidireccional, deadband 150
+  - [ ] Transport: botones RW/FF/STOP/PLAY/REC → Logic feedback
+
+- [ ] **Validación hardware P4 multimedia**
+  - [ ] Display IPS 480×800 con LVGL v9
+  - [ ] Touch GT911 calibración multi-punto
+  - [ ] NeoTrellis 4×8 (seesaw dual 0x2F/0x2E)
+  - [ ] PSRAM 32MB: profiling LovyanGFX sprites + LVGL
+
+- [ ] **P4 Task Architecture documentation (ARCHITECTURE_P4.md)**
+  - Dual-core Core0/Core1 sincronización
+  - Race conditions known (flags g_switchToPage)
+  - VU meter decay timing
+  - ISR priorities
+
+---
+
+### DOCUMENTACIÓN HARDWARE — S3 N16R8 + P4 JC4880P443C-I-W especificaciones completas (2026-05-16 20:45) — ✅ COMPLETADO
+
+**Commits:** 7ec018f, 84c549b, c9e6166, 41bfdc9, b384ead, cba7178
+
+**DIRECTIVAS OBLIGATORIAS (CLAUDE.md):**
+- ✅ Crear memoria: `config.h_source_of_truth.md`
+- ✅ Actualizar: `MEMORY.md` (nueva sección "Directivas Vinculantes")
+- ✅ CLAUDE.md línea 55-62: "config.h es FUENTE ÚNICA DE VERDAD (2026-05-16 20:15)"
+  - Nunca asumir NUM_SLAVES, verificar config.h SIEMPRE
+  - S3 actual: NUM_SLAVES=1 (correcto, no bug)
+  - P4 actual: NUM_SLAVES=9 (correcto)
+  - Cada MCU tiene config.h independiente
+  - Ubicaciones documentadas
+
+**S3 EXTENDER — Placa + Flujo (MASTER_S3-P4/S3/README.md):**
+
+Especificación (commits c9e6166, 41bfdc9):
+- ✅ Placa: ESP32-S3-WROOM-1 **N16R8** (confirmado)
+- ✅ Flash: 16MB (QIO)
+- ✅ PSRAM: 8MB (OPI)
+- ✅ Conector: USB Type-C
+- ✅ Pines: 44 totales (~27 GPIO usuario)
+- ✅ Energía: USB 5V→3.3V, 80mA idle, 160mA full
+
+Flujo de trabajo completo (commit 84c549b):
+- ✅ Setup (USB, Transporte, RS485, MIDI, Tasks FreeRTOS)
+- ✅ Handshake Mackie MCU:
+  - Fase 0: probe (Logic 0x00 → S3 responde family 0x14)
+  - Fase 2: keep-alive (Logic 0x21 → S3 echo + g_logicConnected=1)
+  - Desconexión: GoOffline (0x0F → disconnectSequence)
+- ✅ Task Core 0: MIDI + RS485 responses (ciclo 1ms)
+  - Leer USB MIDI → processMidiByte()
+  - Procesar SlavePacket → fader/botones/encoder → MIDI OUT
+  - Calibración automática cascada (1 a la vez)
+  - Timeout handling
+- ✅ Task Core 1: Transporte (10ms, botones RW/FF/STOP/PLAY/REC)
+  - Notes 0x5B-0x5F
+  - Feedback LEDs desde Logic
+- ✅ RS485 polling task (Core 1):
+  - Máquina 3 estados: SEND → WAIT_RESP → GAP
+  - Timing: ~300µs/ciclo (NUM_SLAVES=1)
+  - Timeout > 5 reintentos → LED rojo + HALT
+- ✅ Procesamiento MIDI incoming (CC, Channel Pressure, SysEx)
+- ✅ Conversión RS485→MIDI (PitchBend, Notes, CC)
+- ✅ Calibración automática (cascada, timeout handling)
+
+**P4 MASTER — Placa GUITION JC4880P443C-I-W (MASTER_S3-P4/P4/README.md):**
+
+Especificación (commits b384ead, cba7178):
+- ✅ Módulo: GUITION **JC4880P443C-I-W** (modelo exacto)
+- ✅ Procesador principal: ESP32-P4 Xtensa 360MHz dual-core
+- ✅ Procesador secundario: ESP32-C6 (Wi-Fi 6 + Bluetooth 5)
+- ✅ Flash: 16MB (QIO)
+- ✅ PSRAM: **32MB** (OPI) — ⚠️ 4x más que S3, abundante para LVGL
+- ✅ Memoria: HP L2MEM 768KB, LP SRAM 32KB
+- ✅ Display: IPS 4.3" 480×800 (70.4 ppi, ST7701S MIPI-DSI 2-lane)
+- ✅ Touch: GT911 capacitivo multitouch (I2C)
+- ✅ Audio: ES8311 codec opcional (I2S stereo)
+- ✅ Energía: USB 5V→3.3V, 200mA idle, 400mA full, picos 500mA
+
+Periféricos completos:
+- ✅ RS485 bus A (GPIO 50/51/52): 9 slaves S2
+- ✅ I2C_NUM_0 (GPIO 33/31): NeoTrellis seesaw (0x2F/0x2E)
+- ✅ I2C_NUM_1 (GPIO 7/8): GT911 touch
+- ✅ MIPI-CSI: entrada cámara (interfaz física)
+- ✅ MIPI-DSI: display (integrado)
+- ✅ SPI, I2S, LED PWM, MCPWM, RMT, ADC 12-bit, UART, TWAI (CAN), USB OTG 2.0
+
+Aceleradores multimedia:
+- ✅ JPEG codec (encode/decode hardware)
+- ✅ Pixel Processing Accelerator (PPA)
+- ✅ Image Signal Processor (ISP) — soporte cámara MIPI-CSI
+- ✅ H.264 video encoder
+
+Capacidades futuras documentadas (tabla):
+- Cámara MIPI-CSI: análisis visual, grabación
+- Audio I2S: synth, metrónomo, realtime monitor
+- Wi-Fi 6: control remoto Logic Pro, OSC
+- Bluetooth 5: MIDI remote, control inalámbrico
+- TWAI (CAN): bus industrial expansión modular
+- MCPWM: motor control, cortinas, luces escena
+- ADC: sensores (temperatura, batería, presión)
+- JPEG/H.264: captura foto, streaming video Logic
+
+**Fuentes externas:**
+- CNX Software: 4.3-inch touch display ESP32-P4 + ESP32-C6
+- GUITION Official: ESP32P4 Display Module
+- Home Assistant: Guition ESP32 P4 working config
+
+---
+
 ### S2 MOTOR v3 — requestCalibration + Usuario Master absoluto (2026-05-16 18:41) — ✅ IMPLEMENTADO
 
 **Cambio crítico — Flujo calibración:**
