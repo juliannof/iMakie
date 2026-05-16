@@ -353,95 +353,11 @@ loop() {
 
 ---
 
-## Mackie MCU — comportamiento Logic
+## Mackie MCU — comportamiento, handshake, transport — 📌 Ver Transport.md y FADER.md
 
-- Logic solo envía automation state global via notas MIDI 74–78
-- `GoOffline` SysEx: `F0 00 00 66 14 0F F7`
-- En desconexión Logic envía `AllFadersToMinimum` SysEx + PitchWheel -8192 en todos los canales antes del `GoOffline`
-- SELECT es latch-style
-- MIDI fader max para recorrido físico completo: **14848** (no 16383)
-- `track_idx = currentOffset / 7`, `char_pos = currentOffset % 7` — parser SysEx `0x12`
-
-### Rango de Faders — Mapeo Logic → Hardware (2026-05-13 00:30)
-
-**Arquitectura de mapeo (S3 centraliza responsabilidad):**
-```
-Logic Pro
-  │ PitchBend 0-14848
-  ↓
-S3 MidiProcessor::processPitchBend()
-  │ Recibe bendValue 0-14848
-  ↓
-S3 RS485Master::setFaderTarget()
-  │ Si slave calibrado: mapea 0-14848 → rango real S2 (ej: 25-26468)
-  │ Si no calibrado: mapea 0-14848 → rango teórico (0-27000)
-  ↓
-S3 envía MasterPacket.faderTarget → valor YA MAPEADO
-  ↓
-S2 recibe faderTarget (valor final)
-  ↓
-S2 Motor::setTarget(target) → usa DIRECTAMENTE (sin map(), O(1))
-  ↓
-Motor posiciona a target
-```
-
-**Calibración — rango se envía una sola vez al boot:**
-1. S3 ordena FLAG_CALIB a S2
-2. S2 calibra → obtiene min/max
-3. S2 envía 2 paquetes:
-   - Paquete 1: faderPos=min, flags=CALIB_DONE|CALIB_SENDING|CALIB_IS_MIN
-   - Paquete 2: faderPos=max, flags=CALIB_DONE|CALIB_SENDING (sin IS_MIN)
-4. S3 almacena calibratedMin/Max para ese S2
-5. Desde entonces: S3 usa rango real para mapeos
-
-**Razón arquitectónica:** S2 es single-core. Motor::setTarget() debe ser O(1) sin cálculos.
-
-### Mackie MCU — handshake correcto (S3 Extender / familia 0x14)
-
-Logic sondea varias familias. El dispositivo responde a **cualquier familia** para los comandos de sondeo, luego solo procesa familia `0x14`.
-
-```
-── Fase 0: sondeo (cualquier familia) ──────────────────────────────
-Logic → Device:  F0 00 00 66 <any> 00 F7
-Device → Logic:  F0 00 00 66 14 01 00 00 00 01 00 00 00 00 F7
-
-Logic → Device:  F0 00 00 66 <any> 13 F7
-Device → Logic:  F0 00 00 66 14 14 00 F7
-
-── Fase 1: handshake (familia 0x14) ────────────────────────────────
-Logic → Device:  F0 00 00 66 14 21 01 F7
-Device → Logic:  F0 00 00 66 14 21 01 F7   → CONNECTED
-
-Logic → Device:  F0 00 00 66 14 20 0x 07 F7  (×8, opcional)
-Logic → Device:  F0 00 00 66 14 0A 01 F7
-Device → Logic:  F0 00 00 66 14 0A 01 F7
-
-Logic → Device:  F0 00 00 66 14 0C 00 F7
-Device → Logic:  F0 00 00 66 14 0C 00 F7
-Device → Logic:  F0 00 00 66 14 10 00 F7   ← suscripción a feedback (inmediato)
-
-Logic → Device:  F0 00 00 66 14 0B 0F F7
-Device → Logic:  F0 00 00 66 14 0B 0F F7
-```
-
-- `DEVICE_FAMILY 0x14` para P4 y S3 Extender — Logic configurado con **dos "Mackie Control"**
-- `CONNECTED` se establece al recibir `0x21` (con `connectedSinceTime = millis()`)
-- `0x0C` hardcodeado a `0x00` (Surface Type = Master) — **no cambiar**, necesario para recibir transport LEDs
-- `0x10 00` es la suscripción a feedback — sin él Logic no envía Note On de transporte
-
-### Mackie MCU — transport LEDs (S3 Extender)
-
-Logic envía notas en canal 1 para controlar los LEDs de transporte:
-
-| Nota | Decimal | LED GPIO | Vel 127 | Vel 0 |
-|------|---------|----------|---------|-------|
-| 0x5B | 91 | GPIO4 (RW) | RW on | RW off |
-| 0x5C | 92 | GPIO8 (FF) | FF on | FF off |
-| 0x5D | 93 | GPIO6 (STOP) | STOP on | STOP off |
-| 0x5E | 94 | GPIO10 (PLAY) | PLAY on | PLAY off |
-| 0x5F | 95 | GPIO12 (REC) | REC on | REC off |
-
-Implementado en `Transporte::setLedByNote()`.
+**Documentación exhaustiva:**
+- **Transport.md** — Botones transport (RW/FF/STOP/PLAY/REC), LEDs, MIDI feedback, handshake Mackie MCU familia 0x14, troubleshooting (2026-05-16)
+- **FADER.md (sección "Rango de Faders")** — Mapeo Logic 0-14848 ↔ ADC 0-27000, arquitectura bidireccional S3-S2 (2026-05-16)
 
 ---
 
