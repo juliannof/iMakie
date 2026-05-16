@@ -7,6 +7,43 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### S2 MOTOR v3 — requestCalibration + Usuario Master absoluto (2026-05-16 18:41) — ✅ IMPLEMENTADO
+
+**Cambio crítico — Flujo calibración:**
+- RS485Handler.cpp línea 67: `Motor::startCalib()` → `Motor::requestCalibration()`
+- requestCalibration() baja fader a 0 PRIMERO si es necesario, luego calibra
+- Elimina lógica defectuosa de startCalib() que fallaba si fader ≠ 0
+
+**Arquitectura mejorada:**
+- Motor.cpp: Variables de estado movidas a config.h (fuente única de verdad)
+  - `_pendingCalib`, `_connected`, `_motor_goingToMin`, `_userDropTarget`, `_s3Target`, `_atTargetStartTime`
+- setADCDelta(): Guard inicialización en primera llamada (evita falsa detección boot)
+- Protocol.h S3: Comentario faderTarget corregido (0-14848, no 16383)
+
+**Documentación actualizada:**
+- CLAUDE.md: Directiva obligatoria "Auditoría MCU" (tabla impacto S2/S3/P4, protocolo informe)
+- MOTOR.md: Sección 2.0 "Arquitectura Motor v3" + 3.3 "requestCalibration()"
+- FADER.md: Sección 1.1 "Inicialización y Calibración v3" + guardia usuario
+
+**Prioridades VINCULANTES (v3):**
+```
+MÁXIMA:  Usuario mueve → Motor stop INMEDIATO
+         GoToMin ejecuta SIEMPRE si !_connected
+MEDIA:   S3 ordena → Motor se mueve SOLO si usuario NO toca
+MÍNIMA:  Idle en posición actual
+```
+
+**Test requerido (hardware):**
+- [ ] Boot: Motor baja a 0
+- [ ] S3 conecta: Motor NO baja, espera órdenes
+- [ ] S3 FLAG_CALIB: baja a 0 si ≠0, luego calibra
+- [ ] Usuario mueve: Motor para inmediatamente
+- [ ] S3 target mientras usuario toca: rechazado
+- [ ] Usuario suelta: S3 puede controlar (debounce 200ms)
+- [ ] S3 desconecta: Motor baja a 0 indefinidamente
+
+---
+
 ### S2 MOTOR BEHAVIOR — Usuario como master, S3 respeta prioridades (2026-05-16 10:52) — ✅ IMPLEMENTADO
 
 **Comportamiento correcto — prioridad:**
