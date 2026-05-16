@@ -2,8 +2,9 @@
 
 Controlador Mackie MCU extendido para Logic Pro. Controla 1 track S2 (ID=1) vía RS485 bus B, y transport buttons (RW/FF/STOP/PLAY/REC) locales.
 
-**Placa de desarrollo:** ESP32-S3-WROOM-1  
-**Variante:** N16R8 (16MB Flash, 8MB PSRAM) o N8R2 (8MB Flash, 2MB PSRAM)  
+**Placa de desarrollo:** ESP32-S3-WROOM-1 N16R8  
+**Flash:** 16MB (QIO)  
+**PSRAM:** 8MB (OPI)  
 **Conector:** USB Type-C  
 **Pines:** 44 pines  
 **Framework:** Arduino IDE / PlatformIO  
@@ -18,25 +19,27 @@ Controlador Mackie MCU extendido para Logic Pro. Controla 1 track S2 (ID=1) vía
 
 ## Hardware S3
 
-### Especificación de placa
+### Especificación de placa (2026-05-16)
 
-**Módulo:** ESP32-S3-WROOM-1 (Xtensa dual-core 240MHz)  
-**Variantes soportadas:**
-- N16R8: 16MB Flash (QIO), 8MB PSRAM (OPI) — recomendado
-- N8R2: 8MB Flash (QIO), 2MB PSRAM (OPI)
+**Módulo:** ESP32-S3-WROOM-1 N16R8 (Xtensa dual-core 240MHz)  
+**Flash:** 16MB (QIO mode) — configurado en platformio.ini  
+**PSRAM:** 8MB (OPI mode) — disponible via BOARD_HAS_PSRAM flag  
+**Conector:** USB Type-C (directo a chip USB, sin regulator adicional)  
+**Pines:** 44 pines totales  
+**Disponibles para usuario:** ~27 pines GPIO (resto reservados Flash/PSRAM)
 
-**Conector:** USB Type-C (directo a chip USB)  
-**Pines:** 44 pines totales (algunos reservados para PSRAM/Flash)  
-**Disponibles para usuario:** ~27 pines GPIO
+**Mapa de memoria:**
+| Región | Dirección | Tamaño | Función |
+|--------|-----------|--------|----------|
+| Bootloader | 0x0 | 256KB | ROM bootloader |
+| App | 0x10000 | 15.75MB | Firmware iMakie |
+| Flash | 0x0-0xFFFFFF | 16MB | Total |
+| PSRAM | Externa | 8MB | Heap dinámico |
 
-**Memoria:**
-- Flash: 16MB (default) o 8MB
-- PSRAM: 8MB (N16R8) o 2MB (N8R2)
-- Bootloader: 0x0 (256KB)
-- App: 0x10000 (resto)
-
-**Voltaje:** 3.3V (USB alimenta directamente, no regulator adicional)  
-**Corriente:** ~80mA idle, hasta 160mA full power
+**Energía:**
+- Voltaje: 3.3V (USB 5V → regulador interno)
+- Corriente: ~80mA idle, 160mA full power, picos 200mA
+- USB: alimenta placa y periféricos (RS485, NeoPixel)
 
 ### Pinout definitivo S3
 
