@@ -1,15 +1,42 @@
 # iMakie — ESP32-S3 Extender
 
-Controlador Mackie MCU extendido para Logic Pro. Controla 8 tracks S2 adicionales (IDs 1–8) vía RS485 bus B, y transport buttons (RW/FF/STOP/PLAY/REC) locales.
+Controlador Mackie MCU extendido para Logic Pro. Controla 1 track S2 (ID=1) vía RS485 bus B, y transport buttons (RW/FF/STOP/PLAY/REC) locales.
 
-**Chip:** ESP32-S3  
-**Familia Mackie:** 0x14  
-**Slaves controlados:** 8 (IDs 1–8) en RS485 bus B  
-**Transport buttons:** 5 (RW/FF/STOP/PLAY/REC)
+**Placa de desarrollo:** ESP32-S3-WROOM-1  
+**Variante:** N16R8 (16MB Flash, 8MB PSRAM) o N8R2 (8MB Flash, 2MB PSRAM)  
+**Conector:** USB Type-C  
+**Pines:** 44 pines  
+**Framework:** Arduino IDE / PlatformIO  
+
+**Configuración actual:**
+- **Chip:** ESP32-S3  
+- **Familia Mackie:** 0x14  
+- **Slaves controlados:** 1 (ID=1) en RS485 bus B (NUM_SLAVES=1, ver config.h)  
+- **Transport buttons:** 5 (RW/FF/STOP/PLAY/REC)
 
 ---
 
 ## Hardware S3
+
+### Especificación de placa
+
+**Módulo:** ESP32-S3-WROOM-1 (Xtensa dual-core 240MHz)  
+**Variantes soportadas:**
+- N16R8: 16MB Flash (QIO), 8MB PSRAM (OPI) — recomendado
+- N8R2: 8MB Flash (QIO), 2MB PSRAM (OPI)
+
+**Conector:** USB Type-C (directo a chip USB)  
+**Pines:** 44 pines totales (algunos reservados para PSRAM/Flash)  
+**Disponibles para usuario:** ~27 pines GPIO
+
+**Memoria:**
+- Flash: 16MB (default) o 8MB
+- PSRAM: 8MB (N16R8) o 2MB (N8R2)
+- Bootloader: 0x0 (256KB)
+- App: 0x10000 (resto)
+
+**Voltaje:** 3.3V (USB alimenta directamente, no regulator adicional)  
+**Corriente:** ~80mA idle, hasta 160mA full power
 
 ### Pinout definitivo S3
 
@@ -317,14 +344,41 @@ Timeout manejo:
 
 ## Compilación
 
+### Build con PlatformIO
+
 ```bash
 cd MASTER_S3-P4/S3/iMakie-ESP32_S3_EXTENDER
 pio run -e esp32-s3-devkitc-1
 ```
 
-**Platform:** espressif32  
+**Nota:** El board `esp32-s3-devkitc-1` en platformio.ini es compatible con módulos genéricos ESP32-S3-WROOM-1. Ambos usan la misma configuración de particiones (default_16MB.csv) y USB CDC.
+
+### Configuración PlatformIO
+
+```ini
+[env:esp32-s3-devkitc-1]
+platform = https://github.com/pioarduino/platform-espressif32/releases/download/55.03.37/platform-espressif32.zip
+board = esp32-s3-devkitc-1
+board_build.partitions = default_16MB.csv
+board_build.flash_size = 16MB
+board_build.arduino.memory_type = qio_opi
+```
+
+**Flags críticos:**
+- `-DBOARD_HAS_PSRAM` — Habilita PSRAM (8MB para N16R8)
+- `-DARDUINO_USB_MODE=0` — USB nativo (no JTAG)
+- `-DARDUINO_USB_CDC_ON_BOOT=0` — CDC activo en boot
+- `-DDEVICE_S3_EXTENDER` — Identifica como S3 Extender (vs P4 Master)
+
+### Platform y Framework
+
+**Platform:** espressif32 (pioarduino 55.03.37 — IDF5 + Arduino core)  
 **Framework:** Arduino  
-**Librerías:** LovyanGFX, LVGL v9, WiFi, MQTT (opcional)
+**Librerías estándar:**
+- Button2 (LennartHennigs)
+- Adafruit NeoPixel
+- USBMIDI (integrada en Arduino core)
+- Serial (logging con log_i/log_e)
 
 ---
 
