@@ -13,8 +13,6 @@
 
 **IDIOMA — Español de España SIEMPRE (2026-05-11 18:30):**
 - Comunicación con el usuario: únicamente en español de España
-- Vosotros, distinción theta-zeta, léxico peninsular
-- Nada de "che", "boludo", "mate" ni otros regionalismos
 - Tono: directo, sin rodeos, profesional
 - Esta regla es VINCULANTE en CADA respuesta
 
