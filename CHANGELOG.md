@@ -7,6 +7,40 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### S2 SLAVE — Placa Lolin D1 Mini S2 especificación completa (2026-05-16 21:00) — ✅ COMPLETADO
+
+**Commit:** 40337a8
+
+**Especificación (S2/README.md):**
+- ✅ Placa: Lolin D1 Mini S2 (form factor ESP8266, single-core)
+- ✅ Chip: ESP32-S2FN4R2 Xtensa 240MHz (single-core vs dual-core P4/S3)
+- ✅ Flash: 4MB QIO (bootloader 192KB, app 3.8MB)
+- ✅ PSRAM: 2MB QSPI (limitado: vs 8MB S3, 32MB P4)
+- ✅ Conector: Micro-USB CH340 UART (reset automático upload)
+- ✅ GPIO: 25 totales (0 libres — todos asignados)
+
+Limitaciones documentadas:
+- ✅ Single-core 240MHz (vs dual-core P4/S3) → timing crítico
+- ✅ 4MB Flash (vs 16MB P4/S3) → OTA dual-partition imposible
+- ✅ 2MB PSRAM (vs 8MB S3, 32MB P4) → buffers pequeños, profiling obligatorio
+- ✅ 25 GPIO saturados (vs 44 P4/S3) → expansión futura imposible
+- ✅ 500mA USB compartido (motor + display + MCU) → picos riesgo reset
+
+Configuración PlatformIO:
+- ✅ Board: lolin_s2_mini
+- ✅ Flags: BOARD_HAS_PSRAM, ARDUINO_USB_MODE=0, CORE_DEBUG_LEVEL=3
+- ✅ Platform: espressif32 (pioarduino 55.03.37, IDF5)
+- ✅ Librerías: LovyanGFX 1.2.19, Adafruit NeoPixel, ADS1115, Wire
+
+Nueva sección "Limitaciones y consideraciones":
+- ✅ Arquitectura: single-core, RS485+display+motor+encoder en CPU
+- ✅ Memoria: profiling crítico, buffers limitados
+- ✅ GPIO: saturado, expansión imposible
+- ✅ Alimentación: 500mA limit compartido, riesgo reset
+- ✅ Serial: Serial.printf() recomendado (log_i/log_e inestables)
+
+---
+
 ### 🔄 PENDIENTES (próxima sesión)
 
 - [ ] **Actualizar P4 config.h con detalles PSRAM 32MB y periféricos**
