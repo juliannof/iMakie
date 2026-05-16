@@ -114,6 +114,8 @@ static constexpr uint32_t CALIB_STUCK_TIMEOUT      = 1000;    // ms sin movimien
 static constexpr uint32_t CALIB_COOLDOWN_MS        = 2000;    // ms espera mínima antes de reiniciar (2026-05-16 HH:MM)
 static constexpr uint8_t  PWM_SLEW                 = 5;       // máximo cambio PWM por tick
 
+// Motor — máquina de estados v2 (2026-05-16 10:45)
+static constexpr uint32_t MOTOR_AT_TARGET_TIMEOUT = 30000;    // ms: si sin comando S3, vuelve IDLE
 
 // Motor — maquina de calibración (enum de fases internas)
 enum class CalibPhase {

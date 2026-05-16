@@ -230,7 +230,9 @@ void setup() {
     }
 
     uint8_t slaveId = satMenu->getConfig().trackId;  // ← mover aquí arriba
-    Motor::goToMin();   // ← baja a posición 0, espera calibración S3
+    // Motor máquina de estados v2: inicia en IDLE
+    // loop() ejecutará Motor::update() que lo llevará a GOING_TO_MIN si ADC > 30
+    // Motor listo para órdenes S3 (FLAG_CALIB, setTarget)
 
     log_i("Track ID: %d", slaveId);
     rs485.begin(slaveId);

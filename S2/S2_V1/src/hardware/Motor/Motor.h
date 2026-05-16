@@ -3,6 +3,16 @@
 
 namespace Motor {
 
+    // Máquina de estados Motor v2 (2026-05-16 10:45)
+    enum class MotorState {
+        IDLE,                  // Fader en 0, esperando órdenes S3
+        GOING_TO_MIN,          // Bajando a 0 (usuario soltó o pre-calib)
+        WAITING_FOR_CALIB,     // En 0, esperando que FLAG_CALIB inicie calibración
+        CALIBRATING,           // Máquina calibración en curso
+        MOVING_TO_TARGET,      // Moviéndose a posición S3
+        AT_TARGET              // En posición objetivo, esperando nuevo comando S3
+    };
+
     enum class CalibState {
         IDLE,
         CALIB_UP,
@@ -36,6 +46,12 @@ namespace Motor {
     void       goToMin();  // Baja motor a posición 0 (mínimo), espera órdenes de S3
     CalibState getCalibState();
     bool       isCalibrated();
+
+    // Máquina de estados v2 (2026-05-16) — S3 commands
+    void       requestCalibration();          // FLAG_CALIB desde S3 → inicia calib o goToMin si necesario
+    void       setTargetFromS3(uint16_t adc); // setTarget desde S3 (ADC ya mapeado)
+    void       setUserDropTarget(uint16_t adc); // Usuario soltó fader en posición ADC
+    MotorState getState();                    // Consulta estado actual
 
     // Test mode — control directo (2026-05-10 19:54)
     void testUp(uint8_t pwm);

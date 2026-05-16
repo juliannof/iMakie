@@ -284,6 +284,125 @@ Fader listo para recibir PitchBend de Logic
 
 ---
 
+## 2.5 Máquina de Estados Motor v2 — S3 Master (2026-05-16 10:45)
+
+**Principios:**
+- S3 es el master (autoridad máxima)
+- Usuario puede soltar fader en cualquier posición → motor va allá
+- Sin comando S3: fader siempre en 0 (goToMin loop)
+- Estados: IDLE → GOING_TO_MIN → WAITING_FOR_CALIB → CALIBRATING → IDLE
+- Alternativa: IDLE → GOING_TO_MIN → AT_TARGET (usuario soltó)
+
+### **2.5.1 Estados y Transiciones**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ IDLE                                                        │
+│ - Fader en 0, esperando órdenes S3 o usuario             │
+│ - Si ADC > 30: bajar a 0 (GOING_TO_MIN)                  │
+│ - Si ADC ≤ 30: apagar motor                               │
+└─────────────────────────────────────────────────────────────┘
+    ↓ (ADC > 30)
+┌─────────────────────────────────────────────────────────────┐
+│ GOING_TO_MIN                                                │
+│ - Motor baja con PWM_MAX                                   │
+│ - Si llega a 0:                                            │
+│   ├─ Si _pendingCalib: → WAITING_FOR_CALIB               │
+│   └─ Sino: → AT_TARGET                                    │
+└─────────────────────────────────────────────────────────────┘
+    ↓ (FLAG_CALIB pendiente)
+┌─────────────────────────────────────────────────────────────┐
+│ WAITING_FOR_CALIB                                           │
+│ - En 0, esperando que startCalib() se ejecute             │
+│ - Cuando _pendingCalib activado: → CALIBRATING            │
+└─────────────────────────────────────────────────────────────┘
+    ↓ (_pendingCalib = true)
+┌─────────────────────────────────────────────────────────────┐
+│ CALIBRATING                                                 │
+│ - Máquina calibración en curso (KICK_UP → DONE)          │
+│ - Si DONE o ERROR: → IDLE                                 │
+└─────────────────────────────────────────────────────────────┘
+    ↓ (calibración completa)
+└──────────→ IDLE (vuelve al inicio)
+
+┌─────────────────────────────────────────────────────────────┐
+│ MOVING_TO_TARGET (desde S3 setTarget)                      │
+│ - Motor se mueve a posición S3                             │
+│ - Si llega: → AT_TARGET                                    │
+└─────────────────────────────────────────────────────────────┘
+    ↓ (error < DEAD_ZONE)
+┌─────────────────────────────────────────────────────────────┐
+│ AT_TARGET                                                   │
+│ - Posición objetivo alcanzada, esperando nuevo comando S3  │
+│ - Si timeout (30s): → IDLE                                │
+│ - Si usuario suelta en Y: → GOING_TO_MIN (_userDropTarget) │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### **2.5.2 Funciones Públicas (API v2)**
+
+```cpp
+// Motor state machine
+void requestCalibration();           // FLAG_CALIB desde RS485
+void setTargetFromS3(uint16_t adc);  // setTarget ADC desde RS485
+void setUserDropTarget(uint16_t adc); // Usuario soltó fader en ADC
+MotorState getState();                // Consulta estado motor
+```
+
+### **2.5.3 Escenarios de Uso**
+
+**Escenario 1: Boot sin comando S3**
+```
+setup() → Motor en IDLE
+loop(): ADC > 30 → GOING_TO_MIN → baja a 0 → IDLE
+Motor queda en 0, esperando S3
+```
+
+**Escenario 2: Usuario suelta fader en posición Y**
+```
+IDLE (fader en 0) 
+  → usuario arrastra a Y
+  → usuario suelta
+  → setUserDropTarget(Y) 
+  → GOING_TO_MIN (ahora target=Y)
+  → llega a Y
+  → AT_TARGET (esperando S3)
+```
+
+**Escenario 3: S3 ordena calibración (FLAG_CALIB)**
+```
+IDLE (fader en posición X) 
+  → requestCalibration() detecta X ≠ 0
+  → GOING_TO_MIN + _pendingCalib=true
+  → llega a 0
+  → WAITING_FOR_CALIB
+  → startCalib() ejecuta
+  → CALIBRATING 
+  → ~8s después: DONE
+  → IDLE
+```
+
+**Escenario 4: S3 ordena setTarget(P) mientras está en AT_TARGET**
+```
+AT_TARGET (posición Y)
+  → setTargetFromS3(P) desde RS485
+  → MOVING_TO_TARGET (target=P)
+  → llega a P
+  → AT_TARGET
+```
+
+### **2.5.4 Variables Internas**
+
+```cpp
+static MotorState _motor_state;        // Estado actual
+static bool _pendingCalib;             // Flag: calibración en espera
+static uint16_t _userDropTarget;       // ADC donde usuario soltó
+static uint16_t _s3Target;             // Target actual de S3
+static uint32_t _atTargetStartTime;    // timestamp llegada a AT_TARGET
+```
+
+---
+
 ## 3. CALIBRACIÓN (Máquina de Estados No-Bloqueante)
 
 ### 3.1 Objetivo

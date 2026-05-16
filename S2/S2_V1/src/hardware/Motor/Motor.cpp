@@ -27,8 +27,16 @@ extern FaderADC faderADC;
 static uint8_t _pwm_min = 0;
 static uint8_t _pwm_max = 0;
 
-// ─── goToMin: flag para bajar a posición 0 ────────────────────
-static bool _motor_goingToMin = false;
+// ─── Máquina de estados Motor v2 (2026-05-16 10:45) ──────────
+// Arquitectura: S3 es master, usuario puede soltar fader
+// Estados: IDLE → GOING_TO_MIN → WAITING_FOR_CALIB → CALIBRATING → IDLE
+//          IDLE → GOING_TO_MIN → AT_TARGET (usuario soltó)
+//          Cualquiera → MOVING_TO_TARGET (S3 ordena setTarget)
+static MotorState _motor_state = MotorState::IDLE;
+static bool _pendingCalib = false;        // Flag: startCalib en espera después goToMin
+static uint16_t _userDropTarget = 0;      // ADC capturado cuando usuario soltó fader
+static uint16_t _s3Target = 0;            // Target actual de S3 (para MOVING_TO_TARGET)
+static uint32_t _atTargetStartTime = 0;   // timestamp cuando llegó a AT_TARGET
 
 // ─── Funciones HW (privadas) ──────────────────────────────────
 static void _hwOff() {
@@ -318,25 +326,85 @@ void initPWM() {
 }
 
 void update() {
-    // ⚠️ goToMin: bajando a posición 0 (prior a calibración)
-    if (_motor_goingToMin) {
-        if (_motor_adcPos <= (MOTOR_ADC_MIN + 10)) {  // Llegó al fondo (ADC ≈ 20-30)
-            _hwOff();
-            _motor_goingToMin = false;
-            log_i("[MOTOR] goToMin: llegó a 0 (ADC=%d)", _motor_adcPos);
-            return;
-        }
-        return;  // Sigue bajando, sin ejecutar otro código
-    }
+    // ┌─ Máquina de estados Motor v2 (2026-05-16) ─────────────────
+    // S3 es master. Usuario puede soltar fader.
+    // Prioridad: S3 órdenes > Estados internos
+    switch (_motor_state) {
 
-    // Lógica normal
-    if (_isCalibrating()) {
+    case MotorState::IDLE:
+        // Esperando órdenes S3 o usuario. Fader debe estar en 0.
+        if (_motor_adcPos > (MOTOR_ADC_MIN + 10)) {
+            // No en 0 → bajar
+            _motor_state = MotorState::GOING_TO_MIN;
+            _hwDown(_pwm_max);
+            log_d("[MOTOR-STATE] IDLE → GOING_TO_MIN");
+        } else {
+            // En 0, apagar motor
+            _hwOff();
+        }
+        break;
+
+    case MotorState::GOING_TO_MIN:
+        // Bajando a 0. Detectar llegada.
+        if (_motor_adcPos <= (MOTOR_ADC_MIN + 10)) {  // Llegó a 0
+            _hwOff();
+            if (_pendingCalib) {
+                // Esperar que startCalib() se ejecute (FLAG_CALIB en espera)
+                _motor_state = MotorState::WAITING_FOR_CALIB;
+                log_d("[MOTOR-STATE] GOING_TO_MIN → WAITING_FOR_CALIB");
+            } else {
+                // Usuario soltó fader en 0 (no FLAG_CALIB)
+                _motor_state = MotorState::AT_TARGET;
+                _atTargetStartTime = millis();
+                log_d("[MOTOR-STATE] GOING_TO_MIN → AT_TARGET (user drop at 0)");
+            }
+        }
+        break;
+
+    case MotorState::WAITING_FOR_CALIB:
+        // En 0, esperando que FLAG_CALIB inicie calibración
+        if (_pendingCalib) {
+            _pendingCalib = false;
+            _motor_state = MotorState::CALIBRATING;
+            startCalib();  // Ahora SÍ inicia calibración
+            log_d("[MOTOR-STATE] WAITING_FOR_CALIB → CALIBRATING");
+        }
+        break;
+
+    case MotorState::CALIBRATING:
+        // Máquina calibración en curso
         _calibUpdate();
-    } else if (_motor_phase == CalibPhase::DONE) {
+        if (_motor_phase == CalibPhase::DONE || _motor_phase == CalibPhase::ERROR) {
+            _motor_state = MotorState::IDLE;
+            log_d("[MOTOR-STATE] CALIBRATING → IDLE");
+        }
+        break;
+
+    case MotorState::MOVING_TO_TARGET:
+        // Moviéndose a posición S3
         _positionTick();
-    } else {
+        if (abs((int)_motor_adcPos - (int)_motor_targetADC) < DEAD_ZONE) {
+            // Llegó a target
+            _hwOff();
+            _motor_state = MotorState::AT_TARGET;
+            _atTargetStartTime = millis();
+            log_d("[MOTOR-STATE] MOVING_TO_TARGET → AT_TARGET");
+        }
+        break;
+
+    case MotorState::AT_TARGET:
+        // En posición objetivo, esperando comando S3
+        // Si usuario suelta en nueva posición, cambiar a GOING_TO_MIN
         _hwOff();
+        // Timeout: si pasa tiempo sin comando S3, volver a IDLE (goToMin)
+        // Configurar en config.h: MOTOR_AT_TARGET_TIMEOUT (ej: 30000 ms)
+        break;
+
+    default:
+        _hwOff();
+        break;
     }
+    // └────────────────────────────────────────────────────────────
 }
 
 void setADC(uint16_t v) {
@@ -454,6 +522,47 @@ void goToMin() {
     _motor_goingToMin = true;
     _hwDown(_pwm_max);  // Motor baja con PWM máximo
     log_i("[MOTOR] goToMin: bajando a posición 0...");
+}
+
+// ─── Máquina de estados v2 (2026-05-16) ──────────────────────
+void requestCalibration() {
+    // S3 ordena FLAG_CALIB → si fader en 0, calibra; si no, baja primero
+    if (_motor_adcPos <= (MOTOR_ADC_MIN + 10)) {
+        // Ya en 0 → calibra directamente
+        _motor_state = MotorState::CALIBRATING;
+        startCalib();
+        log_i("[MOTOR] requestCalibration: fader ya en 0, calibrando");
+    } else {
+        // No en 0 → baja primero, luego calibra
+        _motor_state = MotorState::GOING_TO_MIN;
+        _pendingCalib = true;
+        _motor_goingToMin = true;
+        _hwDown(_pwm_max);
+        log_i("[MOTOR] requestCalibration: bajando a 0 primero, luego calibrar");
+    }
+}
+
+void setTargetFromS3(uint16_t adcTarget) {
+    // S3 ordena posición → interrumpe TODO y va a esa posición
+    _motor_state = MotorState::MOVING_TO_TARGET;
+    _s3Target = adcTarget;
+    _motor_targetADC = adcTarget;
+    _motor_phase = CalibPhase::DONE;  // Asegurar que está calibrado para setTarget
+    log_i("[MOTOR] setTargetFromS3: target=%d", adcTarget);
+}
+
+void setUserDropTarget(uint16_t adcValue) {
+    // Usuario soltó fader en posición adcValue → motor va allá
+    _motor_state = MotorState::GOING_TO_MIN;  // Reutiliza lógica goToMin
+    _userDropTarget = adcValue;
+    _motor_targetADC = adcValue;
+    _motor_phase = CalibPhase::DONE;
+    _motor_goingToMin = false;  // Flag goToMin no aplica aquí
+    log_i("[MOTOR] setUserDropTarget: ADC=%d", adcValue);
+}
+
+MotorState getState() {
+    return _motor_state;
 }
 
 CalibState getCalibState() {
