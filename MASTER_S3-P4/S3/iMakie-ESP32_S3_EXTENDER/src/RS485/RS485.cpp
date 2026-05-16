@@ -97,12 +97,28 @@ void RS485Master::runTask() {
                     if (_consecutiveTimeouts <= 3 || _consecutiveTimeouts % 10 == 0)
                         log_w("[RS485] TIMEOUT slave %d (#%u consecuciones)",
                               _currentId, _consecutiveTimeouts);
-                    if (xSemaphoreTake(_mutex, 0) == pdTRUE) {
-                        _ch[_currentId].responded = false;
-                        xSemaphoreGive(_mutex);
+
+                    // ── Límite de reintentos (2026-05-16 19:25) ──
+                    if (_consecutiveTimeouts > MAX_CALIBRATION_RETRIES) {
+                        // Calibración falló después de máx reintentos
+                        if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(2)) == pdTRUE) {
+                            _ch[_currentId].calibrating = false;  // Libera para siguiente slave
+                            _ch[_currentId].responded = false;
+                            log_e("[RS485] Slave %d ERROR calibración (TIMEOUT máx %u reintentos)",
+                                  _currentId, MAX_CALIBRATION_RETRIES);
+                            xSemaphoreGive(_mutex);
+                        }
+                        _consecutiveTimeouts = 0;
+                        _nextSlave();  // Pasar a siguiente slave
+                    } else {
+                        // Continuar esperando
+                        if (xSemaphoreTake(_mutex, 0) == pdTRUE) {
+                            _ch[_currentId].responded = false;
+                            xSemaphoreGive(_mutex);
+                        }
+                        _busState   = BusState::GAP;
+                        _stateTimer = micros();
                     }
-                    _busState   = BusState::GAP;
-                    _stateTimer = micros();
                 }
                 break;
 
