@@ -346,52 +346,10 @@ loop() {
 
 ---
 
-## Encoder — Arquitectura y sequenciamiento (S2)
+## Encoder — Arquitectura y sequenciamiento (S2) — 📌 Ver ENCODER.md
 
-**Fuente única de verdad:** `src/hardware/encoder/Encoder.cpp` (confirmado 2026-04-27 14:00)
-- ISR basada en cambio de flanco (CHANGE) en GPIO12 y GPIO13
-- Debounce 3ms en ISR (válido)
-- Dirección: A LOW + B HIGH = -1 (izquierda), A LOW + B LOW = +1 (derecha)
-- Sin duplicados en SAT ni main.cpp
-
-**Usuarios correctos:**
-- `RS485Handler::buildResponse()` → captura delta para enviar al master
-- `main.cpp` → calcula nivel VPot (-7..+7) y redibuja Display
-
-**RESUELTO (2026-04-28 15:30) — Sequenciamiento corregido:**
-
-Problema: `Encoder::reset()` estaba en la línea 214 de main.cpp (post-RS485, antes de procesar VPot), causando que el contador fuera 0 al leer para VPot → VPot ring nunca cambiaba en Logic. SAT funcionaba porque procesaba el contador sin ese reset intermedio.
-
-Solución implementada: Mover `Encoder::reset()` a línea 242 (post-VPot, pre-updateDisplay). Ahora el flujo es:
-
-```cpp
-// ✓ ORDEN IMPLEMENTADO (main.cpp línea 205-246)
-if (rs485.hasNewData()) {
-    SlavePacket resp = RS485Handler::buildResponse(...);  // captura delta
-    rs485.sendResponse(resp);
-    // NO resetear aquí
-}
-
-// ... fader, motor, ...
-
-if (!satMenu->isEncoderConsumed()) {
-    Encoder::update();
-    if (Encoder::hasChanged()) {
-        int newLevel = constrain((int)(Encoder::getCount() / 4), -7, 7);
-        if (newLevel != Encoder::currentVPotLevel) {
-            Encoder::currentVPotLevel = newLevel;
-            needsVPotRedraw = true;
-        }
-    }
-}
-
-Encoder::reset();  // RESET al final, post-VPot, pre-updateDisplay
-
-updateButtons();
-updateDisplay();  // redibuja con nuevos niveles
-```
-
-Resultado: RS485 y Display ahora usan el mismo delta, VPot ring responde correctamente en Logic.
+**Documentación exhaustiva:**
+→ **[docs/ENCODER.md](docs/ENCODER.md)** (ISR Gray code, sequenciamiento critical, SAT push >3s, VPot ring -7..+7, bug fix 2026-04-28)
 
 ---
 
