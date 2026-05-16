@@ -326,9 +326,40 @@ void initPWM() {
 }
 
 void update() {
-    // ┌─ Máquina de estados Motor v2 (2026-05-16) ─────────────────
-    // S3 es master. Usuario puede soltar fader.
-    // Prioridad: S3 órdenes > Estados internos
+    // ┌─ Máquina de estados Motor v3 (2026-05-16 18:55) ──────────────────────────────────
+    // PRIORIDAD ABSOLUTA:
+    //   1. Usuario mueve/toca → Motor::stop() inmediato (setADCDelta)
+    //   2. Motor::goToMin() MASTER → baja fader a 0 sin excepciones
+    //   3. S3 ordena → Motor se mueve SOLO si usuario NO toca (setTargetFromS3)
+    //
+    // FLUJO CALIBRACIÓN (requestCalibration):
+    //   S3 FLAG_CALIB → requestCalibration()
+    //     ├─ Si fader EN 0: startCalib() inmediato
+    //     └─ Si fader ≠ 0:
+    //         ├─ _motor_state = GOING_TO_MIN
+    //         ├─ _pendingCalib = true
+    //         └─ goToMin() baja (MASTER sin guard _connected)
+    //
+    //   Motor::update() procesa:
+    //     GOING_TO_MIN: cuando llega a 0 → WAITING_FOR_CALIB (si _pendingCalib)
+    //     WAITING_FOR_CALIB: si _pendingCalib → startCalib() → CALIBRATING
+    //
+    // FLUJO NORMAL (S3 setTarget):
+    //   S3 envía faderTarget → setTargetFromS3() (guarded por usuario)
+    //     → MOVING_TO_TARGET → Motor mueve a target
+    //   Llega a target → AT_TARGET → espera nuevo comando S3
+    //
+    // FLUJO USUARIO MASTER:
+    //   Usuario mueve fader → setADCDelta() detecta delta OR FaderTouch
+    //     → Motor::stop() INMEDIATO
+    //     → AT_TARGET (usuario define posición)
+    //   Usuario suelta (200ms debounce) → S3 puede controlar de nuevo
+    //
+    // FLUJO DESCONEXIÓN S3:
+    //   Motor::setConnected(false) → IDLE con !_connected
+    //     → IDLE → GOING_TO_MIN (baja a 0)
+    //     → Motor::goToMin() loop indefinido (MASTER)
+    // └────────────────────────────────────────────────────────────────────────────────
     switch (_motor_state) {
 
     case MotorState::IDLE:
