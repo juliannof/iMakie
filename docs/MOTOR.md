@@ -122,33 +122,37 @@ CUANDO FADER LLEGA A 0:
 
 ESCENARIOS DURANTE OPERACIÓN:
 
-  1️⃣  S3 conectado + usuario NO toca:
-      ├─ S3 envía FLAG_CALIB:
-      │  └─ Motor::requestCalibration()
-      │     ├─ Si ADC ≠ 0: Motor::goToMin() primero
+  1️⃣  Calibración (S3 ordena, independiente de Logic):  (2026-05-16 19:24)
+      ├─ S3 envía FLAG_CALIB al boot
+      │  └─ Motor::requestCalibration()  ← procesado ANTES de desconexión
+      │     ├─ Si ADC ≠ 0: Motor::goToMin() baja a 0
       │     └─ Si ADC = 0: startCalib() directo
+      ├─ Motor transiciona: GOING_TO_MIN → WAITING_FOR_CALIB → CALIBRATING
+      └─ BuildResponse() reporta CALIB_DONE cuando completa
+      
+  2️⃣  S3 conectado + usuario NO toca (post-calibración):
       └─ S3 envía setTarget(X):
          └─ Motor se mueve a X (si usuario NO toca)
 
-  2️⃣  Usuario mueve fader:
+  3️⃣  Usuario mueve fader:
       ├─ Motor::setADCDelta() detecta delta grande O FaderTouch activo
       ├─ Motor::stop() INMEDIATAMENTE
       ├─ Usuario es MASTER → ADC actual = nueva posición
       ├─ touchState=1 reportado a S3 vía RS485
       └─ S3 ignora targets mientras usuario toque (setTargetFromS3 rechaza)
 
-  3️⃣  Usuario suelta fader:
+  4️⃣  Usuario suelta fader:
       ├─ _motor_manualTouchDetected = false (después 200ms debounce)
       └─ S3 puede enviar nuevo target (Motor acepta)
 
-  4️⃣  S3 desconectado:
+  5️⃣  S3 desconectado (Logic no conectado):
       ├─ Motor::setConnected(false) ejecutado
       ├─ Motor::goToMin() SIEMPRE activo
       └─ Fader baja a 0 indefinidamente (IDLE loop)
 
-  5️⃣  S3 conectado:
+  6️⃣  S3 conectado (Logic conectado):
       ├─ Motor::setConnected(true) ejecutado
-      ├─ Motor NO baja automáticamente (goToMin tiene guard)
+      ├─ Motor NO baja automáticamente
       └─ Espera órdenes S3
 ```
 

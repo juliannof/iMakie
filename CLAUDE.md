@@ -224,19 +224,35 @@ MÍNIMA:  Sin comando: Motor idle en posición actual
    - `setTargetFromS3()` tiene guard: `if (_motor_manualTouchDetected || FaderTouch::isTouched()) return;`
    - S3 targets ignorados mientras usuario toque (debounce 200ms tras soltar)
 
-5. **Conexión S3 controla automática**
+5. **S3 error handling calibración (2026-05-16 19:26)**
+   - `MAX_CALIBRATION_RETRIES = 5` en config.h
+   - Si TIMEOUT > 5 reintentos: marca `calibrating=false`, salta a siguiente slave
+   - Resultado: Secuencia de calibración no se bloquea en slave defectuoso
+
+5. **Calibración es independiente de Logic (2026-05-16 19:24)**
+   - FLAG_CALIB procesado ANTES de checar pkt.connected
+   - Motor puede calibrar sin Logic conectado
+   - S3 envía calibración secuencial al boot (todos los slaves)
+   - Propósito: ADC mapeado ANTES de que Logic tome control
+
+6. **Conexión S3 controla automática (post-calibración)**
    - Si CONNECTED: Motor NO baja a 0 automáticamente, espera órdenes S3
    - Si DISCONNECTED: Motor baja a 0 indefinidamente (goToMin loop)
 
-**Implementación v3 (2026-05-16 18:45):**
+**Implementación v3 (2026-05-16 18:45 → 19:26):**
 - Motor.cpp: función `Motor::requestCalibration()` — NUEVA
 - Motor.cpp: `Motor::goToMin()` — MASTER ABSOLUTO si `!_connected`
 - Motor.cpp: `setADCDelta()` — usuario detection
 - Motor.cpp: `setTargetFromS3()` — con guards usuario
-- RS485Handler.cpp línea 67: **CAMBIO CRÍTICO**
-  - ANTES: `Motor::startCalib();`
-  - DESPUÉS: `Motor::requestCalibration();`
-- Documentación: MOTOR.md + FADER.md actualizados (2026-05-16 18:45)
+- RS485Handler.cpp línea 36 (ANTES línea 67): **CAMBIO CRÍTICO (2026-05-16 19:24)**
+  - FLAG_CALIB procesado ANTES de procesar desconexión
+  - Motor está activo cuando `Motor::requestCalibration()` lo ordena
+  - Calibración independiente de Logic (pkt.connected)
+- RS485.cpp (S3): **Error handling (2026-05-16 19:26)**
+  - config.h: `MAX_CALIBRATION_RETRIES = 5`
+  - runTask(): Límite de reintentos en timeout
+  - Si timeout > 5: marca `calibrating=false`, log error, pasa a siguiente slave
+- Documentación: MOTOR.md + FADER.md + RS485.md + CLAUDE.md actualizados (2026-05-16 19:26)
 
 **Test mínimo requerido:**
 - [ ] Boot: fader baja a 0 (Motor::goToMin() en setup)
