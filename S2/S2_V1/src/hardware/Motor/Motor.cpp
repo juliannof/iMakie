@@ -524,10 +524,9 @@ void startCalib() {
 }
 
 void goToMin() {
-    // Guard: no bajar si S3 está conectado (2026-05-16 10:52)
-    if (_connected) {
-        return;
-    }
+    // MASTER ABSOLUTO — ejecuta SIEMPRE sin excepciones (2026-05-16 18:55)
+    // Prioridad máxima: Usuario > GoToMin > S3
+    // No usar si S3 está conectado — requestCalibration() maneja eso
 
     // Guard: no reiniciar si ya está en movimiento
     if (_isCalibrating()) {
@@ -543,24 +542,24 @@ void goToMin() {
     // Iniciar movimiento hacia abajo
     _motor_goingToMin = true;
     _hwDown(_pwm_max);  // Motor baja con PWM máximo
-    log_i("[MOTOR] goToMin: bajando a posición 0...");
+    log_i("[MOTOR] goToMin: bajando a posición 0 (MASTER)...");
 }
 
 // ─── Máquina de estados v2 (2026-05-16) ──────────────────────
 void requestCalibration() {
-    // S3 ordena FLAG_CALIB → si fader en 0, calibra; si no, baja primero
+    // S3 ordena FLAG_CALIB → GoToMin es MASTER, garantiza fader en 0, luego calibra (2026-05-16 18:55)
+    // Arquitectura: fader SIEMPRE baja a 0 antes de calibración (FADER.md 1.1 escrupuloso)
     if (_motor_adcPos <= (MOTOR_ADC_MIN + 10)) {
         // Ya en 0 → calibra directamente
         _motor_state = MotorState::CALIBRATING;
         startCalib();
         log_i("[MOTOR] requestCalibration: fader ya en 0, calibrando");
     } else {
-        // No en 0 → baja primero, luego calibra
-        _motor_state = MotorState::GOING_TO_MIN;
-        _pendingCalib = true;
-        _motor_goingToMin = true;
-        _hwDown(_pwm_max);
-        log_i("[MOTOR] requestCalibration: bajando a 0 primero, luego calibrar");
+        // No en 0 → GoToMin MASTER baja a 0, luego calibra
+        _motor_state = MotorState::GOING_TO_MIN;      // Establecer estado para Motor::update()
+        _pendingCalib = true;                         // Flag para startCalib() cuando llegue a 0
+        goToMin();                                     // MASTER absoluto — baja sin excepciones
+        log_i("[MOTOR] requestCalibration: GoToMin baja a 0, _pendingCalib esperando...");
     }
 }
 
