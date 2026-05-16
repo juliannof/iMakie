@@ -111,6 +111,21 @@
 - **RS485 es crítico.** Un bug puede dejar el sistema no operacional (incomunicación total S3-S2)
 - Esta regla es VINCULANTE — sin validación hardware, NO merge/deploy
 
+**📝 MEMORY — Sistema de Persistencia (2026-05-16 09:34):**
+- **Ubicación:** `/Users/julianno/.claude/projects/.../memory/`
+- **Propósito:** Mantener contexto, decisiones, y aprendizajes entre conversaciones
+- **Estructura:**
+  - `MEMORY.md` — índice central (máx. 200 líneas, una línea por entrada)
+  - Archivos `.md` individuales por tema (user, feedback, project, reference)
+- **Obligatorio ACTUALIZAR cuando:**
+  - Descubres preferencias nuevas del usuario (feedback)
+  - Cambios arquitectónicos significativos ocurren (project)
+  - Bugs críticos encontrados y solucionados (project)
+  - Patrones de trabajo establecidos (feedback)
+- **NO guardar:** código, filepaths normales, git history, información ya en CLAUDE.md
+- **Formato:** Frontmatter YAML + contenido markdown. Enlazar con `[[nombre]]`
+- **Esta regla es VINCULANTE** — memory es fuente de verdad entre sesiones, mantenerla actualizada
+
 ---
 
 ## Qué es esto
