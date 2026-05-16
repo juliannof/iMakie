@@ -165,7 +165,8 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 │   ├── BUTTONS.md                    ← Debounce, ButtonManager, mapeo MIDI (2026-05-16)
 │   ├── DISPLAY.md                    ← ST7789V3, sprites PSRAM, layout (2026-05-16)
 │   ├── ENCODER.md                    ← ISR Gray code, sequenciamiento, SAT (2026-05-16)
-│   └── LEDS.md                       ← NeoPixels WS2812B, asignación, estados (2026-05-16)
+│   ├── LEDS.md                       ← NeoPixels WS2812B, asignación, estados (2026-05-16)
+│   └── SAT.md                        ← Sistema Auto-Test, navegación, integración (2026-05-16)
 ├── CHANGELOG.md                       ← Historial de cambios
 ├── README.md                          ← Intro repo
 └── platformio.ini                     ← Índice de subproyectos
@@ -180,6 +181,7 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 - **DISPLAY.md** — ST7789V3, sprites PSRAM, layout, LovyanGFX
 - **ENCODER.md** — ISR Gray code, sequenciamiento, SAT, VPot ring
 - **LEDS.md** — WS2812B NeoPixel, asignación LEDs, estados, brillo
+- **SAT.md** — Sistema Auto-Test, navegación menú, integración módulos
 - CLAUDE.md — Directivas vinculantes únicamente (no duplicar)
 
 ---
@@ -341,30 +343,10 @@ setup() {
 - RS485 debe iniciar cuando todo está listo (si falla, no bloquea boot)
 - Display + NeoPixels comparten SPI, timing crítico
 
-### SAT (Sistema de Auto-Test)
+### SAT (Sistema de Auto-Test) — 📌 Ver SAT.md
 
-Menú en display (Encoder push > 3s):
-- **Motor Off/On** — deshabilita motor
-- **Motor Calibrar** — calibración automática + REC para reiniciar (2026-05-12 19:07)
-- **Motor Drive** — manual PWM test
-- **Brightness** — test backlight
-- **RS485 On/Off** — simula desconexión
-- **LEDs Test** — secuencia RGB por índice
-- **WiFi OTA** — carga firmware via WiFi
-- **Reboot** — reinicia
-
-**Motor Calibración (2026-05-12 19:07):**
-- **Autostart:** Se inicia automáticamente al entrar a SAT > Motor > Calibrar
-- **Autoridad:** `main.cpp` ejecuta `Motor::update()` cada frame (SAT NO lo ejecuta)
-  - Evita race conditions entre SAT y main.cpp
-  - Motor::setADC() se actualiza en main.cpp (ButtonManager → Motor)
-  - SAT solo dibuja `Motor::getCalibState()`
-- **Reinicio:** Presionar REC (botón físico) llama `Motor::startCalib()` nuevamente si falla
-- **Arquitectura:** SAT es SOLO display, nunca control
-  - Garantiza que calibración en SAT = calibración en loop principal
-  - Sin conflictos de threading/timing
-
-**Nota:** SAT suspende PSRAM y sprites → libera RAM para diagnósticos
+**Documentación exhaustiva:**
+→ **[SAT.md](docs/SAT.md)** (navegación, menú, integración Motor/Display/Encoder/LEDs/WiFi/RS485, troubleshooting)
 
 ### Build S2
 - Platform: pioarduino 55.03.37 / IDF5 — unificado con P4 (requiere P4)
