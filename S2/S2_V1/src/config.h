@@ -111,6 +111,7 @@ static constexpr uint32_t CALIB_SETTLE_MS          = 200;     // ms para medir r
 static constexpr uint32_t CALIB_MIN_TRAVEL_MS      = 300;     // ms mínimo de viaje antes de medir
 static constexpr uint32_t CALIB_TIMEOUT            = 6000;    // ms timeout calibración
 static constexpr uint32_t CALIB_STUCK_TIMEOUT      = 1000;    // ms sin movimiento = motor atascado (2026-05-12 20:40)
+static constexpr uint32_t CALIB_COOLDOWN_MS        = 2000;    // ms espera mínima antes de reiniciar (2026-05-16 HH:MM)
 static constexpr uint8_t  PWM_SLEW                 = 5;       // máximo cambio PWM por tick
 
 
@@ -128,6 +129,7 @@ static uint32_t   _motor_phaseStart     = 0;
 static uint32_t   _motor_calibStart     = 0;
 static uint32_t   _motor_calibMinDetect = 0;
 static uint32_t   _motor_stableStart    = 0;
+static uint32_t   _motor_lastCalibDone  = 0;    // timestamp último finish exitoso (2026-05-16)
 static int        _motor_stableRef      = 0;
 
 static uint16_t   _motor_adcTop         = 0;

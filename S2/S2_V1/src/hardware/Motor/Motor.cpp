@@ -215,6 +215,7 @@ static void _calibUpdate() {
             _motor_targetADC = (uint16_t)map((long)_motor_lastMidiTarget,
                                         0, MIDI_PB_MAX, _calibratedFaderMin, _calibratedFaderMax);
             faderADC.setCalibration(_calibratedFaderMin, _calibratedFaderMax);
+            _motor_lastCalibDone = millis();  // Registrar timestamp (2026-05-16 07:48)
             _motor_phase     = CalibPhase::DONE;
             log_i("[CALIB] OK  MIN=%d MAX=%d span=%d target=%d",
                   _calibratedFaderMin, _calibratedFaderMax, _motor_adcSpan, _motor_targetADC);
@@ -369,12 +370,23 @@ uint16_t getADCMax() {
 }
 
 void startCalib() {
-    if (_isCalibrating()) return;
+    // Guard 1: no reiniciar si ya está calibrando (2026-05-16 07:48)
+    if (_isCalibrating()) {
+        return;
+    }
+
+    // Guard 2: cooldown — no reiniciar si completó hace poco (2026-05-16 07:48)
+    uint32_t now = millis();
+    if (_motor_lastCalibDone > 0 && (now - _motor_lastCalibDone) < CALIB_COOLDOWN_MS) {
+        log_w("[CALIB] Enfriamiento activo — se completó hace %ld ms (esperar %ld ms)",
+              now - _motor_lastCalibDone, CALIB_COOLDOWN_MS);
+        return;
+    }
+
     if (_motor_adcPos < MOTOR_ADC_MIN || _motor_adcPos > MOTOR_ADC_MAX) {
         log_e("[CALIB] Lectura ADC inválida: %d (esperado %d-%d)", _motor_adcPos, MOTOR_ADC_MIN, MOTOR_ADC_MAX);
         return;
     }
-    uint32_t now = millis();
     _motor_active    = false;
     _motor_currentPWM     = 0;
     _motor_settleMin      = 27000;
