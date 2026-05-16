@@ -41,6 +41,97 @@ Nueva sección "Limitaciones y consideraciones":
 
 ---
 
+### S3 EXTENDER — Arquitectura Boot + Detección Esclavo + Calibración PRE-Logic (2026-05-16 21:10) — ⏳ EN DISEÑO
+
+**Problemas identificados:**
+
+1. ❌ **LED verde 1s cuando debería ser 200ms**
+   - Línea main.cpp:245: `bootLEDTime = millis()` con timeout 1000ms
+   - Debe ser 200ms para boot más rápido
+
+2. ❌ **SIN detección de esclavo online**
+   - S3 NO sabe si S2 está respondiendo
+   - Entra en calibración a ciegas
+   - Mensaje final "ACTIVO" es mentira si S2 no responde
+   - Impacto: Logic recibe S3 "listo" pero S2 ausente
+
+3. ❌ **Calibración NO llega a S2**
+   - S3 envía FLAG_CALIB, pero S2 no responde
+   - Hay bloqueo lógico (determinar dónde)
+   - Síntomas: logs muestran `[CALIB] Slave 1 iniciando...` pero S2 no calibra
+
+4. ❌ **Flujo actual bloqueante**
+   - S3 espera Logic 0x21 para activar RS485
+   - Si S2 no está listo, Logic nunca se conecta
+   - Requiere: S2 calibrado ANTES de Logic, no después
+
+**Solución propuesta — Nueva arquitectura boot S3:**
+
+```
+FASE 1: DETECCIÓN ESCLAVO (0-2s)
+├─ S3 envía probe RS485 a S2 (ping simple)
+├─ S2 responde SlavePacket (confirma online)
+├─ Si timeout > 3 reintentos → ERROR CRÍTICO (LED rojo + log)
+└─ Si OK → Fase 2
+
+FASE 2: CALIBRACIÓN (2-10s)
+├─ S3 envía FLAG_CALIB a S2
+├─ S2 ejecuta calibración motor (baja a min, sube a max)
+├─ S2 responde con min/max ADC
+├─ S3 almacena calibración, valida rangos (e.g., min<max)
+├─ Si calibración falla → LED rojo + ERROR, requiere reset S3
+└─ Si OK → Fase 3
+
+FASE 3: VALIDACIÓN (10-15s)
+├─ S3 envía setTarget(8192) a S2 (posición media)
+├─ S2 mueve fader, reporta faderPos
+├─ S3 valida respuesta (faderPos ≈ 8192 ±500)
+├─ Si responde → LED verde (S2 listo)
+└─ Si timeout → LED rojo (S2 no responde)
+
+FASE 4: LOGIC READY (15s+)
+├─ S3 espera Logic 0x21
+├─ Cuando Logic conecta: S2 ya está calibrado y validado
+└─ RS485 polling activo, todo funcional
+```
+
+**Cambios de código necesarios:**
+
+main.cpp:
+- [ ] Línea 245: `bootLEDTime = millis()` → timeout 200ms (no 1000ms)
+- [ ] Línea 165-172: Reemplazar calibración simple por detección + validación
+- [ ] Agregar estado `g_slaveOnline` (bool) para validar si S2 responde
+- [ ] Agregar estado `g_slaveCalibrated` (bool) para validar calibración ok
+- [ ] Log claro: `[BOOT] S2 detectado ✓`, `[BOOT] S2 calibrado ✓`, `[BOOT] S2 validado ✓`
+- [ ] Si cualquier fase falla: LED rojo + log error, NO continuar
+
+RS485.cpp:
+- [ ] Agregar función `probeSlaveOnline(id)` — ping simple
+- [ ] Agregar función `validateCalibration(id)` — chequea si min/max válidos
+- [ ] Agregar función `validateTargetResponse(id, expected_target)` — verifica respuesta
+
+MIDIProcessor.cpp:
+- [ ] `tickCalibracion()` → cambiar lógica para fases secuenciales
+- [ ] Agregar timeout global boot (e.g., 30s) — si no completa, LCD/log error
+
+**Requisitos CRÍTICOS:**
+
+- ✅ Antes de Logic 0x21: S2 debe estar calibrado + validado
+- ✅ Si S2 offline: NO permitir Logic handshake (mantener S3 esperando)
+- ✅ Si calibración falla: ERROR CRÍTICO (LED rojo, halt, requiere reset)
+- ✅ Logs claros en cada fase (DETECCIÓN → CALIBRACIÓN → VALIDACIÓN → READY)
+- ✅ LED rojo indica error crítico (no recurrir a while(1) loop infinito)
+
+**Test mínimo requerido (ANTES de validar con Logic):**
+
+- [ ] S3 boot → detecta S2 online (logs de DETECCIÓN)
+- [ ] S2 calibra automáticamente (logs de CALIBRACIÓN)
+- [ ] S3 valida respuesta S2 (logs de VALIDACIÓN)
+- [ ] S3 reporta "READY" con S2 calibrado (antes de Logic)
+- [ ] Logic conecta: S3 handshake 0x21 → todo fluye
+
+---
+
 ### 🔄 PENDIENTES (próxima sesión)
 
 - [ ] **Actualizar P4 config.h con detalles PSRAM 32MB y periféricos**
