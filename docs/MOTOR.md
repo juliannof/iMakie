@@ -33,49 +33,88 @@ Documentación exhaustiva del subsistema de motor fader. Incluye hardware, máqu
 
 Ver **FADER.md** para especificación completa de ADS1115.
 
-### 1.3 Órdenes de Inicialización CRÍTICO
+### 1.3 Orden de Inicialización en setup() — CRÍTICO (2026-05-16)
+
+**Líneas exactas de main.cpp:**
 
 ```c
 setup() {
-  1. Motor::init()           ← ⚠️ ANTES de Serial.begin() (silencia motor)
-  2. Serial.begin()
-  3. initNeopixels()
-  4. initDisplay()
-  5. faderADC.begin()
-  6. initHardware()          ← botones + otros GPIO
-  7. FaderTouch::init()
-  8. Encoder::begin()
-  9. ButtonManager::begin()
-  10. Motor::begin()         ← habilita control
-  11. rs485.begin(trackId)   ← ÚLTIMO (ya todo funcional)
+  // 1️⃣  LÍNEA 120-121: Configura GPIO14 (MOTOR_EN) ANTES de Motor::init()
+  pinMode(MOTOR_EN, OUTPUT);
+  digitalWrite(MOTOR_EN, LOW);      ← ⚠️ INMEDIATO (evita movement)
+  
+  // 2️⃣ LÍNEA 122: Safety delay
+  delay(10);
+  
+  // 3️⃣ LÍNEA 123: Motor::init() — silencia motor (EN ya LOW)
+  Motor::init();
+  
+  // LÍNEA 124: Serial.begin()
+  Serial.begin(115200);
+  
+  // LÍNEA 132: Lee PWM range de NVS (guardado por SAT)
+  Motor::initPWM();             ← ⚠️ SAT guarda pwmMin/pwmMax tras calibración
+  
+  // ... Display, Neopixels, Encoder, ButtonManager, SatMenu init ...
+  
+  // LÍNEA 187: ⚠️ CRÍTICO — ADC debe estar listo ANTES de Motor::update()
+  faderADC.begin();
+  
+  // ... más hardware ...
+  
+  // LÍNEA 233: Motor apagado ANTES de RS485
+  Motor::off();
+  
+  // LÍNEA 236: RS485 init — ÚLTIMO (Motor listo, ADC listo)
+  rs485.begin(slaveId);
 }
 ```
 
-**¿Por qué `Motor::init()` ANTES de `Serial.begin()`?**
-- EN (GPIO14) debe estar LOW inmediatamente → evita movimiento involuntario al boot
-- Motor::init() ejecuta `digitalWrite(MOTOR_EN, LOW)` sin debug output
-- Si Serial activo, hay mucho output → riesgo de timing issues
+**Estado final tras setup():**
+- Motor EN (GPIO14) = LOW (deshabilitado)
+- PWM range = cargado de NVS (si SAT calibró previamente)
+- ADC = listo (FaderADC inicializado)
+- RS485 = escuchando a S3
+- Fase motor = `CalibPhase::IDLE` (espera FLAG_CALIB de S3)
+
+**¿Por qué este orden?**
+
+1. **Motor EN LOW ANTES de Motor::init():** Evita pulso accidental en pines IN1/IN2 durante init
+2. **Motor::init() ANTES de Serial:** Configura PWM sin debug output
+3. **Motor::initPWM() DESPUÉS de Serial:** Lee NVS (requiere log output si hay error)
+4. **faderADC.begin() ANTES de SAT init:** Motor necesita feedback ADC en loop()
+5. **Motor::off() ANTES de RS485:** Asegura motor inerte cuando comienza comunicación
+6. **RS485 init ÚLTIMO:** Todos los módulos listos para procesar MasterPackets (incluyendo FLAG_CALIB)
 
 ---
 
 ## 2. CONTROL DE MOTOR
 
-### 2.1 APIs Críticas
+### 2.1 APIs Críticas (Motor.h)
 
 ```cpp
 // Inicialización (setup)
-Motor::init()              // Silencia motor (EN → LOW)
-Motor::begin()             // Habilita control (post-setup)
+Motor::init()              // Configura pines (EN→LOW, IN1/IN2 PWM 20kHz)
+Motor::initPWM()           // Lee pwmMin/Max de NVS (SAT las guarda)
+Motor::off()               // Apaga motor (before RS485.begin())
 
-// Control en loop
-Motor::setADC(uint16_t pos)      // Posición actual fader (ADS1115)
-Motor::setTarget(uint16_t target) // Posición objetivo (Logic)
+// Calibración
+Motor::startCalib()        // Inicia máquina calibración (KICK_UP → DONE)
+Motor::getCalibState()     // Estado actual (IDLE/CALIB_UP/CALIB_DOWN/DONE/ERROR)
+Motor::isCalibrated()      // true si fase==DONE y span>100
+
+// Control en loop (post-calibración)
+Motor::setADC(uint16_t pos)      // Actualiza _motor_adcPos desde FaderADC
+Motor::setADCDelta()             // Detecta movimiento manual (guarda motor)
+Motor::setTarget(uint16_t target) // Objetivo Logic 0-14848 → moveMotor
 Motor::update()                   // Máquina de estado (ejecutar SIEMPRE)
 
-// Diagnóstico
-Motor::getCalibState()     // Estado calibración (para SAT)
-Motor::getRawADC()         // Lectura ADC actual
-uint16_t Motor::getCalibMin() / getCalibMax() // Rango calibrado
+// Diagnóstico & Test
+Motor::getRawADC()         // Lectura ADC actual (_motor_adcPos)
+Motor::getPosition()       // Posición normalizada 0.0-1.0
+Motor::getADCMin() / getADCMax() // Rango calibrado
+Motor::getPWMMin() / getPWMMax() // PWM range (de NVS)
+Motor::testUp(pwm) / testDown(pwm) / testOff()  // Test Manual SAT
 ```
 
 ### 2.2 Control de Posición (Post-calibración)
@@ -106,6 +145,64 @@ Motor::setTarget(uint16_t target) {
 }
 ```
 
+### 2.2.1 Motor::initPWM() y Persistencia NVS (2026-05-16)
+
+**Flujo completo PWM Min/Max:**
+
+```
+Primer boot:
+  Motor::initPWM() → lee NVS ("ptxx", pwmMin/Max) → no existe
+  → _pwm_min=0, _pwm_max=0 (inválido)
+  → Motor usa fallback PWM_MIN=100, PWM_MAX=160 (config.h)
+
+Usuario entra SAT → edita PWM Min/Max:
+  SatMenu::loadConfig() → lee NVS
+  SatMenu::saveConfig() → guarda con:
+    _prefs.putUChar("pwmMin", _cfg.pwmMin);
+    _prefs.putUChar("pwmMax", _cfg.pwmMax);
+
+Próximo boot:
+  Motor::initPWM() → lee NVS
+  → encuentra pwmMin=123, pwmMax=157 (valor guardado por SAT)
+  → _pwm_min=123, _pwm_max=157 ← usa valores persistentes
+```
+
+**Código relevante:**
+
+Motor.cpp (líneas 297-315):
+```cpp
+void initPWM() {
+    Preferences prefs;
+    prefs.begin("ptxx", true);  // read-only
+    uint8_t pwmMin = prefs.getUChar("pwmMin", 0);
+    uint8_t pwmMax = prefs.getUChar("pwmMax", 0);
+    prefs.end();
+
+    if (pwmMin > 0 && pwmMax > 0 && pwmMin < pwmMax) {
+        _pwm_min = pwmMin;      // ← Usa valor de SAT
+        _pwm_max = pwmMax;      // ← Usa valor de SAT
+        log_i("[MOTOR] PWM: %u-%u (NVS)", _pwm_min, _pwm_max);
+    } else {
+        _pwm_min = 0;
+        _pwm_max = 0;           // ← Fallback a config.h en Motor.cpp init
+        log_e("[MOTOR] PWM NVS inválido");
+    }
+}
+```
+
+SatMenu.cpp (guardado):
+```cpp
+// Dentro de saveConfig()
+_prefs.putUChar("pwmMin",  _cfg.pwmMin);   // Persistencia
+_prefs.putUChar("pwmMax",  _cfg.pwmMax);   // Persistencia
+```
+
+**¿Por qué es importante?**
+- Cada S2 puede tener motor con características diferentes (fricción, inercia, etc.)
+- SAT calibra PWM Min/Max para ese motor específico en la sesión física
+- NVS persiste calibración entre reboots → no necesita recalibrar PWM cada boot
+- Motor::initPWM() es el puente entre SAT y motor en el siguiente boot
+
 ### 2.3 Parámetros de Control (config.h)
 
 ```cpp
@@ -122,6 +219,64 @@ static constexpr uint16_t ADC_SPIKE_GUARD          = 500;   // cuentas entre lec
 // Motor — EMA filter
 static constexpr float    FADER_EMA_ALPHA_FAST     = 0.20f; // 75% histórico, 25% nuevo
 ```
+
+---
+
+## 2.4 Comportamiento Inicial (Boot) — Estado Motor (2026-05-16)
+
+**Tras completar setup():**
+
+| Estado | Valor | Notas |
+|--------|-------|-------|
+| Fase motor | `CalibPhase::IDLE` | Espera FLAG_CALIB de S3 |
+| Motor habilitado | NO (EN=LOW) | Deshabilitado hasta FLAG_CALIB |
+| PWM_MIN/MAX | Cargado NVS o fallback config.h | De SAT o constantes |
+| ADC | Listo (FaderADC activo) | Puede leer pero motor no se mueve |
+| Target | indeterminado | Se establece cuando S3 envía MasterPacket |
+| Posición fader | Física actual (donde esté) | No hay garantía de posición específica |
+
+**¿Cómo hace el fader para ir a 0 al boot?**
+
+Hay dos flujos posibles:
+
+**Flujo A: Calibración automática (S3 ordena FLAG_CALIB)**
+```
+S3 boot → envía MasterPacket con FLAG_CALIB
+  ↓
+RS485Handler::onMasterData() detecta FLAG_CALIB
+  ↓
+Motor::startCalib() → transición IDLE → KICK_UP
+  ↓
+loop() tick N: Motor::update() ejecuta máquina calibración
+  ↓
+~8 segundos después → _motor_phase = DONE
+  ↓
+Fader automáticamente en 0 (posición mínima calibrada)
+```
+**Duración:** ~8 segundos  
+**Ventaja:** Fader queda calibrado y conoce su rango  
+**Desventaja:** Requiere esperar a que S3 ordene (no automático en S2)
+
+**Flujo B: Posicionamiento directo sin calibración**
+```
+setup() → agregar Motor::setTarget(MOTOR_ADC_MIN)
+  ↓
+Intenta mover a 0, pero Motor::setTarget() ignora si _motor_phase != DONE
+  ↓
+Fader NO se mueve (requiere calibración previa)
+```
+**Duración:** Instantáneo  
+**Ventaja:** Muy rápido  
+**Desventaja:** Requiere que fader ya esté calibrado  
+
+**Recomendación (2026-05-16):**
+- **Opción A (calibración):** Implementar si S3 NO envía FLAG_CALIB automáticamente
+- Agregar en setup() después Motor::initPWM():
+  ```cpp
+  Motor::startCalib();  // Inicia calibración automática
+  ```
+- Motor estará listo (en 0) después de ~8 segundos
+- Fader conoce su rango y está listo para recibir Logic PitchBend
 
 ---
 
