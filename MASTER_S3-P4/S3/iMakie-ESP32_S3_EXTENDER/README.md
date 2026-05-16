@@ -131,6 +131,190 @@ struct SlavePacket {
 
 ---
 
+## Flujo de Trabajo (2026-05-16)
+
+### Setup (main.cpp:205-248)
+
+```
+1. USB.begin()                    ← Inicializa USB-MIDI
+2. Transporte::begin()            ← Config botones transport (GPIO 3-12)
+3. rs485.begin(NUM_SLAVES=1)      ← RS485 bus B, NeoPixel azul (esperando)
+4. MIDI.begin()                   ← USB MIDI stack
+5. xTaskCreatePinnedToCore(taskCore0)  ← Task MIDI+RS485 responses (Core 0)
+6. xTaskCreatePinnedToCore(taskCore1)  ← Task Transporte (Core 1)
+7. rs485.startTask()              ← RS485 polling task (Core 1)
+8. LED verde 1s (no bloqueante)   ← bootLEDTime
+9. loop() → vTaskDelay(portMAX_DELAY)  ← Todo en tareas
+```
+
+### Handshake Mackie MCU (Fases 0–2)
+
+**Fase 0: Probe**
+```
+Logic: SysEx F0 00 00 66 00 00 F7 (cmd=0x00)
+S3:    → F0 00 00 66 14 01 00 00 00 01 00 00 00 00 F7
+       (responde con device family 0x14)
+```
+
+**Fase 2: Keep Alive / Handshake Complete (cmd=0x21)**
+```
+Logic: SysEx F0 00 00 66 14 21 F7 (cada ~1s mientras conectado)
+
+S3 recibe (MIDIProcessor:436-448):
+  1. Envía echo INMEDIATAMENTE: F0 00 00 66 14 21 01 F7
+  2. Si (logicConnectionState != CONNECTED):
+       logicConnectionState = CONNECTED
+       g_logicConnected = 1       ← Activa RS485 polling
+       _calibPendingFrom = 1      ← Inicia calibración cascada
+```
+
+**Fase desconexión: GoOffline (cmd=0x0F)**
+```
+Logic: SysEx F0 00 00 66 14 0F F7
+
+S3:
+  1. g_logicConnected = 0
+  2. rs485.beginDisconnectSequence()  ← Notifica slave DISCONNECTED
+  3. g_switchToOffline = true
+```
+
+### Task Core 0 — MIDI + RS485 Responses (taskCore0, línea 131-190)
+
+```
+Ciclo principal (cada 1ms):
+
+1. LED Boot (no bloqueante) — línea 136-141
+   if (bootLEDTime > 0 && millis() - bootLEDTime > 1000)
+     pixels.off()
+
+2. Leer USB MIDI → processMidiByte() — línea 143-148
+   SysEx, Notes, CC, PitchBend → actualiza state
+
+3. Procesar respuestas RS485 (SOLO si CONNECTED) — línea 150-155
+   if (logicConnectionState == CONNECTED):
+     for (id=1 to NUM_SLAVES):
+       if (rs485.hasNewSlaveData(id)):
+         processSlaveResponse(id)  ← Convierte a MIDI OUT
+           - Fader → PitchBend
+           - Botones → NoteOn/Off
+           - Encoder → CC
+
+4. Calibración automática (1 slave a la vez) — línea 165-172
+   for (id=1 to NUM_SLAVES):
+     if (!calibrated && !calibrating):
+       rs485.setCalibrate(id)
+       break
+
+5. Tick calibración (timeout handling) — línea 174
+   tickCalibracion() → Envía FLAG_CALIB secuencial
+```
+
+### Task Core 1 — Transporte (taskCore1, línea 195-200)
+
+```
+Ciclo cada 10ms:
+
+Transporte::update()
+  for (i=0 to 4):
+    buttons[i].loop()
+      ├─ onButtonPressed()  → sendNoteOn(MCU_TRANSPORT_NOTES[i])
+      └─ onButtonReleased() → sendNoteOff()
+
+Notas transport (config.h):
+  RW   = 0x5B
+  FF   = 0x5C
+  STOP = 0x5D
+  PLAY = 0x5E
+  REC  = 0x5F
+```
+
+### RS485 Polling Task (RS485.cpp:70-147)
+
+```
+Máquina de 3 estados (NUM_SLAVES=1 → ~300µs/ciclo):
+
+BusState::SEND (T=0µs)
+  └─ Envía MasterPacket a slave X (16 bytes)
+
+BusState::WAIT_RESP (T=100-150µs)
+  ├─ Lee SlavePacket (9 bytes)
+  ├─ Si OK: _handleResponse() → almacena en _ch[]
+  └─ Si timeout > 3000µs: retry contador
+
+BusState::GAP (T=300µs)
+  └─ Espera 300µs, pasa a siguiente slave
+
+Timeout handling (RS485.cpp:115-133):
+  - Si _consecutiveTimeouts > MAX_CALIBRATION_RETRIES (5):
+    NeoPixel = ROJO
+    Log: "[CALIB] ✗ FALLO CRÍTICO Slave X"
+    while(1) delay(1000)  ← SISTEMA DETENIDO
+
+Bloqueo si NO CONNECTED (RS485.cpp:68-72):
+  if (!g_logicConnected):
+    vTaskDelay(100)  ← RS485 bloqueado
+```
+
+### Procesamiento MIDI Incoming (processMidiByte)
+
+```
+Control Change (CC):
+  CC 48-55: VPot values → rs485.setVPotValue()
+  CC 64-73: Timecode display
+
+Channel Pressure (0xD0):
+  Channel 0: Master meter (encodeado)
+  Channel 1-7: Strip VU levels → rs485.setVuLevel()
+
+SysEx:
+  0x00: Probe → responde family 0x14
+  0x0F: GoOffline → desconexión
+  0x12: Track names → rs485.setTrackName()
+  0x21: Handshake complete → g_logicConnected=1
+  0x61: AllFaderstoMinimum
+  0x72: VU meters bulk
+  0x0E: Auto mode
+```
+
+### Conversión RS485 → MIDI OUT (processSlaveResponse)
+
+```
+Slave → S3:
+  faderPos (ADC 0-27000) 
+    → PitchBend (Logic 0-14848)
+       if (pb != lastSentPb[id]) → solo si cambió
+       msg: 0xE0 + ch, pb_low, pb_high
+
+  buttons (bits 0-3)
+    → NoteOn/Off
+       note = noteBase[bit] + midiCh
+       velocity = 127 (press) / 0 (release)
+
+  encoderDelta (int8_t)
+    → CC 16+ch
+       if (delta > 0): val 1-62 (CW)
+       else: val 64-127 (CCW)
+```
+
+### Calibración Automática (main.cpp:165-172 + MIDIProcessor:55-66)
+
+```
+Flujo:
+  1. Logic envía 0x21 → g_logicConnected=1, _calibPendingFrom=1
+  2. taskCore0 loop: busca slave no calibrado
+  3. rs485.setCalibrate(id) → Envía FLAG_CALIB=1 a slave
+  4. Slave recibe, inicia calibración motor
+  5. Slave completa, envía min/max calibrado
+  6. Siguiente ciclo: siguiente slave
+  7. Repetir hasta NUM_SLAVES
+
+Timeout manejo:
+  - RS485 timeout > 5 reintentos → LED rojo + HALT
+  - Requiere RESET manual S3
+```
+
+---
+
 ## Compilación
 
 ```bash
