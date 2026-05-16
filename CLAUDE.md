@@ -340,7 +340,8 @@ loop() {
 
 ---
 
-**→ [Ver STATUS.md](STATUS.md)** para bugs conocidos y pendientes.
+<!-- ⚠️ DESACTUALIZADO (2026-05-16): STATUS.md información obsoleta. Consultar docs/ para contenido actual -->
+**→ [Ver STATUS.md](STATUS.md)** para bugs conocidos y pendientes. ⚠️ *Desactualizado — consultar docs/ para info actual*
 
 
 ---
