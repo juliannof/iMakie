@@ -299,28 +299,10 @@ loop() {
 **Documentación exhaustiva:**
 → **[RS485.md](docs/RS485.md)** (topología, MasterPacket/SlavePacket, timing, máquina estados, CRC8, troubleshooting)
 
-### Órdenes de init crítico
+### Inicialización S2 — 📌 Ver S2/README.md
 
-```c
-setup() {
-  1. Motor::init()           ← ANTES de Serial.begin() (silencia motor)
-  2. Serial.begin()
-  3. initNeopixels()
-  4. initDisplay()
-  5. faderADC.begin()
-  6. initHardware()          ← botones + otros GPIO
-  7. FaderTouch::init()
-  8. Encoder::begin()
-  9. ButtonManager::begin()
-  10. Motor::begin()         ← habilita control
-  11. rs485.begin(trackId)   ← ÚLTIMO (ya todo funcional)
-}
-```
-
-**¿Por qué importa el orden?**
-- Motor::init() silencia antes de Serial debug output
-- RS485 debe iniciar cuando todo está listo (si falla, no bloquea boot)
-- Display + NeoPixels comparten SPI, timing crítico
+**Documentación exhaustiva:**
+→ **[S2/README.md](S2/README.md)** (orden init crítico, dependencias, timing SPI/I2C/RS485)
 
 ### SAT (Sistema de Auto-Test) — 📌 Ver SAT.md
 

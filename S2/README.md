@@ -80,6 +80,35 @@ A Mackie Control fader with ESP32-S2
 
 ---
 
+## Inicialización (Orden Crítico)
+
+**Orden de init en `setup()`:**
+
+```cpp
+setup() {
+  1. Motor::init()           ← ANTES de Serial.begin() (silencia motor)
+  2. Serial.begin()
+  3. initNeopixels()
+  4. initDisplay()
+  5. faderADC.begin()
+  6. initHardware()          ← botones + otros GPIO
+  7. FaderTouch::init()
+  8. Encoder::begin()
+  9. ButtonManager::begin()
+  10. Motor::begin()         ← habilita control
+  11. rs485.begin(trackId)   ← ÚLTIMO (ya todo funcional)
+}
+```
+
+**¿Por qué importa el orden?**
+- **Motor::init()** debe ejecutarse ANTES de `Serial.begin()` para silenciar motor sin debug output
+- **RS485** debe iniciar cuando todo está listo (si falla, no bloquea boot)
+- **Display + NeoPixels** comparten SPI, timing crítico
+- **Encoder** debe inicializarse DESPUÉS de hardware GPIO pero ANTES de RS485 (ISR attachInterrupt)
+- **FaderADC** depende de I2C (Wire), debe estar antes que RS485 poll
+
+---
+
 ## Control de Fader
 
 **Arquitectura end-to-end:**
@@ -124,7 +153,15 @@ Platform: pioarduino 55.03.37 / IDF5
 
 ## Referencias
 
-- **Documentación exhaustiva:** Ver `FADER.md` en raíz del repo
-- **Arquitectura general:** Ver `CLAUDE.md`
-- **Estado técnico:** Ver `STATUS.md`
-- **Historial cambios:** Ver `CHANGELOG.md`
+- **Fader (ADS1115):** [docs/FADER.md](../docs/FADER.md)
+- **Motor (DRV8833):** [docs/MOTOR.md](../docs/MOTOR.md)
+- **RS485 (protocolo):** [docs/RS485.md](../docs/RS485.md)
+- **Botones:** [docs/BUTTONS.md](../docs/BUTTONS.md)
+- **Display (ST7789V3):** [docs/DISPLAY.md](../docs/DISPLAY.md)
+- **Encoder (Gray code):** [docs/ENCODER.md](../docs/ENCODER.md)
+- **LEDs (NeoPixel):** [docs/LEDS.md](../docs/LEDS.md)
+- **SAT (Auto-Test):** [docs/SAT.md](../docs/SAT.md)
+- **WiFi/OTA:** [docs/WIFI.md](../docs/WIFI.md)
+- **Arquitectura general:** [CLAUDE.md](../CLAUDE.md)
+- **Estado técnico:** [STATUS.md](../STATUS.md)
+- **Historial cambios:** [CHANGELOG.md](../CHANGELOG.md)
