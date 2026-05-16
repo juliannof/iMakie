@@ -33,6 +33,14 @@ void onMasterData(const MasterPacket& pkt) {
         lastLog = millis();
     }
 
+    // ── Calibración — ANTES de desconexión (2026-05-16 19:20) ──
+    // CRÍTICO: Procesar FLAG_CALIB ANTES de Motor::off() para que motor pueda calibrar
+    // S3 envía calibración secuencial al boot, independiente de Logic
+    // Motor debe estar activo cuando requestCalibration() lo ordene
+    if (pkt.flags & FLAG_CALIB) {
+        Motor::requestCalibration();  // Motor puede calibrar aunque _connected vaya a cambiar
+    }
+
     // ── Conexión ──────────────────────────────────────────────
     ConnectionState newState = pkt.connected ?
         ConnectionState::CONNECTED : ConnectionState::DISCONNECTED;
@@ -60,13 +68,6 @@ void onMasterData(const MasterPacket& pkt) {
         // Neopixels se actualizan en main.cpp DESPUÉS de sendResponse()
     }
 }
-
-    // ── Calibración — SIEMPRE se procesa, incluso sin Logic conectado (2026-05-16 18:50) ──
-    // Hardware calibration no depende de Logic — debe poder ocurrir en boot
-    // Motor v3: requestCalibration() baja a 0 si es necesario, luego calibra (arquitectura limpia)
-    if (pkt.flags & FLAG_CALIB) {
-        Motor::requestCalibration();  // Cambio v3: reemplaza startCalib() (2026-05-16 18:50)
-    }
 
     if (logicConnectionState != ConnectionState::CONNECTED) return;
 
