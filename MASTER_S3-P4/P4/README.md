@@ -17,30 +17,61 @@ Master Mackie Control Universal (MCU) para Logic Pro. Controla 9 tracks S2 local
 ## Especificación de placa (2026-05-16)
 
 **Módulo:** GUITION JC4880P443C-I-W (placa de desarrollo integrada)  
-**Procesador:** ESP32-P4 Xtensa dual-core 360MHz (Core0 + Core1)  
+**Procesador principal:** ESP32-P4 Xtensa dual-core 360MHz (Core0 + Core1)  
+**Procesador secundario:** ESP32-C6 (Wi-Fi 6 + Bluetooth 5)  
 **Memoria:**
 - Flash: 16MB (QIO mode)
-- PSRAM: 8MB (OPI mode)
+- PSRAM: **32MB** (OPI mode) — ⚠️ ABUNDANTE para LVGL + multimedia
+- HP L2MEM: 768KB
+- LP SRAM: 32KB
+- HP ROM: 128KB
 - Bootloader: 0x0 (256KB)
 - App: 0x10000 (15.75MB)
 
-**Display:** IPS capacitivo 4.3"
-- Resolución: 480×800 píxeles
-- Interface: MIPI-DSI 2-lane (ST7701S driver)
+**Display:** IPS capacitivo 4.3" (color, alta definición)
+- Resolución: 480×800 píxeles (70.4 ppi)
+- Interface: MIPI-DSI 2-lane (ST7701S driver integrado)
 - Colores: 16M (24-bit RGB)
-- Touch: Capacitivo multitouch GT911 (I2C)
-- Brillo: Ajustable 0-255
+- Touch: Capacitivo multitouch GT911 (I2C, detección gesto)
+- Brillo: Ajustable 0-255 (backlight PWM control)
+
+**Procesamiento multimedia:** (ESP32-P4 integrado)
+- JPEG codec (encode/decode)
+- Pixel Processing Accelerator (PPA)
+- Image Signal Processor (ISP) — RAW sensor input
+- H.264 video encoder
+- Propósito: soporta cámara MIPI-CSI + procesamiento en tiempo real
+
+**Audio:** (opcional, ES8311 codec en algunas variantes)
+- I2S stereo (microfono + altavoz)
+- ADC/DAC 16-bit
+- Propósito: soporte para synth/metrónomo futuro
 
 **Energía:**
 - Voltaje: USB 5V → regulador interno 3.3V
 - Corriente: ~200mA idle, 400mA full power, picos 500mA
 - USB: alimenta placa, display, touch y periféricos
 
-**Conectividad:**
-- RS485 bus A: 500 kbaud (9 slaves S2)
-- I2C_NUM_0: NeoTrellis seesaw (GPIO 33/31)
-- I2C_NUM_1: GT911 touch (GPIO 7/8)
-- UART: RS485 (GPIO 50/51/52)
+**Conectividad integral (ESP32-P4 + ESP32-C6):**
+
+ESP32-P4 periféricos:
+- **RS485 bus A:** 500 kbaud (9 slaves S2) — GPIO 50/51/52 UART
+- **I2C_NUM_0:** NeoTrellis seesaw (GPIO 33/31) — dirección 0x2F/0x2E
+- **I2C_NUM_1:** GT911 touch (GPIO 7/8) — multitouch capacitivo
+- **MIPI-CSI:** entrada cámara (interfaz física en placa)
+- **MIPI-DSI:** display ST7701S (integrado)
+- **SPI:** periféricos (DDR, SDIO)
+- **I2S:** audio stereo (micrófono, altavoz)
+- **LED PWM:** backlight display + 8 canales PWM auxiliares
+- **MCPWM:** motor control PWM (future expansion)
+- **ADC:** analog input (sensor temperatura, batería, etc)
+- **TWAI (CAN):** bus industrial (future)
+- **USB OTG 2.0 HS:** host + device mode
+
+ESP32-C6 wireless (suplementario):
+- **Wi-Fi 6** (802.11ax)
+- **Bluetooth 5** (BLE + classic)
+- Propósito: conectividad Logic Pro remota (futuro), OTA firmware
 
 ---
 
@@ -94,6 +125,23 @@ board_build.arduino.memory_type = qio_opi
 - Adafruit NeoPixel (seesaw 4×4 RGB)
 - Wire (I2C GT911 touch, seesaw)
 - HardwareSerial (RS485)
+
+---
+
+## Capacidades no utilizadas (expansion futura)
+
+| Capacidad | Hardware | Uso potencial |
+|-----------|----------|----------------|
+| **Cámara MIPI-CSI** | Interfaz física, ISP integrado | Análisis visual de escena, grabación |
+| **Audio I2S** | ES8311 codec (opcional en PCB) | Synth integrado, metrónomo, realtime monitor |
+| **Wi-Fi 6** | ESP32-C6 | Control remoto Logic Pro, streaming OSC |
+| **Bluetooth 5** | ESP32-C6 | Control inalámbrico de transporte, MIDI remote |
+| **USB OTG 2.0** | Integrado P4 | Host mode para periféricos USB futuros |
+| **TWAI (CAN)** | GPIO dedicados | Bus industrial para expansión modular |
+| **ADC 12-bit** | 7 canales | Sensores analog (temperatura, batería, presión) |
+| **MCPWM** | 6 canales PWM | Motor control (proyector, cortinas, luces escena) |
+| **JPEG codec** | Acelerador HW | Captura y envío foto de contraseña/escena |
+| **H.264 encoder** | Acelerador HW | Streaming video Logic → redes |
 
 ---
 
