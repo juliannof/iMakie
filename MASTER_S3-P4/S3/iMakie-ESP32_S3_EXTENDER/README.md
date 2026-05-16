@@ -58,63 +58,10 @@ Controlador Mackie MCU extendido para Logic Pro. Controla 8 tracks S2 adicionale
 
 ---
 
-## Transport — Botones y LEDs
+## Transport — Botones y LEDs — 📌 Ver docs/Transport.md
 
-### Notas MIDI Transporte
-
-| Función | Nota (hex) | Decimal | GPIO BTN | GPIO LED | MIDI Vel |
-|---------|-----------|---------|----------|----------|----------|
-| **RW** (Rewind) | 0x5B | 91 | 3 | 4 | 127 on / 0 off |
-| **FF** (Fast Forward) | 0x5C | 92 | 7 | 8 | 127 on / 0 off |
-| **STOP** | 0x5D | 93 | 5 | 6 | 127 on / 0 off |
-| **PLAY** | 0x5E | 94 | 9 | 10 | 127 on / 0 off |
-| **REC** (Record) | 0x5F | 95 | 11 | 12 | 127 on / 0 off |
-
-### Flujo Control
-
-```
-Logic Pro
-    │ MIDI feedback (nota 91-95, velocidad)
-    ↓
-S3 MidiProcessor::processMidiNote()
-    │ Recibe nota + velocidad
-    ↓
-Transporte::setLedByNote(note, velocity)
-    │ Si velocity=127 → LED ON
-    │ Si velocity=0 → LED OFF
-    ↓
-digitalWrite(GPIO_LED, HIGH/LOW)
-    │ Controla LED física
-    ↓
-Usuario presiona BTN
-    ↓
-ButtonManager::update()
-    │ Detecta flanco (LOW → HIGH)
-    ↓
-Envía nota MIDI a Logic
-    │ Note On (nota 91-95, vel 127)
-    ↓
-Logic actualiza estado transporte
-```
-
-### Handshake Mackie MCU (Familia 0x14)
-
-```
-Fase sondeo (cualquier familia):
-Logic → Device:  F0 00 00 66 <any> 00 F7
-Device → Logic:  F0 00 00 66 14 01 00 00 00 01 00 00 00 00 F7
-
-Fase handshake (familia 0x14):
-Logic → Device:  F0 00 00 66 14 21 01 F7  (connect request)
-Device → Logic:  F0 00 00 66 14 21 01 F7  (connected)
-
-Logic → Device:  F0 00 00 66 14 0C 00 F7  (surface type = Master)
-Device → Logic:  F0 00 00 66 14 0C 00 F7
-
-Device → Logic:  F0 00 00 66 14 10 00 F7  (suscripción a feedback)
-```
-
-**Resultado:** Logic envía feedback MIDI en tiempo real para controlar LEDs transport
+**Documentación exhaustiva:**
+→ **[docs/Transport.md](../../../../docs/Transport.md)** (pinout, MIDI notas 0x5B-0x5F, flujo bidireccional, handshake Mackie, troubleshooting)
 
 ---
 

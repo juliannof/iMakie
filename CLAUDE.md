@@ -166,7 +166,8 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 │   ├── DISPLAY.md                    ← ST7789V3, sprites PSRAM, layout (2026-05-16)
 │   ├── ENCODER.md                    ← ISR Gray code, sequenciamiento, SAT (2026-05-16)
 │   ├── LEDS.md                       ← NeoPixels WS2812B, asignación, estados (2026-05-16)
-│   └── SAT.md                        ← Sistema Auto-Test, navegación, integración (2026-05-16)
+│   ├── SAT.md                        ← Sistema Auto-Test, navegación, integración (2026-05-16)
+│   └── Transport.md                  ← Control transport RW/FF/STOP/PLAY/REC, MIDI (2026-05-16)
 ├── CHANGELOG.md                       ← Historial de cambios
 ├── README.md                          ← Intro repo
 └── platformio.ini                     ← Índice de subproyectos
@@ -182,6 +183,7 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 - **ENCODER.md** — ISR Gray code, sequenciamiento, SAT, VPot ring
 - **LEDS.md** — WS2812B NeoPixel, asignación LEDs, estados, brillo
 - **SAT.md** — Sistema Auto-Test, navegación menú, integración módulos
+- **Transport.md** — Controles transport, MIDI notas, handshake Mackie, bidireccional
 - CLAUDE.md — Directivas vinculantes únicamente (no duplicar)
 
 ---
