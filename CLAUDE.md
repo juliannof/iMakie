@@ -294,31 +294,10 @@ loop() {
 **Documentación exhaustiva:**
 → **[LEDS.md](docs/LEDS.md)** (WS2812B 12 LEDs, asignación 0-3/4-10/11, estados color, brillo, SAT test)
 
-### Ciclo de comunicación RS485
+### Ciclo de comunicación RS485 — 📌 Ver RS485.md
 
-```
-1. Master envía MasterPacket (16B)
-   - trackName, faderTarget, vuLevel, flags, etc.
-   
-2. S2 recibe → RS485Handler::onMasterData()
-   - Actualiza: trackName, faderTarget, botones esperados, etc.
-   - Marca lastRxTime
-
-3. S2 construye SlavePacket (9B)
-   - faderPos, touchState, buttons (REC/SOLO/MUTE/SELECT)
-   - encoderDelta, encoderButton, flags de calibración
-   
-4. S2 envía respuesta inmediatamente
-   - ANTES de display/motor/neopixel update
-   - **CRÍTICO:** si esto tarda >150µs, master timeout
-   
-5. RS485Handler::checkTimeout(lastRxTime)
-   - Si ms > 1000 sin recibir → LED11=rojo, suspende motor
-   - Si vuelve → LED11=verde, reanuda
-
-6. Master timeout → reintenta 3 veces con FLAG_CALIB
-   - Si error persiste, marca `NOT_CALIBRATED`
-```
+**Documentación exhaustiva:**
+→ **[RS485.md](docs/RS485.md)** (topología, MasterPacket/SlavePacket, timing, máquina estados, CRC8, troubleshooting)
 
 ### Órdenes de init crítico
 
