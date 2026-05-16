@@ -1,16 +1,88 @@
 # AITEC-17 PTxx — S2 Slave Fader
-A Mackie Control fader with ESP32-S2
 
-<img alt="ESP32 S2" src="https://www.wemos.cc/en/latest/_static/boards/s2_mini_v1.0.0_4_16x9.jpg">
+Controlador Mackie fader individual para iMakie. Controla 1 fader (ADS1115 16-bit), 1 motor (DRV8833), 4 botones, encoder rotatorio, y display IPS 240×280.
+
+**Placa de desarrollo:** Lolin D1 Mini S2 (basada ESP8266)  
+**Chip:** ESP32-S2FN4R2 (Xtensa single-core 240MHz)  
+**Flash:** 4MB (QIO mode)  
+**PSRAM:** 2MB (QSPI mode)  
+**Conector:** Micro-USB CH340 UART  
+**Pines:** 25 GPIO (muchos usados en subsistemas)  
+**Familia Mackie:** 0x14
+
+<img alt="ESP32 S2 Mini" src="https://www.wemos.cc/en/latest/_static/boards/s2_mini_v1.0.0_4_16x9.jpg">
+
+---
+
+## Especificación de placa (2026-05-16)
+
+**Módulo:** Lolin D1 Mini S2 (form factor compatible ESP8266)  
+**Procesador:** ESP32-S2FN4R2 Xtensa single-core 240MHz  
+**Memoria:**
+- Flash: 4MB (QIO mode)
+- PSRAM: 2MB (QSPI mode) — ⚠️ LIMITADO, cuidado con buffers
+- Bootloader: 0x0 (192KB)
+- App: 0x10000 (3.8MB)
+
+**Conector:** Micro-USB CH340 (UART serial, no USB nativo)  
+**Pines disponibles:** 25 GPIO totales
+- Usados por iMakie: RS485(3), Motor(3), ADS1115(4), Encoder(3), Display(6), Botones(4), NeoPixel(1), Misc(2)
+- Libres: ~0 (saturado, todo asignado)
+
+**Energía:**
+- Voltaje: 5V USB → regulador interno 3.3V
+- Corriente: ~60mA idle, 120mA operacional, picos 150mA
+- Límite USB: 500mA (compartido con motor + display + otros)
+
+**Limitaciones vs S3/P4:**
+- Single-core (vs dual-core)
+- 4MB Flash (vs 16MB S3/P4)
+- 2MB PSRAM (vs 8MB S3, 32MB P4)
+- Micro-USB CH340 (vs Type-C nativo)
+- Menos GPIO (25 vs 44 P4, 44 S3)
 
 ---
 
 ## Hardware
 
-**MCU:** ESP32-S2FN4R2  
-**Flash:** 4MB  
-**PSRAM:** 2MB (QSPI)  
-**Placa:** Lolin S2 Mini
+---
+
+## Limitaciones y consideraciones
+
+### Arquitectura
+- **Single-core 240MHz** vs dual-core P4/S3
+  - No hay Core0/Core1 paralelismo
+  - RS485 + display + motor + encoder comparten CPU
+  - Timing crítico en ISRs (ADS1115 Alert, Encoder, etc)
+
+### Memoria
+- **4MB Flash** — CUIDADO con binarios grandes
+  - Bootloader: 192KB
+  - App: 3.8MB (teórico, en práctica ~3.2MB usable)
+  - No hay espacio para OTA dual-partition (vs P4 16MB)
+- **2MB PSRAM** — LIMITADO
+  - Display sprites: máx ~100KB
+  - Evitar buffers grandes (JSON, logs, etc)
+  - Profiling crítico (stack vs heap)
+
+### GPIO
+- **25 GPIO totales, 0 libres**
+  - Todos asignados: RS485, Motor, ADS1115, Display, Encoder, Botones, NeoPixel
+  - Expansión futura imposible sin reorganizar hardware
+
+### Alimentación
+- **500mA USB limit** compartido entre:
+  - MCU ~60mA
+  - Motor picos ~150mA (H-bridge)
+  - Display backlight ~30mA
+  - Botones/NeoPixel ~10mA
+  - Margen: muy ajustado, riesgo reset si motor + display simultáneamente
+
+### Serial/Debugging
+- **CH340 UART** (Micro-USB)
+  - Reset automático al programar (ideal para upload, incómodo para debugging)
+  - Velocidad: 115200 baud estándar
+  - `Serial.printf()` recomendado (vs log_i/log_e inestables)
 
 ---
 
@@ -168,10 +240,45 @@ initHardware()     // GPIO, botones, etc.
 
 ## Compilación
 
+### Build con PlatformIO
+
 ```bash
 cd S2/S2_V1
 pio run -e lolin_s2_mini
 ```
+
+### Configuración PlatformIO
+
+```ini
+[env:lolin_s2_mini]
+platform = https://github.com/pioarduino/platform-espressif32/releases/download/55.03.37/platform-espressif32.zip
+board = lolin_s2_mini
+board_build.flash_size = 4MB
+board_build.arduino.memory_type = qio_qspi
+```
+
+**Flags críticos:**
+- `-DBOARD_HAS_PSRAM` — Habilita PSRAM (2MB disponibles)
+- `-DARDUINO_USB_MODE=0` — Desactiva USB OTG (S2 no soporta)
+- `-DCORE_DEBUG_LEVEL=3` — Logging Serial.printf() activo
+
+### Platform y Framework
+
+**Platform:** espressif32 (pioarduino 55.03.37 — IDF5 + Arduino core)  
+**Framework:** Arduino  
+**Librerías críticas:**
+- LovyanGFX 1.2.19 (display ST7789V3 SPI3)
+- Adafruit NeoPixel (LED WS2812B)
+- ADS1115 library (fader ADC 16-bit I2C)
+- Wire (I2C moderno)
+- HardwareSerial (RS485 UART)
+
+**⚠️ Limitaciones S2:**
+- Single-core → sin dual-core FreeRTOS (vs P4/S3)
+- 4MB Flash → cuidado con SPIFFS/LittleFS (vs 16MB P4/S3)
+- 2MB PSRAM → buffers pequeños (evitar grandes arrays)
+- Micro-USB CH340 → reset automático al subir (vs Type-C nativo)
+- Serial.printf() recomendado (log_i/log_e inestables en S2)
 
 ---
 
