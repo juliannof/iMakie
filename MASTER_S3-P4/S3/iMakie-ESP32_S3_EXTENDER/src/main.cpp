@@ -133,8 +133,8 @@ void taskCore0(void* pvParameters) {
     static unsigned long lastStatusLog = 0;  // ← MOVER AQUÍ
 
     for (;;) {
-        // ── Apagar LED verde después de 1s (2026-05-16 19:50) ──
-        if (bootLEDTime > 0 && millis() - bootLEDTime > 1000) {
+        // ── Apagar LED verde después de 200ms (2026-05-16 21:30) ──
+        if (bootLEDTime > 0 && millis() - bootLEDTime > 200) {
             pixels.setPixelColor(0, pixels.Color(0, 0, 0));  // Apagar
             pixels.show();
             bootLEDTime = 0;  // Reset
