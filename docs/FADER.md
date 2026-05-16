@@ -18,12 +18,12 @@ S3 MidiProcessor::processPitchBend()
     │ Mapea: -8192..+8191 → 0..27000 (ADC range)
     ▼
 S3 RS485Master::setFaderTarget()
-    │ Envía MasterPacket.faderTarget (0-27000)
+    │ Envía MasterPacket.faderTarget (0-27000) O MasterPacket.flags |= FLAG_CALIB
     ▼
 RS485 500kbaud (20ms ciclo, ~2 paquetes/s por slave)
     ▼
 S2 Slave (×1 canal)
-    │ Recibe faderTarget (0-27000)
+    │ Recibe faderTarget (0-27000) O FLAG_CALIB
     │
     ├─→ FaderADC (ADS1115)
     │   └─→ ISR-driven (860 SPS)
@@ -34,21 +34,86 @@ S2 Slave (×1 canal)
     │   └─→ Baseline IIR + sostenimiento (120ms)
     │       └─→ Detección contacto humano
     │
-    ├─→ Motor (DRV8833 H-bridge)
-    │   ├─→ Calibración: KICK_UP → GOING_UP → SETTLE_UP → KICK_DOWN → GOING_DOWN → SETTLE_DOWN
-    │   └─→ Control: Dead zone (50 cuentas), sin PID
+    ├─→ Motor (DRV8833 H-bridge) — v3 USUARIO MASTER (2026-05-16 18:45)
+    │   ├─→ Prioridad: Usuario > GoToMin > S3
+    │   ├─→ setADCDelta(): Usuario mueve → Motor stop
+    │   ├─→ goToMin(): MASTER si !_connected
+    │   ├─→ requestCalibration(): FLAG_CALIB → baja a 0, luego calibra
+    │   └─→ setTargetFromS3(): S3 ordena SOLO si usuario NO toca
     │
     └─→ Display feedback (ST7789V3)
         └─→ Fader visual 0-100%
 
     ▼
-S2 responde: SlavePacket.faderPos (0-27000)
+S2 responde: SlavePacket.faderPos (0-27000) + touchState + flags
 
     ▼
 S3 mapea: faderPos * 14848 / 27000 → PitchBend 0-14848
 
     ▼
 Logic recibe PitchBend → sube/baja fader gráfico
+```
+
+---
+
+## 1.1 INICIALIZACIÓN Y CALIBRACIÓN (v3 — 2026-05-16 18:45)
+
+### Flujo Boot → Operación Normal
+
+```
+setup():
+  Motor::init()
+  Motor::initPWM()  ← Lee PWM de NVS
+  Motor::goToMin()  ← INMEDIATAMENTE baja a 0 (MASTER control)
+  
+loop():
+  FaderADC::update()        ← Lee posición ADC
+  FaderTouch::update()      ← Detecta toque capacitivo
+  Motor::setADC(pos)        ← Motor recibe ADC actual (SIEMPRE)
+  Motor::setADCDelta(pos)   ← Detecta usuario moviendo (MASTER)
+  RS485.update()            ← Recibe MasterPacket de S3
+  
+  Si S3 manda FLAG_CALIB:
+    RS485Handler::onMasterData()
+      ↓
+    Motor::requestCalibration()
+      ├─ Si fader EN 0: startCalib() inmediato
+      └─ Si fader ≠ 0: goToMin() primero, luego startCalib()
+      
+  Si usuario mueve:
+    setADCDelta() detecta delta > 500 O capacitivo activo
+      ↓
+    Motor::stop()
+      ↓
+    Motor en AT_TARGET (usuario es MASTER)
+      ↓
+    S3 targets ignorados hasta que usuario suelte (debounce 200ms)
+    
+  Si usuario suelta:
+    _motor_manualTouchDetected = false (después 200ms)
+      ↓
+    setTargetFromS3() acepta órdenes de S3
+    
+  Si S3 desconectado:
+    Motor::setConnected(false)
+      ↓
+    Motor::goToMin() ejecuta SIEMPRE
+      ↓
+    Fader baja a 0 indefinidamente (loop IDLE)
+```
+
+### Guardia de Usuario (2026-05-16 18:45)
+
+```cpp
+setTargetFromS3(uint16_t adcTarget) {
+    if (_motor_manualTouchDetected || FaderTouch::isTouched()) {
+        log_i("[MOTOR] Usuario MASTER, ignorando S3 target");
+        return;  ← Usuario controla, S3 es esclavo
+    }
+    // S3 puede mover motor
+    _motor_state = MotorState::MOVING_TO_TARGET;
+    _motor_targetADC = adcTarget;
+}
 ```
 
 ---

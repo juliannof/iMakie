@@ -150,6 +150,14 @@ static uint16_t   _motor_noiseBottomSpan = 0;    // Ruido medido en SETTLE_DOWN
 static bool       _motor_active         = false;
 static int        _motor_currentPWM     = 0;
 
+// Motor — máquina de estados v2 (2026-05-16 10:52)
+static bool       _pendingCalib         = false;        // Flag: startCalib en espera después goToMin
+static bool       _connected            = false;        // Estado de conexión con S3
+static bool       _motor_goingToMin     = false;        // Flag: motor bajando a posición 0
+static uint16_t   _userDropTarget       = 0;            // ADC capturado cuando usuario soltó fader
+static uint16_t   _s3Target             = 0;            // Target actual de S3 (para MOVING_TO_TARGET)
+static uint32_t   _atTargetStartTime    = 0;            // timestamp cuando llegó a AT_TARGET
+
 // Motor — detección movimiento manual (delta ADC rápido)
 static uint16_t   _motor_lastADCForDelta = 0;  // ADC anterior para calcular delta
 static bool       _motor_manualTouchDetected = false;  // Flag toque manual en curso

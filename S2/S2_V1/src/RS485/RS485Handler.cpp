@@ -61,10 +61,11 @@ void onMasterData(const MasterPacket& pkt) {
     }
 }
 
-    // ── Calibración — SIEMPRE se procesa, incluso sin Logic conectado (2026-05-14) ──
+    // ── Calibración — SIEMPRE se procesa, incluso sin Logic conectado (2026-05-16 18:50) ──
     // Hardware calibration no depende de Logic — debe poder ocurrir en boot
+    // Motor v3: requestCalibration() baja a 0 si es necesario, luego calibra (arquitectura limpia)
     if (pkt.flags & FLAG_CALIB) {
-        Motor::startCalib();
+        Motor::requestCalibration();  // Cambio v3: reemplaza startCalib() (2026-05-16 18:50)
     }
 
     if (logicConnectionState != ConnectionState::CONNECTED) return;

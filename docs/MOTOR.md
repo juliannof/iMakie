@@ -89,6 +89,90 @@ setup() {
 
 ---
 
+## 2. ARQUITECTURA MOTOR v3 — PRIORIDADES DE CONTROL (2026-05-16 18:45)
+
+### 2.0.1 Jerarquía de Prioridades — VINCULANTE
+
+```
+PRIORIDAD 1 (MÁXIMA):  Usuario mueve fader → Motor para INMEDIATAMENTE
+PRIORIDAD 2:           Motor::goToMin() ejecuta SIEMPRE si no conectado a S3
+PRIORIDAD 3:           S3 ordena posición → Motor se mueve SOLO si usuario NO toca
+PRIORIDAD 4 (MÍNIMA):  Sin comando: Motor idle en posición actual
+```
+
+**Principio fundamental:** El usuario tiene control físico absoluto. S3 es esclavo que responde, no maestro que ordena.
+
+### 2.0.2 Flujo Completo Operación (2026-05-16 18:45)
+
+```
+SETUP:
+  Motor::init()         ← Configura pines
+  Motor::initPWM()      ← Lee PWM de NVS (o fallback config.h)
+  Motor::goToMin()      ← INMEDIATAMENTE baja a 0
+  
+LOOP (mientras motor bajando):
+  Motor::update()       ← Máquina de estados baja a 0
+  Motor::setADC()       ← Recibe posición ADC desde FaderADC
+  Motor::setADCDelta()  ← Detecta movimiento usuario
+
+CUANDO FADER LLEGA A 0:
+  Motor en AT_TARGET (posición 0)
+  Motor apagado
+  Esperando órdenes
+
+ESCENARIOS DURANTE OPERACIÓN:
+
+  1️⃣  S3 conectado + usuario NO toca:
+      ├─ S3 envía FLAG_CALIB:
+      │  └─ Motor::requestCalibration()
+      │     ├─ Si ADC ≠ 0: Motor::goToMin() primero
+      │     └─ Si ADC = 0: startCalib() directo
+      └─ S3 envía setTarget(X):
+         └─ Motor se mueve a X (si usuario NO toca)
+
+  2️⃣  Usuario mueve fader:
+      ├─ Motor::setADCDelta() detecta delta grande O FaderTouch activo
+      ├─ Motor::stop() INMEDIATAMENTE
+      ├─ Usuario es MASTER → ADC actual = nueva posición
+      ├─ touchState=1 reportado a S3 vía RS485
+      └─ S3 ignora targets mientras usuario toque (setTargetFromS3 rechaza)
+
+  3️⃣  Usuario suelta fader:
+      ├─ _motor_manualTouchDetected = false (después 200ms debounce)
+      └─ S3 puede enviar nuevo target (Motor acepta)
+
+  4️⃣  S3 desconectado:
+      ├─ Motor::setConnected(false) ejecutado
+      ├─ Motor::goToMin() SIEMPRE activo
+      └─ Fader baja a 0 indefinidamente (IDLE loop)
+
+  5️⃣  S3 conectado:
+      ├─ Motor::setConnected(true) ejecutado
+      ├─ Motor NO baja automáticamente (goToMin tiene guard)
+      └─ Espera órdenes S3
+```
+
+### 2.0.3 Variables de Estado y Guards
+
+```cpp
+// Estado conexión S3
+static bool _connected;                    ← setConnected() actualiza esto
+
+// Detección movimiento usuario
+static bool _motor_manualTouchDetected;    ← setADCDelta() actualiza
+static uint32_t _motor_manualTouchStartTime;
+static uint16_t _motor_lastADCForDelta;
+
+// Máquina estados
+static MotorState _motor_state;            ← IDLE, GOING_TO_MIN, WAITING_FOR_CALIB, CALIBRATING, MOVING_TO_TARGET, AT_TARGET
+
+// Flags
+static bool _pendingCalib;                 ← requestCalibration() pone en true
+static bool _motor_goingToMin;             ← goToMin() pone en true
+```
+
+---
+
 ## 2. CONTROL DE MOTOR
 
 ### 2.1 APIs Críticas (Motor.h)
@@ -97,25 +181,31 @@ setup() {
 // Inicialización (setup)
 Motor::init()              // Configura pines (EN→LOW, IN1/IN2 PWM 20kHz)
 Motor::initPWM()           // Lee pwmMin/Max de NVS (SAT las guarda)
-Motor::goToMin()           // Baja fader a posición 0, espera órdenes S3
+Motor::goToMin()           // Baja fader a posición 0 (MASTER, ejecuta SIEMPRE si !_connected)
 Motor::off()               // Apaga motor (emergencia)
 
-// Calibración
-Motor::startCalib()        // Inicia máquina calibración (KICK_UP → DONE)
+// Calibración (v3 — 2026-05-16)
+Motor::requestCalibration() // FLAG_CALIB desde RS485 → baja a 0 si necesario, luego calibra
+Motor::startCalib()        // Inicia máquina calibración (KICK_UP → DONE) — REQUIERE estar en 0
 Motor::getCalibState()     // Estado actual (IDLE/CALIB_UP/CALIB_DOWN/DONE/ERROR)
-Motor::isCalibrated()      // true si fase==DONE y span>100
+
+// Control de usuario (MASTER — máxima prioridad)
+Motor::setADCDelta(uint16_t currentADC) // Detecta movimiento usuario (delta > 500 O capacitivo)
+                           // Si activo: Motor::stop(), usuario toma control, ADC = target
+
+// Control desde S3 (ESCLAVO — solo si usuario NO toca)
+Motor::setTargetFromS3(uint16_t adcTarget) // S3 ordena posición — RECHAZADO si usuario toca
+Motor::setConnected(bool connected)        // Notifica estado conexión S3 (goToMin respeta esto)
 
 // Control en loop (post-calibración)
-Motor::setADC(uint16_t pos)      // Actualiza _motor_adcPos desde FaderADC
-Motor::setADCDelta()             // Detecta movimiento manual (guarda motor)
-Motor::setTarget(uint16_t target) // Objetivo Logic 0-14848 → moveMotor
-Motor::update()                   // Máquina de estado (ejecutar SIEMPRE)
+Motor::setADC(uint16_t pos)  // Actualiza _motor_adcPos desde FaderADC (ejecutar SIEMPRE)
+Motor::update()              // Máquina de estado (ejecutar SIEMPRE en main loop)
 
 // Diagnóstico & Test
 Motor::getRawADC()         // Lectura ADC actual (_motor_adcPos)
 Motor::getPosition()       // Posición normalizada 0.0-1.0
 Motor::getADCMin() / getADCMax() // Rango calibrado
-Motor::getPWMMin() / getPWMMax() // PWM range (de NVS)
+Motor::getState()          // MotorState actual (IDLE, GOING_TO_MIN, etc.)
 Motor::testUp(pwm) / testDown(pwm) / testOff()  // Test Manual SAT
 ```
 
@@ -477,7 +567,7 @@ Encontrar rango físico real del fader (min ADC, max ADC) midiendo movimiento y 
                 └─────────────────────────────────┘
 ```
 
-### 3.3 Inicio de Calibración
+### 3.3 Inicio de Calibración (v3 — 2026-05-16 18:45)
 
 **Boot automático (S3 ordena FLAG_CALIB vía RS485):**
 ```
@@ -485,15 +575,48 @@ S3 envía MasterPacket con FLAG_CALIB
   ↓
 S2 RS485Handler::onMasterData() detecta FLAG_CALIB
   ↓
-Motor::startCalib() → transición IDLE → KICK_UP
+Motor::requestCalibration()  ← NUEVA FUNCIÓN — reemplaza startCalib()
+  ├─ Si fader EN 0:
+  │   └─ Motor::startCalib() → KICK_UP inmediatamente
+  └─ Si fader NO EN 0:
+      └─ Motor::goToMin() primero
+         ├─ Baja a 0
+         ├─ Motor queda en AT_TARGET
+         └─ startCalib() se ejecuta en siguiente ciclo
+```
+
+**Código requestCalibration() — implementación (2026-05-16):**
+```cpp
+void requestCalibration() {
+    // S3 ordena FLAG_CALIB → si fader en 0, calibra; si no, baja primero
+    if (_motor_adcPos <= (MOTOR_ADC_MIN + 10)) {
+        // Ya en 0 → calibra directamente
+        _motor_state = MotorState::CALIBRATING;
+        startCalib();
+        log_i("[MOTOR] requestCalibration: fader ya en 0, calibrando");
+    } else {
+        // No en 0 → baja primero, luego calibra
+        _motor_state = MotorState::GOING_TO_MIN;
+        _pendingCalib = true;           ← FLAG para startCalib() en siguiente ciclo
+        _motor_goingToMin = true;
+        _hwDown(_pwm_max);
+        log_i("[MOTOR] requestCalibration: bajando a 0 primero, luego calibrar");
+    }
+}
 ```
 
 **Manual (SAT menu):**
 ```
 Usuario: Encoder push >3s → SAT menu
          Motor → Calibración
-         → Motor::startCalib()
+         → Motor::requestCalibration()  ← Mismo flujo
 ```
+
+**Ventajas requestCalibration() vs startCalib():**
+- ✅ Garantiza fader en 0 ANTES de calibración
+- ✅ No necesita "esperar" que usuario lo coloque
+- ✅ Arquitectura clean: S3 no necesita conocer posición actual
+- ✅ Reutiliza goToMin() (MASTER control)
 
 ### 3.4 Guard Cooldown (2026-05-16)
 

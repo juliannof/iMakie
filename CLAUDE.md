@@ -46,6 +46,97 @@
 - Cambios de código se entregan sin compilación — el usuario compila en su máquina
 - Esta regla es ABSOLUTA e INVIOLABLE
 
+**⚠️ AUDITORÍA MCU — DIRECTIVA OBLIGATORIA (2026-05-16 18:50):**
+- **ANTES de cualquier cambio de código, generar INFORME de MCU afectadas**
+- **DESPUÉS de completar cambios, confirmar impacto por MCU**
+- **Cambios que afecten RS485, Motor, FaderADC, calibración → revisar TODOS los MCU**
+- Formato: tabla con MCU | Archivo | Línea | Cambio | Razón | Estado
+
+**Tabla de Impacto por MCU (referencia):**
+
+| Subsistema | S2 (Slave) | S3 (Extender) | P4 (Master) | Notas |
+|-----------|-----------|--------------|-----------|-------|
+| Motor | ✅ DRV8833 local | ❌ No aplica | ❌ No aplica | Solo S2 tiene motor |
+| FaderADC | ✅ ADS1115 + cap | ❌ No aplica | ❌ No aplica | Solo S2 tiene fader |
+| RS485 Slave | ✅ RS485Handler.cpp | ✅ RS485Master.cpp | ✅ RS485Master.cpp | Ambos masters |
+| FLAG_CALIB | ✅ Recibe en onMasterData | ✅ Envía setCalibrate | ✅ Envía setCalibrate | S2 recibe, S3/P4 envían |
+| Calibración | ✅ Motor::requestCalibration | ❌ No tiene motor | ❌ No tiene motor | Solo S2 calibra |
+| protocol.h | ✅ S2 version | ✅ S3 version | ✅ P4 version | 3 copias independientes |
+
+**Protocolo de Informe (obligatorio para CADA sesión con cambios):**
+
+```
+═══════════════════════════════════════════════════════════════
+  INFORME DE CAMBIOS — [FECHA HORA]
+═══════════════════════════════════════════════════════════════
+
+SUBSISTEMA AFECTADO: [Motor / RS485 / FaderADC / Calibración / Otro]
+
+MCU IMPACTADAS:
+┌─────────────────────────────────────────────────────────────┐
+│ S2 (Slave)     ✅ AFECTADO / ❌ No afectado                 │
+│ S3 (Extender)  ✅ AFECTADO / ❌ No afectado                 │
+│ P4 (Master)    ✅ AFECTADO / ❌ No afectado                 │
+└─────────────────────────────────────────────────────────────┘
+
+CAMBIOS DETALLADOS:
+
+S2 (si aplica):
+  Archivo: [ruta/archivo.cpp]
+    Línea NNN: [cambio exacto]
+    Razón: [por qué]
+    Validación: [cómo testear]
+
+S3 (si aplica):
+  Archivo: [ruta/archivo.cpp]
+    Línea NNN: [cambio exacto]
+    Razón: [por qué]
+    Validación: [cómo testear]
+
+P4 (si aplica):
+  Archivo: [ruta/archivo.cpp]
+    Línea NNN: [cambio exacto]
+    Razón: [por qué]
+    Validación: [cómo testear]
+
+INCONSISTENCIAS DETECTADAS:
+  ⚠️ [Si hay duplicación de código entre MCU, documentar]
+  ⚠️ [Si hay diferencias de versión en protocol.h, documentar]
+
+RIESGO TOTAL: [BAJO / MEDIO / ALTO / CRÍTICO]
+  - BAJO: Solo S2, cambios locales, no afecta comunicación
+  - MEDIO: S2 + S3, cambios en RS485 protocol, validación hardware requerida
+  - ALTO: P4 + S3 + S2, cambios en architecture, impacto sistémico
+  - CRÍTICO: RS485 protocol, puede dejar sistema no operacional
+
+PRÓXIMO PASO: [Commit message, validación, deploy]
+═══════════════════════════════════════════════════════════════
+```
+
+**Ejemplos de aplicación:**
+
+❌ **INCORRECTO** — Cambio sin informe:
+```
+Usuario: "Cambia setCalibrate en RS485"
+Claude: [hace cambio en S3]
+→ ERROR: No verificó si S2 también necesita cambio en RS485Handler
+```
+
+✅ **CORRECTO** — Con informe obligatorio:
+```
+Usuario: "Cambia setCalibrate en RS485"
+Claude: 
+  INFORME:
+    S2: RS485Handler.cpp línea 67 — cambio startCalib→requestCalibration
+    S3: RS485.cpp línea 41 — ya correcto, sin cambio
+    P4: RS485Master.cpp línea XX — verificar si duplica S3
+  RIESGO: MEDIO (RS485, requiere validación hardware)
+  
+[Procede con cambios]
+```
+
+Esta regla es VINCULANTE — SIEMPRE generar informe antes de código.
+
 **🔒 HARDWARE LOCKED — NO CAMBIOS FÍSICOS (2026-05-10 22:00):**
 - **El hardware ES el que ES. Hacerlo funcionar POR SOFTWARE.**
 - **NUNCA proponer cambiar cables, pines, soldaduras, o conexiones físicas**
@@ -99,52 +190,66 @@
 - **Un cambio a la vez, confirmar antes de continuar**
 - Esta regla es ABSOLUTA — evita duplicación de código y mantiene cohesión arquitectónica
 
-**🎮 COMPORTAMIENTO MOTOR S2 — Usuario es Master (2026-05-16 10:52):**
+**🎮 COMPORTAMIENTO MOTOR S2 — v3 Usuario es Master (2026-05-16 18:45):**
 
-**Prioridad de control:**
+**Jerarquía de prioridades VINCULANTE:**
 ```
-Usuario tocando > S3 commands > Motor autónomo
+MÁXIMA:  Usuario mueve fader → Motor para INMEDIATAMENTE
+         GoToMin ejecuta SIEMPRE si !_connected (MASTER control)
+MEDIA:   S3 ordena posición → Motor se mueve SOLO si usuario NO toca
+MÍNIMA:  Sin comando: Motor idle en posición actual
 ```
 
-**Reglas vinculantes:**
-1. **Usuario toma control con toque** (FaderTouch::isTouched() OR delta ADC > 500)
-   - Motor para INMEDIATAMENTE (Motor::stop())
-   - ADC actual se convierte en nuevo target (_motor_targetADC = currentADC)
-   - Estado cambia a AT_TARGET (usuario define posición)
-   - touchState=1 se reporta a S3 via RS485
+**Cambios críticos v3 (vs v2):**
+1. **`Motor::requestCalibration()` reemplaza `startCalib()` en RS485**
+   - Cuando S3 manda FLAG_CALIB → RS485Handler llama `Motor::requestCalibration()`
+   - Si fader ≠ 0: `Motor::goToMin()` PRIMERO, luego `startCalib()`
+   - Si fader = 0: `startCalib()` directo
+   - Garantiza fader EN 0 antes de calibración (arquitectura limpia)
 
-2. **S3 NO puede overridear mientras usuario toca**
-   - setTargetFromS3() tiene guard: `if (_motor_manualTouchDetected || FaderTouch::isTouched()) return;`
-   - S3 targets son ignorados mientras usuario toque (FaderTouch o debounce activo)
+2. **`Motor::goToMin()` es MASTER absoluto**
+   - Ejecuta SIEMPRE si `!_connected` (S3 desconectado)
+   - No se rechaza por ningún otro estado
+   - Si `_connected = true` → goToMin() retorna (espera órdenes S3)
+   - Propósito: Fader siempre baja a 0 si S3 no controla
 
-3. **Usuario suelta fader** (MANUAL_TOUCH_DEBOUNCE_MS = 200ms sin movimiento)
-   - _motor_manualTouchDetected = false
-   - Motor queda en AT_TARGET en la posición del usuario
-   - S3 ahora PUEDE mandar nuevo target (setTargetFromS3() ejecuta)
+3. **Usuario toma control con movimiento manual**
+   - `setADCDelta()` detecta: delta > 500 cuentas O `FaderTouch::isTouched()`
+   - Motor para INMEDIATAMENTE: `Motor::stop()`
+   - ADC actual = nuevo target (_motor_targetADC = currentADC)
+   - Estado: AT_TARGET (usuario es master absoluto)
+   - touchState=1 reportado a S3 vía RS485
 
-4. **Conexión S3 controla modo "autonom o"**
-   - Si CONNECTED: IDLE NO baja a 0, espera orders S3
-   - Si DISCONNECTED: IDLE baja a 0 (goToMin loop)
-   - goToMin() tiene guard: `if (_connected) return;`
-   - Motor::setConnected() es llamado por RS485Handler al cambiar estado
+4. **S3 NO puede overridear mientras usuario toca**
+   - `setTargetFromS3()` tiene guard: `if (_motor_manualTouchDetected || FaderTouch::isTouched()) return;`
+   - S3 targets ignorados mientras usuario toque (debounce 200ms tras soltar)
 
-**Implementación (2026-05-16 10:52):**
-- Motor.cpp: variable `_connected`, función `setConnected()`
-- Motor.cpp: setADCDelta() + FaderTouch::isTouched() integrados
-- Motor.cpp: setTargetFromS3() con guards usuario
-- Motor.cpp: update() IDLE con guard `!_connected`
-- Motor.cpp: goToMin() con guard `_connected`
-- RS485Handler.cpp: llamar Motor::setConnected() al cambiar conexión
-- RS485Handler.cpp: usar setTargetFromS3() en lugar de setTarget()
+5. **Conexión S3 controla automática**
+   - Si CONNECTED: Motor NO baja a 0 automáticamente, espera órdenes S3
+   - Si DISCONNECTED: Motor baja a 0 indefinidamente (goToMin loop)
+
+**Implementación v3 (2026-05-16 18:45):**
+- Motor.cpp: función `Motor::requestCalibration()` — NUEVA
+- Motor.cpp: `Motor::goToMin()` — MASTER ABSOLUTO si `!_connected`
+- Motor.cpp: `setADCDelta()` — usuario detection
+- Motor.cpp: `setTargetFromS3()` — con guards usuario
+- RS485Handler.cpp línea 67: **CAMBIO CRÍTICO**
+  - ANTES: `Motor::startCalib();`
+  - DESPUÉS: `Motor::requestCalibration();`
+- Documentación: MOTOR.md + FADER.md actualizados (2026-05-16 18:45)
 
 **Test mínimo requerido:**
-- [ ] Boot sin S3: fader baja a 0
+- [ ] Boot: fader baja a 0 (Motor::goToMin() en setup)
 - [ ] S3 conecta: motor NO baja, espera target
-- [ ] S3 manda target: motor va
-- [ ] Usuario toca fader: motor para inmediatamente
+- [ ] S3 manda FLAG_CALIB: Motor::requestCalibration() ejecuta
+  - [ ] Si fader ≠ 0: baja a 0, LUEGO calibra
+  - [ ] Si fader = 0: calibra inmediatamente
+- [ ] S3 manda target: motor va (si usuario NO toca)
+- [ ] Usuario mueve fader: motor para INMEDIATAMENTE
 - [ ] S3 manda target MIENTRAS usuario toca: motor ignora (no se mueve)
-- [ ] Usuario suelta: motor queda donde está
-- [ ] S3 manda nuevo target TRAS soltar: motor va (usuario liberó control)
+- [ ] Usuario suelta: motor queda en posición usuario
+- [ ] S3 manda nuevo target TRAS soltar (después 200ms): motor va
+- [ ] S3 desconecta: Motor::goToMin() ejecuta, fader baja a 0
 
 **⚠️ VALIDACIÓN EN HARDWARE — OBLIGATORIA (2026-05-13 15:59):**
 - **TODO cambio en RS485, Motor, FaderADC, o protocolo REQUIERE validación en hardware**

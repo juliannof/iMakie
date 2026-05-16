@@ -2,8 +2,11 @@
 #include "../../config.h"
 #include <Preferences.h>
 #include "../fader/FaderADC.h"
+#include "../fader/FaderTouch.h"
 
 extern FaderADC faderADC;
+
+using Motor::MotorState;
 
 // ────────────────────────────────────────────────────────────────
 // Motor Control — iMakie PTxx Track S2
@@ -27,17 +30,13 @@ extern FaderADC faderADC;
 static uint8_t _pwm_min = 0;
 static uint8_t _pwm_max = 0;
 
-// ─── Máquina de estados Motor v2 (2026-05-16 10:45) ──────────
+// ─── Máquina de estados Motor v2 (2026-05-16 10:52) ──────────
 // Arquitectura: S3 es master, usuario puede soltar fader
+// Variables declaradas en config.h (fuente única de verdad)
 // Estados: IDLE → GOING_TO_MIN → WAITING_FOR_CALIB → CALIBRATING → IDLE
 //          IDLE → GOING_TO_MIN → AT_TARGET (usuario soltó)
 //          Cualquiera → MOVING_TO_TARGET (S3 ordena setTarget)
 static MotorState _motor_state = MotorState::IDLE;
-static bool _pendingCalib = false;        // Flag: startCalib en espera después goToMin
-static bool _connected = false;           // Estado de conexión con S3 (2026-05-16 10:52)
-static uint16_t _userDropTarget = 0;      // ADC capturado cuando usuario soltó fader
-static uint16_t _s3Target = 0;            // Target actual de S3 (para MOVING_TO_TARGET)
-static uint32_t _atTargetStartTime = 0;   // timestamp cuando llegó a AT_TARGET
 
 // ─── Funciones HW (privadas) ──────────────────────────────────
 static void _hwOff() {
@@ -419,6 +418,13 @@ void setADC(uint16_t v) {
 void setADCDelta(uint16_t currentADC) {
     // Detecta movimiento manual del fader: delta ADC rápido O sensor capacitivo
     // Usuario toma control absoluto del motor — S3 no puede overridear
+
+    // Inicialización en primera llamada (evitar falsa detección en boot)
+    if (_motor_lastADCForDelta == 0) {
+        _motor_lastADCForDelta = currentADC;
+        return;  // Solo calibrar, no detectar delta en boot
+    }
+
     uint16_t delta = abs((int)currentADC - (int)_motor_lastADCForDelta);
     _motor_lastADCForDelta = currentADC;
 
