@@ -7,6 +7,53 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### S2 MOTOR BEHAVIOR — Usuario como master, S3 respeta prioridades (2026-05-16 10:52) — ✅ IMPLEMENTADO
+
+**Comportamiento correcto — prioridad:**
+```
+Usuario tocando > S3 commands > Motor autónomo
+```
+
+**Cambios implementados:**
+
+Motor.cpp:
+- Variable `_connected` (tracks S3 connection state)
+- `setConnected(bool)` — notifica estado conexión
+- `update()` IDLE: no baja a 0 si CONNECTED
+- `goToMin()`: guard CONNECTED (no ejecuta si S3 está conectado)
+- `setTargetFromS3()`: reimplementado con guards usuario + cambio a MOVING_TO_TARGET
+- `setADCDelta()`: integra FaderTouch::isTouched() + usuario como master (ADC actual = target)
+
+Motor.h:
+- Declaración `void setConnected(bool)`
+
+RS485Handler.cpp:
+- `onMasterData()`: llamar Motor::setConnected(true/false) al cambiar estado
+- Usar `setTargetFromS3()` en lugar de `setTarget()`
+
+**Flujo de control:**
+- Boot sin S3 → Motor va a 0 (GOING_TO_MIN → AT_TARGET)
+- S3 conecta → Motor en IDLE, espera target de S3
+- S3 manda target → Motor va (MOVING_TO_TARGET → AT_TARGET)
+- Usuario mueve fader → Motor para, ADC = nuevo target, touchState=1 a S3
+- Usuario suelta → Motor queda en posición, S3 puede mandar nuevo target
+- S3 desconecta → Motor para, espera boot de nuevo
+
+---
+
+### S2 MOTOR BOOT — Motor::goToMin() en setup() (2026-05-16 10:51) — ✅ IMPLEMENTADO
+
+**Cambio implementado:**
+- main.cpp línea 133: Llamada a `Motor::goToMin()` después de `Motor::initPWM()`
+- Efecto: Fader baja a posición 0 en boot, listo para órdenes de S3
+
+**Comportamiento:**
+- Boot: Motor inicia EN (habilitado), inicia movimiento lento hacia min (si ADC > 30)
+- Llega a 0: Motor se detiene, espera órdenes de S3 (FLAG_CALIB o setTarget)
+- Sin comandos S3: Motor permanece en posición 0 (idle)
+
+---
+
 ### DOCUMENTACIÓN — Centralizar en carpeta docs/ (2026-05-16 08:59) — ✅ COMPLETADO
 
 **Cambios realizados:**
@@ -110,7 +157,7 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ---
 
-### S3 TRÁFICO MIDI — Filtrado "send-only-on-change" en processSlaveResponse (2026-05-14 17:35) — ⏳ IMPLEMENTAR PRÓXIMA SESIÓN
+### S3 TRÁFICO MIDI — Filtrado "send-only-on-change" en processSlaveResponse (2026-05-16 10:49) — ✅ IMPLEMENTADO
 
 **Problema identificado (2026-05-14 17:08):**
 - Tráfico MIDI excesivo: 17 faders × 50 updates/s = **850 mensajes MIDI/s**
@@ -174,10 +221,13 @@ static void processSlaveResponse(uint8_t slaveId) {
 - Responsividad: **Inmediata** (envía en el ciclo 20ms siguiente al cambio)
 - Comportamiento: Fader parado = 0 mensajes; fader movido = cambios en tiempo real
 
-**Validación requerida (MAÑANA):**
-- [ ] Implementar código exacto arriba
-- [ ] Compilar (verificar sin errores)
-- [ ] Deploy en hardware
+**Cambios implementados (2026-05-16 10:49):**
+- main.cpp línea 69: Agregar `static uint16_t lastSentPb[9] = {0};` para trackear último PitchBend por slave
+- main.cpp líneas 76-78: Envolver sendMIDIBytes en `if (pb != lastSentPb[slaveId])` — envía SOLO si cambió
+- main.cpp línea 79: Guardar `lastSentPb[slaveId] = pb;` después de enviar
+
+**Validación requerida:**
+- [ ] Deploy en hardware S3
 - [ ] MIDI monitor: Fader parado NO debe mostrar repeticiones
 - [ ] MIDI monitor: Fader movido debe mostrar cambios suavemente
 - [ ] Medir tráfico: Debería bajar 80%+ (850 → <100 msgs/s)
@@ -186,21 +236,9 @@ static void processSlaveResponse(uint8_t slaveId) {
 **Notas arquitectónicas:**
 - **EMA filter ya está en S3** (RS485.cpp línea 221) ✅
 - **Mapeo 0-14848 ya está** (main.cpp línea 76) ✅
-- **Solo falta:** Este "send-only-on-change" en S3
+- **Send-only-on-change implementado** ✅
 - **S2 NO se toca:** Mantiene envío simple cada 20ms (single-core, sin cálculos)
 - **P4:** Hereda automáticamente (mismo código, escala a 300 slaves)
-
-**Commit esperado:**
-```
-ADD S3: Send-only-on-change en processSlaveResponse — reducir tráfico MIDI (2026-05-15 HH:MM)
-
-- Agregar lastSentPb[9] array para trackear último PitchBend enviado
-- Enviar a Logic SOLO si pb != lastSentPb[slaveId]
-- Reduce 850 msgs/s → ~50-100 msgs/s sin pérdida de resolución
-- S2 mantiene simple (raw ADC cada 20ms), S3 filtra inteligentemente
-
-Impacto: 80%+ reducción tráfico MIDI, responsividad inmediata
-```
 
 ---
 

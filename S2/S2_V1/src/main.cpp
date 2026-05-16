@@ -130,6 +130,7 @@ void setup() {
 
     // Leer PWM range de NVS (2026-05-10 20:20)
     Motor::initPWM();
+    Motor::goToMin();  // Llevar fader a 0 en boot (2026-05-16 10:50)
 
     // Detectar OTA-only mode
     Preferences prefs;

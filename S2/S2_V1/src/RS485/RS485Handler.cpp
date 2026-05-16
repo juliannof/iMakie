@@ -41,12 +41,14 @@ void onMasterData(const MasterPacket& pkt) {
     needsTOTALRedraw = true;
 
     if (newState == ConnectionState::CONNECTED) {
+        Motor::setConnected(true);  // Notificar motor que S3 conectó (2026-05-16 10:52)
         neoWaitingHandshake = false;
         // Cambio de azul a colores tenues
         // ¡CRÍTICO! NO llamar updateAllNeopixels() aquí — retarda RS485 response
         // Neopixels se actualizan en main.cpp DESPUÉS de sendResponse()
     } else {
         // ── Desconexión limpia ────────────────────────────
+        Motor::setConnected(false);  // Notificar motor que S3 desconectó (2026-05-16 10:52)
         Motor::off();
         Motor::setTarget(Motor::getRawADC());
         recStates = soloStates = muteStates = selectStates = false;
@@ -111,7 +113,7 @@ void onMasterData(const MasterPacket& pkt) {
     float newFader = pkt.faderTarget / 16383.0f;
     if (fabsf(faderPositions - newFader) > 0.001f) {
         faderPositions = newFader;
-        Motor::setTarget(pkt.faderTarget);
+        Motor::setTargetFromS3(pkt.faderTarget);  // User can override (master) (2026-05-16 10:52)
     }
 
     // ── Modo de automatización (bits 5-7) ─────────────────────

@@ -284,14 +284,23 @@ Fader listo para recibir PitchBend de Logic
 
 ---
 
-## 2.5 Máquina de Estados Motor v2 — S3 Master (2026-05-16 10:45)
+## 2.5 Máquina de Estados Motor v2 — Usuario Master (2026-05-16 10:52)
 
-**Principios:**
-- S3 es el master (autoridad máxima)
-- Usuario puede soltar fader en cualquier posición → motor va allá
-- Sin comando S3: fader siempre en 0 (goToMin loop)
+**Prioridad correcta:**
+```
+Usuario tocando > S3 commands > Motor autónomo
+```
+
+**Principios (actualizado 2026-05-16 10:52):**
+- **Usuario es el master absoluto** — puede tomar control en cualquier momento
+- S3 controla SOLO si usuario no toca el fader
+- Si usuario mueve → Motor para INMEDIATAMENTE, ADC actual = nuevo target
+- Si usuario suelta → Motor queda en posición, S3 puede mandar nuevo target
+- Sin comando S3 y sin usuario: fader en 0 (IDLE → GOING_TO_MIN → AT_TARGET)
 - Estados: IDLE → GOING_TO_MIN → WAITING_FOR_CALIB → CALIBRATING → IDLE
 - Alternativa: IDLE → GOING_TO_MIN → AT_TARGET (usuario soltó)
+- CONNECTED a S3: NO baja a 0 automáticamente, espera órdenes
+- DISCONNECTED de S3: baja a 0 (goToMin loop)
 
 ### **2.5.1 Estados y Transiciones**
 
@@ -339,14 +348,16 @@ Fader listo para recibir PitchBend de Logic
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### **2.5.2 Funciones Públicas (API v2)**
+### **2.5.2 Funciones Públicas (API v2 — 2026-05-16 10:52)**
 
 ```cpp
 // Motor state machine
 void requestCalibration();           // FLAG_CALIB desde RS485
-void setTargetFromS3(uint16_t adc);  // setTarget ADC desde RS485
+void setTargetFromS3(uint16_t adc);  // setTarget ADC desde RS485 — GUARDED por usuario
 void setUserDropTarget(uint16_t adc); // Usuario soltó fader en ADC
+void setConnected(bool connected);   // Notifica estado conexión S3 (NEW 2026-05-16)
 MotorState getState();                // Consulta estado motor
+void setADCDelta(uint16_t currentADC); // Detecta movimiento usuario (delta OR capacitivo)
 ```
 
 ### **2.5.3 Escenarios de Uso**
@@ -668,6 +679,121 @@ Motor::setADC(uint16_t pos) {
 **Problema:** Motor muy lento o sin movimiento.
 
 **Fix:** Calibrar PWM_MIN=100, PWM_MAX=160 (testeo en bench).
+
+---
+
+## 3. DETECCIÓN DE USUARIO — Master Control (2026-05-16 10:52)
+
+### 3.1 Mecanismo: Sensor Capacitivo + Delta ADC
+
+**Dos detecciones en paralelo:**
+
+| Método | Fuente | Umbral | Ventaja |
+|--------|--------|--------|---------|
+| **Capacitivo** | FaderTouch::isTouched() | Contacto físico | Preciso, sin lag |
+| **Delta ADC** | setADCDelta(currentADC) | > 500 cuentas/tick | Detecta velocidad rápida |
+
+**Lógica:**
+```cpp
+bool userTouch = (delta > MANUAL_TOUCH_THRESHOLD) || FaderTouch::isTouched();
+
+if (userTouch && !_motor_manualTouchDetected) {
+    // Usuario toma control
+    _motor_manualTouchDetected = true;
+    Motor::stop();  // Para motor INMEDIATAMENTE
+    _motor_state = MotorState::AT_TARGET;
+    _motor_targetADC = currentADC;  // ADC actual = nueva posición
+}
+```
+
+### 3.2 Flujo: Usuario Toma Control
+
+```
+Loop() — usuario mueve fader rápido:
+  setADCDelta(currentADC) detecta delta > 500
+    ↓
+  _motor_manualTouchDetected = true
+  Motor::stop()  ← Motor para INMEDIATAMENTE
+  _motor_state = AT_TARGET  ← Usuario define posición
+  _motor_targetADC = currentADC  ← Nuevo target aceptado
+  log: "Usuario master: adc=12345"
+    ↓
+  RS485Handler::buildResponse():
+    touchState = FaderTouch::isTouched() ? 1 : 0
+    faderPos = Motor::getRawADC()  ← Nueva posición
+    → envía SlavePacket a S3
+      ↓
+  S3 recibe touchState=1 + nueva faderPos
+    → Logic entiende "usuario movió fader"
+    → Logic NOT envía nuevo target (respeta usuario)
+      ↓
+  Usuario suelta fader (después de MANUAL_TOUCH_DEBOUNCE_MS):
+    _motor_manualTouchDetected = false
+    Motor queda en AT_TARGET (nueva posición del usuario)
+    S3 ahora puede mandar nuevo target
+```
+
+### 3.3 Guardia en setTargetFromS3()
+
+```cpp
+void setTargetFromS3(uint16_t adcTarget) {
+    if (_motor_manualTouchDetected || FaderTouch::isTouched()) {
+        return;  // Usuario es master — S3 ignorado
+    }
+    _motor_targetADC = adcTarget;
+    _motor_state = MotorState::MOVING_TO_TARGET;
+}
+```
+
+**Interpretación:**
+- Si `_motor_manualTouchDetected` activo → usuario moviendo → IGNORA S3
+- Si `FaderTouch::isTouched()` → dedo en fader → IGNORA S3
+- Sino → usuario liberó → S3 PUEDE controlar
+
+### 3.4 Conexión S3 (setConnected)
+
+**Nueva variable:**
+```cpp
+static bool _connected = false;  // Estado conexión S3
+```
+
+**Guards en IDLE y goToMin():**
+
+**IDLE:**
+```cpp
+if (!_connected && _motor_adcPos > (MOTOR_ADC_MIN + 10)) {
+    // Sin S3 → bajar a 0
+    _motor_state = MotorState::GOING_TO_MIN;
+} else {
+    // CONNECTED → motor quieto
+    _hwOff();
+}
+```
+
+**goToMin():**
+```cpp
+if (_connected) return;  // No ejecutar si S3 conectado
+```
+
+**Flujo:**
+```
+Boot: _connected = false
+  → IDLE detecta ADC > 30
+  → Baja a 0 (GOING_TO_MIN)
+  → Llega a 0 (AT_TARGET)
+  
+RS485Handler recibe MasterPacket con connected=1
+  → Motor::setConnected(true)
+  → update() IDLE: !_connected es false → no baja
+  → Motor quieto, espera target S3
+  
+S3 ordena setTargetFromS3()
+  → Motor va a target (MOVING_TO_TARGET → AT_TARGET)
+  
+RS485 timeout 500ms
+  → checkTimeout() → Motor::setConnected(false)
+  → update() IDLE: !_connected es true → baja a 0
+```
 
 ---
 

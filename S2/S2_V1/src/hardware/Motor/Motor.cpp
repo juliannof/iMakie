@@ -34,6 +34,7 @@ static uint8_t _pwm_max = 0;
 //          Cualquiera → MOVING_TO_TARGET (S3 ordena setTarget)
 static MotorState _motor_state = MotorState::IDLE;
 static bool _pendingCalib = false;        // Flag: startCalib en espera después goToMin
+static bool _connected = false;           // Estado de conexión con S3 (2026-05-16 10:52)
 static uint16_t _userDropTarget = 0;      // ADC capturado cuando usuario soltó fader
 static uint16_t _s3Target = 0;            // Target actual de S3 (para MOVING_TO_TARGET)
 static uint32_t _atTargetStartTime = 0;   // timestamp cuando llegó a AT_TARGET
@@ -332,14 +333,14 @@ void update() {
     switch (_motor_state) {
 
     case MotorState::IDLE:
-        // Esperando órdenes S3 o usuario. Fader debe estar en 0.
-        if (_motor_adcPos > (MOTOR_ADC_MIN + 10)) {
-            // No en 0 → bajar
+        // Esperando órdenes S3 o usuario.
+        if (!_connected && _motor_adcPos > (MOTOR_ADC_MIN + 10)) {
+            // Sin S3: fader debe estar en 0 — bajar
             _motor_state = MotorState::GOING_TO_MIN;
             _hwDown(_pwm_max);
             log_d("[MOTOR-STATE] IDLE → GOING_TO_MIN");
         } else {
-            // En 0, apagar motor
+            // CONNECTED o ya en 0: motor quieto
             _hwOff();
         }
         break;
@@ -416,22 +417,28 @@ void setADC(uint16_t v) {
 }
 
 void setADCDelta(uint16_t currentADC) {
-    // Detecta movimiento manual del fader por delta ADC rápido
-    // Si delta > umbral → motor no puede haberlo causado → toque manual
+    // Detecta movimiento manual del fader: delta ADC rápido O sensor capacitivo
+    // Usuario toma control absoluto del motor — S3 no puede overridear
     uint16_t delta = abs((int)currentADC - (int)_motor_lastADCForDelta);
     _motor_lastADCForDelta = currentADC;
 
-    if (delta > MANUAL_TOUCH_THRESHOLD) {
-        // Movimiento rápido detectado — es toque manual
+    bool userTouch = (delta > MANUAL_TOUCH_THRESHOLD) || FaderTouch::isTouched();
+
+    if (userTouch && !_motor_manualTouchDetected) {
+        // Primera detección: usuario toma control — INMEDIATO
         _motor_manualTouchDetected = true;
         _motor_manualTouchStartTime = millis();
         Motor::stop();
-        log_w("[MOTOR] Manual touch detected: delta=%d", delta);
-    } else if (_motor_manualTouchDetected) {
-        // Esperando a que se estabilice
+        _motor_state = MotorState::AT_TARGET;      // Motor cede control
+        _userDropTarget = currentADC;
+        _motor_targetADC = currentADC;             // ADC actual = nueva posición aceptada
+        log_w("[MOTOR] Usuario master: adc=%d delta=%d", currentADC, delta);
+    } else if (_motor_manualTouchDetected && !FaderTouch::isTouched()) {
+        // Usuario todavía moviendo pero sensor capacitivo ya lo perdió
+        // Esperar a que se estabilice por debounce temporal
         if (millis() - _motor_manualTouchStartTime > MANUAL_TOUCH_DEBOUNCE_MS) {
             _motor_manualTouchDetected = false;
-            log_i("[MOTOR] Manual touch released");
+            log_i("[MOTOR] Usuario soltó fader en adc=%d", currentADC);
         }
     }
 }
@@ -453,6 +460,10 @@ void stop() {
     _hwOff();
     _motor_active = false;
     _motor_currentPWM = 0;
+}
+
+void setConnected(bool connected) {
+    _connected = connected;  // Notificar estado de conexión S3 (2026-05-16 10:52)
 }
 
 uint16_t getRawADC() {
@@ -507,6 +518,11 @@ void startCalib() {
 }
 
 void goToMin() {
+    // Guard: no bajar si S3 está conectado (2026-05-16 10:52)
+    if (_connected) {
+        return;
+    }
+
     // Guard: no reiniciar si ya está en movimiento
     if (_isCalibrating()) {
         return;
@@ -543,12 +559,19 @@ void requestCalibration() {
 }
 
 void setTargetFromS3(uint16_t adcTarget) {
-    // S3 ordena posición → interrumpe TODO y va a esa posición
-    _motor_state = MotorState::MOVING_TO_TARGET;
+    // S3 ordena posición → solo si usuario NO está tocando (usuario es master)
     _s3Target = adcTarget;
+    if (_motor_phase != CalibPhase::DONE) {
+        log_w("[MOTOR] setTargetFromS3: no calibrado, ignorando target=%d", adcTarget);
+        return;
+    }
+    if (_motor_manualTouchDetected || FaderTouch::isTouched()) {
+        log_i("[MOTOR] setTargetFromS3: usuario master, ignorando target=%d", adcTarget);
+        return;  // Usuario es master — ignora orden de S3
+    }
     _motor_targetADC = adcTarget;
-    _motor_phase = CalibPhase::DONE;  // Asegurar que está calibrado para setTarget
-    log_i("[MOTOR] setTargetFromS3: target=%d", adcTarget);
+    _motor_state = MotorState::MOVING_TO_TARGET;
+    log_d("[MOTOR] setTargetFromS3: target=%d", adcTarget);
 }
 
 void setUserDropTarget(uint16_t adcValue) {

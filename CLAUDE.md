@@ -99,6 +99,53 @@
 - **Un cambio a la vez, confirmar antes de continuar**
 - Esta regla es ABSOLUTA — evita duplicación de código y mantiene cohesión arquitectónica
 
+**🎮 COMPORTAMIENTO MOTOR S2 — Usuario es Master (2026-05-16 10:52):**
+
+**Prioridad de control:**
+```
+Usuario tocando > S3 commands > Motor autónomo
+```
+
+**Reglas vinculantes:**
+1. **Usuario toma control con toque** (FaderTouch::isTouched() OR delta ADC > 500)
+   - Motor para INMEDIATAMENTE (Motor::stop())
+   - ADC actual se convierte en nuevo target (_motor_targetADC = currentADC)
+   - Estado cambia a AT_TARGET (usuario define posición)
+   - touchState=1 se reporta a S3 via RS485
+
+2. **S3 NO puede overridear mientras usuario toca**
+   - setTargetFromS3() tiene guard: `if (_motor_manualTouchDetected || FaderTouch::isTouched()) return;`
+   - S3 targets son ignorados mientras usuario toque (FaderTouch o debounce activo)
+
+3. **Usuario suelta fader** (MANUAL_TOUCH_DEBOUNCE_MS = 200ms sin movimiento)
+   - _motor_manualTouchDetected = false
+   - Motor queda en AT_TARGET en la posición del usuario
+   - S3 ahora PUEDE mandar nuevo target (setTargetFromS3() ejecuta)
+
+4. **Conexión S3 controla modo "autonom o"**
+   - Si CONNECTED: IDLE NO baja a 0, espera orders S3
+   - Si DISCONNECTED: IDLE baja a 0 (goToMin loop)
+   - goToMin() tiene guard: `if (_connected) return;`
+   - Motor::setConnected() es llamado por RS485Handler al cambiar estado
+
+**Implementación (2026-05-16 10:52):**
+- Motor.cpp: variable `_connected`, función `setConnected()`
+- Motor.cpp: setADCDelta() + FaderTouch::isTouched() integrados
+- Motor.cpp: setTargetFromS3() con guards usuario
+- Motor.cpp: update() IDLE con guard `!_connected`
+- Motor.cpp: goToMin() con guard `_connected`
+- RS485Handler.cpp: llamar Motor::setConnected() al cambiar conexión
+- RS485Handler.cpp: usar setTargetFromS3() en lugar de setTarget()
+
+**Test mínimo requerido:**
+- [ ] Boot sin S3: fader baja a 0
+- [ ] S3 conecta: motor NO baja, espera target
+- [ ] S3 manda target: motor va
+- [ ] Usuario toca fader: motor para inmediatamente
+- [ ] S3 manda target MIENTRAS usuario toca: motor ignora (no se mueve)
+- [ ] Usuario suelta: motor queda donde está
+- [ ] S3 manda nuevo target TRAS soltar: motor va (usuario liberó control)
+
 **⚠️ VALIDACIÓN EN HARDWARE — OBLIGATORIA (2026-05-13 15:59):**
 - **TODO cambio en RS485, Motor, FaderADC, o protocolo REQUIERE validación en hardware**
 - **NUNCA desplegar cambios RS485 sin test físico en rig S3-S2**

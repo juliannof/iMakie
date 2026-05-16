@@ -32,6 +32,7 @@ namespace Motor {
 
     // Control
     void setTarget(uint16_t midiPB14);  // 0-16383, mapea internamente a ADC
+    void setConnected(bool connected);  // notifica estado de conexión S3 (2026-05-16 10:52)
     void off();                         // para motor + desactiva control
     void stop();                        // frena motor, mantiene target
 

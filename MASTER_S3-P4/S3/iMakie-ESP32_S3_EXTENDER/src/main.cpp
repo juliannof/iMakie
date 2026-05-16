@@ -66,6 +66,8 @@ TaskHandle_t taskCore1Handle = nullptr;
 // ====================================================================
 // --- HELPER RS485 → MIDI ---
 // ====================================================================
+static uint16_t lastSentPb[9] = {0};  // Track último PitchBend enviado por slave
+
 static void processSlaveResponse(uint8_t slaveId) {
     const ChannelData& ch = rs485.getChannel(slaveId);
     uint8_t midiCh = slaveId - 1;
@@ -74,8 +76,13 @@ static void processSlaveResponse(uint8_t slaveId) {
     // NO ENVIAR si slave está en calibración (CALIB_SENDING activo) — valores raw no son válidos para Logic
     if (ch.touchState && !(ch.buttons & SLAVE_FLAG_CALIB_SENDING)) {
         uint16_t pb  = ((uint32_t)ch.faderPos * 14848 / 27000) & 0x3FFF;
-        byte msg[3]  = { (byte)(0xE0 | midiCh), (byte)(pb & 0x7F), (byte)(pb >> 7) };
-        sendMIDIBytes(msg, 3);
+
+        // Send-only-on-change: filtrar repeticiones idénticas (reduce tráfico 850→~100 msgs/s)
+        if (pb != lastSentPb[slaveId]) {
+            byte msg[3]  = { (byte)(0xE0 | midiCh), (byte)(pb & 0x7F), (byte)(pb >> 7) };
+            sendMIDIBytes(msg, 3);
+            lastSentPb[slaveId] = pb;
+        }
     }
 
     // --- Botones → Note On/Off ---
