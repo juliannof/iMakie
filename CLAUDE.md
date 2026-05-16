@@ -9,13 +9,6 @@
 
 ---
 
-## 📋 ARQUITECTURA (Consulta directa)
-
-**→ [Ver en STATUS.md](STATUS.md)** — Referencia única de componentes, flujos MIDI, RS485, y puntos críticos.  
-**No preguntar sobre arquitectura. Consultar STATUS.md.**
-
----
-
 ## ⚠️ DIRECTIVA OBLIGATORIA
 
 **IDIOMA — Español de España SIEMPRE (2026-05-11 18:30):**
