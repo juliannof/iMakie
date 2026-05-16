@@ -7,6 +7,41 @@ Formato: [Keep a Changelog](https://keepachangelog.com/)
 
 ## [Unreleased]
 
+### S3 PITCHBEND MAPEO — Fix signed 14-bit (-8192..+8191) → ADC 0..27000 (2026-05-16 08:05) — ✅ IMPLEMENTADO
+
+**Problema identificado (2026-05-16 08:00):**
+- Logic envía Pitch Wheel **signed 14-bit: -8192..+8191**, no unsigned 0-16383
+- Cuando Logic desconecta → envía -8192 (mínimo)
+- S3 mapeaba con `uint32_t bendValue * 14848 / 16383` → overflow en negativos
+- Resultado: valor ADC inválido → S3 detectaba "no calibrado" → mandaba FLAG_CALIB automáticamente
+- Síntoma: S2 calibraba involuntariamente cada vez que Logic se desconectaba
+
+**Solución implementada (MIDIProcessor.cpp línea 599-612):**
+- Clipear valores negativos a 0 (fondo del fader)
+- Mapear rango real Logic 0..8191 → ADC 0..27000
+- Fórmula correcta: `fader_adc = bendValue * 27000 / 8191` (sin overflow)
+- Normalización: `faderPositionNormalized = fader_adc / 27000.0f` (no 16383)
+
+**Cambios exactos:**
+1. MIDIProcessor.cpp línea 604: Agregar guard `if (bendClamped < 0) bendClamped = 0`
+2. MIDIProcessor.cpp línea 605: Mapeo correcto `fader_adc = bendClamped * 27000 / 8191`
+3. MIDIProcessor.cpp línea 612: Normalización → 27000 (no 16383)
+
+**Impacto esperado:**
+- Logic desconecta (Pitch -8192) → S2 NO calibra automáticamente
+- Fader responde correctamente: 0% = -8192, 100% = +8191
+- Sin FLAG_CALIB involuntario
+- S2 solo calibra si S3 lo ordena explícitamente
+
+**Validación requerida:**
+- [ ] Compilar S3 sin errores
+- [ ] Deploy en S3 + S2
+- [ ] Logic init → connect: faders responden suave (0-100%)
+- [ ] Logic disconnect: S2 NO hace calibración
+- [ ] MIDI monitor: no cambios involuntarios en PitchBend
+
+---
+
 ### S2 MOTOR CALIBRACIÓN — Guard cooldown + desactivación auto-calib (2026-05-16 07:48) — ✅ IMPLEMENTADO
 
 **Problema identificado (2026-05-16 07:45):**
