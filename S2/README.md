@@ -140,14 +140,38 @@ Logic recibe feedback
 
 ---
 
+## Build S2
+
+**Platform:** pioarduino 55.03.37 / IDF5 — unificado con P4 (requiere P4)
+
+**Librerías clave:**
+- **LovyanGFX 1.2.19** — Display driver ST7789V3 (cambio desde NeoPixelBus)
+- **Adafruit NeoPixel** — Control LEDs WS2812B (compatible IDF5)
+- **ADS1115 library** — ADC I2C 16-bit
+- **Otras:** Wire (I2C moderno), FreeRTOS, ESP-IDF5
+
+**Orden de init obligatorio en código:**
+```cpp
+// main.cpp setup()
+initDisplay()      // LovyanGFX init ANTES
+initNeopixels()    // Adafruit NeoPixel DESPUÉS (SPI timing)
+initHardware()     // GPIO, botones, etc.
+```
+
+**Logging:**
+- `Serial.printf()` para S2 (recomendado)
+- `log_i()`/`log_w()` no son fiables en S2 (IDF5 limitation)
+
+**Versioning:** `FW_VERSION` y `FW_BUILD_ID` inyectados vía `pre_build.py` en build time
+
+---
+
 ## Compilación
 
 ```bash
 cd S2/S2_V1
 pio run -e lolin_s2_mini
 ```
-
-Platform: pioarduino 55.03.37 / IDF5
 
 ---
 

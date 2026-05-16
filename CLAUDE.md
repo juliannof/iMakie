@@ -309,13 +309,10 @@ loop() {
 **Documentación exhaustiva:**
 → **[SAT.md](docs/SAT.md)** (navegación, menú, integración Motor/Display/Encoder/LEDs/WiFi/RS485, troubleshooting)
 
-### Build S2
-- Platform: pioarduino 55.03.37 / IDF5 — unificado con P4 (requiere P4)
-- LovyanGFX 1.2.19, Adafruit NeoPixel (cambio desde NeoPixelBus)
-- Orden de init obligatorio: `initDisplay()` → `initNeopixels()` → `initHardware()`
-- FreeRTOS: `rs485.begin()` en setup, `rs485.startTask()` al final del setup
-- `Serial.printf` para logging — `log_i`/`log_w` no son fiables en S2
-- Versioning: `FW_VERSION` y `FW_BUILD_ID` inyectados via `pre_build.py`
+### Build S2 — 📌 Ver S2/README.md
+
+**Documentación exhaustiva:**
+→ **[S2/README.md](S2/README.md)** (platform pioarduino/IDF5, librerías, orden init, logging, versioning)
 
 ---
 
