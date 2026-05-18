@@ -101,7 +101,7 @@ void RS485Master::runTask() {
                               _currentId, _consecutiveTimeouts);
 
                     // ── Límite de reintentos (2026-05-16 19:25) ──
-                    if (_consecutiveTimeouts > MAX_CALIBRATION_RETRIES) {
+                    if (_ch[_currentId].calibrated && _consecutiveTimeouts > MAX_CALIBRATION_RETRIES) {
                         // ✗ FALLO CRÍTICO: Calibración falló después de máx reintentos (2026-05-16 19:40)
                         pixels.setPixelColor(0, pixels.Color(255, 0, 0));  // Rojo puro
                         pixels.show();
@@ -250,6 +250,13 @@ void RS485Master::_handleResponse() {
         _ch[_currentId].encoderDelta      = resp->encoderDelta;
         _ch[_currentId].prevEncoderButton = _ch[_currentId].encoderButton;
         _ch[_currentId].encoderButton     = resp->encoderButton;
+        // Auto-calibración al primer contacto (boot pre-Logic)
+        if (!_ch[_currentId].responded && !_ch[_currentId].calibrated && !_ch[_currentId].calibrating) {
+            _ch[_currentId].calibrate   = true;
+            _ch[_currentId].calibrating = true;
+            _ch[_currentId].dirty       = true;
+            log_i("[CALIB] Slave %d primer contacto — calibración automática", _currentId);
+        }
         _ch[_currentId].responded         = true;
 
         // ════════════════════════════════════════════════════════════════════

@@ -30,7 +30,7 @@ namespace {
     static int8_t  g_selectedChannel    = -1;
     static unsigned long connectedSinceTime  = 0;
     static const unsigned long CONNECT_GRACE_MS = 1500;
-    static uint8_t  _calibPendingFrom = 1;  // boot: calibrar S2 antes de Logic
+    static uint8_t  _calibPendingFrom = 0;
     static uint32_t _calibNextTime    = 0;
     static int16_t lastSentPitchBend[9] = {INT16_MIN, INT16_MIN, INT16_MIN, INT16_MIN, INT16_MIN, INT16_MIN, INT16_MIN, INT16_MIN, INT16_MIN};
 }
