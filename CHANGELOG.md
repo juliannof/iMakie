@@ -132,6 +132,34 @@ MIDIProcessor.cpp:
 
 ---
 
+### S3 EXTENDER — LOGIC_PITCHBEND_MAX + MIDI.md completo (2026-05-18 18:08) — ✅ COMPLETADO
+
+**Commits:** ceef081 (MIDI.md inicial), f043136 (LOGIC_PITCHBEND_MAX + secuencia arranque)
+
+**Fixes:**
+- ✅ `LOGIC_PITCHBEND_MAX = 14845` definido en `config.h` S3 (fuente única de verdad)
+  - Span real confirmado: max=+6653 − min=(−8192) = 14845 (MIDI monitor canal 2, 18:04)
+  - Valor anterior 14848 era incorrecto en código y documentación
+- ✅ `RS485.cpp` `setFaderTarget()`: divisor 14848 → `LOGIC_PITCHBEND_MAX` (×2)
+- ✅ `main.cpp`: divisor 14848 → `LOGIC_PITCHBEND_MAX` en envío PB a Logic
+- ✅ `docs/MIDI.md`: rango corregido en tabla 4.7 y fórmula 5.1
+
+**Documentación MIDI.md — nuevo contenido:**
+- ✅ Sección 3.3: secuencia completa de 3×GoOnline con timing real
+  - GoOnline #1 (t=0ms): reset completo, faders −8192
+  - GoOnline #2 (t=122ms): reset completo, faders −8192
+  - GoOnline #3 (t=2471ms): estado REAL del proyecto (faders reales, nombres, LEDs)
+  - Automodos reales: t=~4000ms
+  - Explicación de por qué existe `CONNECT_GRACE_MS = 1500ms`
+- ✅ Sección 4.11: SysEx 0x0A — Fader Touch Sense
+- ✅ Sección 4.12: SysEx 0x0B — Button Enable Mask (0x0F)
+- ✅ Sección 4.13: SysEx 0x20 — VPot Ring LEDs (tabla de bits modo/posición)
+
+**Pendiente (B1 sin resolver):**
+- ⚠️ `case 0x61` en MIDIProcessor.cpp: `g_logicConnected = 0` incorrecto → fix propuesto pero no aplicado
+
+---
+
 ### 🔄 PENDIENTES (próxima sesión)
 
 - [ ] **Actualizar P4 config.h con detalles PSRAM 32MB y periféricos**
