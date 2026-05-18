@@ -160,6 +160,80 @@ MIDIProcessor.cpp:
 
 ---
 
+### S3 EXTENDER — Boot calibración sin HALT + auto-calib primer contacto (2026-05-18 18:35) — ✅ COMPLETADO
+
+**Commits:** 1c3015a, 7800ebe
+
+**Problema raíz:**
+- RS485 bloqueado por `g_logicConnected` → S2 agotaba timeout antes de que Logic llegara
+- Sin gate: S3 arrancaba polling inmediato → S2 tarda ~100ms en boot → 5 timeouts → HALT
+- `_calibPendingFrom=1` al boot causaba doble disparo de calibración
+
+**Fixes aplicados:**
+
+`RS485.cpp`:
+- ✅ Eliminado gate `g_logicConnected` en `runTask()` — RS485 activo desde boot
+- ✅ HALT condition gateada: solo hace HALT si `_ch[id].calibrated` era true (S2 ya respondía)
+- ✅ Auto-calibración en primer contacto S2 en `_handleResponse()`:
+  - Si S2 no había respondido nunca y no está calibrado → dispara `calibrate=true` automáticamente
+  - Sin necesidad de que Logic envíe GoOnline primero
+
+`MIDIProcessor.cpp`:
+- ✅ `_calibPendingFrom = 0` — sin pre-arm al boot, calibración vía primer contacto
+
+**Flujo resultante:**
+```
+S3 boot → RS485 activo inmediatamente
+S2 responde primer paquete → auto-calibración disparada
+S2 calibra (GOING_TO_MIN → CALIBRATING → DONE)
+S3 recibe SLAVE_FLAG_CALIB_DONE → _ch[0].calibrated = true
+Logic conecta → handshake → control normal
+```
+
+---
+
+### S2 SLAVE — Motor _pendingCalib: GOING_TO_MIN → CALIBRATING (2026-05-18 18:55) — ✅ COMPLETADO
+
+**Commit:** a04e58f
+
+**Problema raíz:**
+- `_pendingCalib` declarado en `config.h` línea 154 pero nunca conectado en `Motor.cpp`
+- `requestCalibration()` cuando fader ≠ 0: iniciaba `goToMin()` pero no ponía `_pendingCalib = true`
+- `update()` case `GOING_TO_MIN`: al llegar a 0 → transicionaba a `AT_TARGET` sin verificar
+- FLAG_CALIB es one-shot en S3 → tras primer envío no se reenvía → calibración nunca arrancaba
+
+**Fixes aplicados en `S2/S2_V1/src/hardware/Motor/Motor.cpp`:**
+
+`requestCalibration()` else branch (fader ≠ 0):
+```cpp
+if (_motor_state != MotorState::GOING_TO_MIN) {
+    _pendingCalib = true;   // ← AÑADIDO
+    _motor_state = MotorState::GOING_TO_MIN;
+    goToMin();
+}
+```
+
+`update()` case `GOING_TO_MIN` al llegar a 0:
+```cpp
+if (_pendingCalib) {
+    _pendingCalib = false;
+    _motor_state = MotorState::CALIBRATING;
+    startCalib();
+} else {
+    _motor_state = MotorState::AT_TARGET;
+}
+```
+
+**Flujo resultante:**
+```
+S3 envía FLAG_CALIB (one-shot) → S2 requestCalibration()
+Si fader ≠ 0: _pendingCalib=true + GOING_TO_MIN + goToMin()
+Al llegar ADC ≤ MIN+10: _pendingCalib→false, startCalib() directo
+CALIBRATING → DONE → S3 recibe min/max en SlavePacket
+```
+
+---
+
 ### 🔄 PENDIENTES (próxima sesión)
 
 - [ ] **Actualizar P4 config.h con detalles PSRAM 32MB y periféricos**
