@@ -385,6 +385,7 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 │   ├── ENCODER.md                    ← ISR Gray code, sequenciamiento, SAT (2026-05-16)
 │   ├── LEDS.md                       ← NeoPixels WS2812B, asignación, estados (2026-05-16)
 │   ├── SAT.md                        ← Sistema Auto-Test, navegación, integración (2026-05-16)
+│   ├── MIDI.md                       ← Protocolo Mackie MCU completo: handshake, faders, VU, botones (2026-05-18)
 │   ├── Transport.md                  ← Control transport RW/FF/STOP/PLAY/REC, MIDI (2026-05-16)
 │   ├── DISPLAY_P4.md                 ← ST7701S MIPI-DSI 480×800, LVGL v9 (2026-05-16)
 │   ├── TOUCH.md                      ← GT911 capacitivo I2C, calibración (2026-05-16)
@@ -408,6 +409,7 @@ ESP32-S3  ←→  RS485 bus B  ←→  8× ESP32-S2 (PTxx Track)
 
 **Sistemas Compartidos (S2/S3/P4):**
 - **RS485.md** — Protocolo binario, timing, paquetes, máquina estados (Buses A y B)
+- **MIDI.md** — Protocolo Mackie MCU completo: handshake SysEx, faders, VU, botones, encoders, desconexión
 - **WIFI.md** — Provisioning credenciales, OTA, ElegantOTA, NVS
 - **SAT.md** — Sistema Auto-Test, navegación menú, integración módulos
 - **Transport.md** — Controles transport (S3), MIDI notas, handshake Mackie, bidireccional
