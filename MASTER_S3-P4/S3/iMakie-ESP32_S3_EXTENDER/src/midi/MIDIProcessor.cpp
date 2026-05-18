@@ -597,20 +597,17 @@ void processPitchBend(byte channel, int bendValue) {
     }
 
     if (channel < 9) {
-        // Mapeo corregido (2026-05-16 08:05): Logic envía signed 14-bit (-8192..+8191)
-        // Clipear negativos a 0 (fondo), mapear a ADC 0..27000
-        int bendClamped = bendValue;
-        if (bendClamped < 0) bendClamped = 0;
-        uint16_t fader_adc = ((uint32_t)bendClamped * 27000 / 8191);
+        // Logic raw 0-14848 (bajo=-8192 signed=0, alto=6653 signed=14848)
+        // setFaderTarget espera este rango y hace el mapeo a ADC internamente
+        int bendClamped = (bendValue < 0) ? 0 : bendValue;
 
         if (channel < 8) {
-            // Deadband: solo enviar si cambio > 150 cuentas (evita retroalimentación por ruido ADC)
-            if (abs((int16_t)fader_adc - lastSentPitchBend[channel]) > PITCHBEND_DEADBAND) {
-                rs485.setFaderTarget(channel + 1, fader_adc);
-                lastSentPitchBend[channel] = (int16_t)fader_adc;
+            if (abs(bendClamped - (int)lastSentPitchBend[channel]) > PITCHBEND_DEADBAND) {
+                rs485.setFaderTarget(channel + 1, (uint16_t)bendClamped);
+                lastSentPitchBend[channel] = (int16_t)bendClamped;
             }
         }
-        float faderPositionNormalized = (float)fader_adc / 27000.0f;  // Normalizar a rango ADC
+        float faderPositionNormalized = (float)bendClamped / 14848.0f;
         if (abs(faderPositions[channel] - faderPositionNormalized) > 0.001f) {
             faderPositions[channel] = faderPositionNormalized;
         }

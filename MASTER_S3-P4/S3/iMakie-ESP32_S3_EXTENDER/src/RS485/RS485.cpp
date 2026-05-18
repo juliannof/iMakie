@@ -299,12 +299,7 @@ void RS485Master::_handleResponse() {
             log_e("[CALIB] Slave %d ✗ ERROR calibración (reintento %d)",
                   _currentId, _ch[_currentId].calibRetries);
         } else {
-            // Normal: no está en calibración, reportar estado
-            if (_ch[_currentId].calibrating) {
-                _ch[_currentId].calibrating = false;
-                log_i("[CALIB] Slave %d → bajando a 0 (en progreso)",
-                      _currentId);
-            }
+            // S2 en tránsito — calibrating solo lo limpia CALIB_DONE o CALIB_ERROR
         }
 
         xSemaphoreGive(_mutex);
