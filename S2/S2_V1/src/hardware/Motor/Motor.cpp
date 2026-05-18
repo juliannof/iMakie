@@ -379,11 +379,16 @@ void update() {
         // Bajando a 0. Detectar llegada.
         if (_motor_adcPos <= (MOTOR_ADC_MIN + 10)) {  // Llegó a 0
             _hwOff();
-            // En 0: S3 enviará FLAG_CALIB en próximo ciclo para calibrar
-            // Mientras tanto, queda en AT_TARGET esperando siguiente comando
-            _motor_state = MotorState::AT_TARGET;
-            _atTargetStartTime = millis();
-            log_d("[MOTOR-STATE] GOING_TO_MIN → AT_TARGET (llegó a 0)");
+            if (_pendingCalib) {
+                _pendingCalib = false;
+                _motor_state = MotorState::CALIBRATING;
+                startCalib();
+                log_d("[MOTOR-STATE] GOING_TO_MIN → CALIBRATING");
+            } else {
+                _motor_state = MotorState::AT_TARGET;
+                _atTargetStartTime = millis();
+                log_d("[MOTOR-STATE] GOING_TO_MIN → AT_TARGET (llegó a 0)");
+            }
         }
         break;
 
@@ -579,8 +584,9 @@ void requestCalibration() {
             log_i("[MOTOR] requestCalibration: EN 0, iniciando startCalib()");
         }
     } else {
-        // Fader ≠ 0 → bajar a 0 (S3 reintentará próximo ciclo)
+        // Fader ≠ 0 → bajar a 0, luego calibrar automáticamente
         if (_motor_state != MotorState::GOING_TO_MIN) {
+            _pendingCalib = true;
             _motor_state = MotorState::GOING_TO_MIN;
             goToMin();
             log_i("[MOTOR] requestCalibration: ≠ 0, goToMin() bajando...");
