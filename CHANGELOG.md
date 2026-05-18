@@ -190,6 +190,14 @@ S3 recibe SLAVE_FLAG_CALIB_DONE → _ch[0].calibrated = true
 Logic conecta → handshake → control normal
 ```
 
+**⚠️ VALIDACIÓN HARDWARE PENDIENTE:**
+- [ ] Flash S3 con commits 1c3015a + 7800ebe
+- [ ] S3 boot → RS485 activo sin Logic → no HALT
+- [ ] S2 responde primer paquete → S3 dispara calibración automática (log `[CALIB] Slave 1 primer contacto`)
+- [ ] S2 calibra correctamente → S3 recibe `SLAVE_FLAG_CALIB_DONE`
+- [ ] Logic conecta posterior → handshake y control normal
+- [ ] Caso error: desconectar S2 tras calibración → S3 no hace HALT (calibrated=true)
+
 ---
 
 ### S2 SLAVE — Motor _pendingCalib: GOING_TO_MIN → CALIBRATING (2026-05-18 18:55) — ✅ COMPLETADO
@@ -231,6 +239,13 @@ Si fader ≠ 0: _pendingCalib=true + GOING_TO_MIN + goToMin()
 Al llegar ADC ≤ MIN+10: _pendingCalib→false, startCalib() directo
 CALIBRATING → DONE → S3 recibe min/max en SlavePacket
 ```
+
+**⚠️ VALIDACIÓN HARDWARE PENDIENTE:**
+- [ ] Flash S2 con commit a04e58f
+- [ ] S3 envía FLAG_CALIB → S2 fader ≠ 0: baja a 0 automáticamente
+- [ ] Al llegar a 0: calibración arranca sin intervención (log `[MOTOR-STATE] GOING_TO_MIN → CALIBRATING`)
+- [ ] Calibración completa → S3 recibe `SLAVE_FLAG_CALIB_DONE` + min/max ADC
+- [ ] S3 envía FLAG_CALIB → S2 fader = 0: calibra directamente (sin goToMin)
 
 ---
 
