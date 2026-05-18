@@ -82,7 +82,7 @@ static void processSlaveResponse(uint8_t slaveId) {
     // --- Fader → Pitch Bend ---
     // NO ENVIAR si slave está en calibración (CALIB_SENDING activo) — valores raw no son válidos para Logic
     if (ch.touchState && !(ch.buttons & SLAVE_FLAG_CALIB_SENDING)) {
-        uint16_t pb  = ((uint32_t)ch.faderPos * 14848 / 27000) & 0x3FFF;
+        uint16_t pb  = ((uint32_t)ch.faderPos * LOGIC_PITCHBEND_MAX / 27000) & 0x3FFF;
 
         // Send-only-on-change: filtrar repeticiones idénticas (reduce tráfico 850→~100 msgs/s)
         if (pb != lastSentPb[slaveId]) {

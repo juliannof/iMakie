@@ -1,7 +1,7 @@
 # MIDI.md — Protocolo Mackie MCU (iMakie S3 Extender)
 
 **Fuente:** `src/midi/MIDIProcessor.cpp`  
-**Última actualización:** 2026-05-18  
+**Última actualización:** 2026-05-18 18:10  
 **Estado:** Producción
 
 ---
@@ -74,6 +74,44 @@ S3 → Logic:   F0 00 00 66 14 21 01 F7     (eco inmediato)
 - Estado → CONNECTED
 - `g_logicConnected = 1` (RS485 task empieza a enviar paquetes a S2)
 - Se dispara `tickCalibracion()` → FLAG_CALIB al primer S2
+
+---
+
+### 3.3 — Secuencia Completa de Arranque (MIDI monitor 2026-05-18)
+
+Logic Pro emite **3 iteraciones GoOnline** en ~2.5 segundos. Solo la tercera contiene el estado real del proyecto.
+
+```
+t=0ms     Logic → S3:  Sondeo cmd 0x00 (familia 0x14)
+          Logic → S3:  GoOnline #1 (cmd 0x21) + reset completo:
+                         SysEx 0x20 ×8    — VPot rings a 0
+                         SysEx 0x0A 01    — fader touch sense ON
+                         SysEx 0x0E ×9    — automodos → Trim (modo 3)
+                         SysEx 0x0C 00    — tipo superficie
+                         SysEx 0x0B 0F    — button enable mask (REC/SOLO/MUTE/SEL)
+                         SysEx 0x12       — nombres de canal (vacíos: "- ")
+                         CC reset a 32    — VPots a centro
+                         Note Off masivo  — todos los botones/LEDs a OFF
+                         Note On selectivos — LEDs fijos del proyecto (LOOP, etc.)
+                         SysEx 0x72       — VU meters a 7 (peak)
+                         Pitch Wheel ×10  — -8192 (raw 0) ← TODOS LOS FADERS A MÍNIMO
+                         CC VPots a 0
+
+t=122ms   Logic → S3:  GoOnline #2 (cmd 0x21) + mismo reset completo
+                         Pitch Wheel ×10  — -8192 ← de nuevo todos a mínimo
+
+t=2471ms  Logic → S3:  GoOnline #3 (cmd 0x21) + estado REAL del proyecto:
+                         SysEx 0x12       — nombres reales ("Pan", "PanSpr", "0", "111 o"…)
+                         Note On reales   — botones/LEDs con estado real
+                         SysEx 0x72       — VU con niveles reales
+                         Pitch Wheel ×10  — valores reales: 6653, -951, -6755, 3733…
+                         CC VPots reales
+
+t=~4000ms Logic → S3:  SysEx 0x0E ×9    — automodos reales del proyecto (Trim por defecto)
+```
+
+> **⚠️ CRÍTICO — Por qué existe `CONNECT_GRACE_MS = 1500`:**
+> Las iteraciones #1 y #2 mandan los 10 faders a -8192 (raw 0). Sin grace period, el sistema detectaría 9+ faders a 0 simultáneos y ejecutaría la desconexión automática. El grace period de 1500ms absorbe las dos primeras iteraciones y deja pasar la tercera con los valores reales.
 
 ---
 
@@ -185,10 +223,9 @@ Logic → S3:   Ex <LSB> <MSB>      x = canal MIDI 0-8
 | Posición | Valor signed (monitor) | Valor raw unsigned |
 |----------|------------------------|-------------------|
 | Mínimo (fondo) | -8192 | 0 |
-| Medio (0 dB notch) | ~2201 | ~10393 |
-| Máximo (tope) | ~6653 | ~14848 |
+| Máximo (tope) | 6653 | 14845 |
 
-> Logic NO usa el rango MIDI completo 0-16383. El máximo real es ~14848.
+> Logic NO usa el rango MIDI completo 0–16383. Span real: 6653 − (−8192) = **14845** (`LOGIC_PITCHBEND_MAX` en `config.h`).
 
 S3 pasa el valor raw directamente a `rs485.setFaderTarget(canal+1, valor)`. `setFaderTarget` gestiona internamente el mapeo a ADC calibrado del S2 (0–27000).
 
@@ -277,6 +314,45 @@ S3 → `rs485.setAutoMode(canal_seleccionado, modo)`.
 
 ---
 
+### 4.11 Fader Touch Sense (SysEx 0x0A)
+
+```
+Logic → S3:   F0 00 00 66 14 0A 01 F7
+```
+
+Habilita el modo touch en los faders. Enviado en cada iteración GoOnline. S3 lo **ecoa inmediatamente** sin procesamiento adicional.
+
+---
+
+### 4.12 Button Enable Mask (SysEx 0x0B)
+
+```
+Logic → S3:   F0 00 00 66 14 0B 0F F7
+```
+
+`0x0F` = bits 0-3 activos → habilita los 4 botones por canal (REC, SOLO, MUTE, SELECT). Enviado en cada iteración GoOnline. S3 lo **ecoa inmediatamente**.
+
+---
+
+### 4.13 VPot Ring LEDs (SysEx 0x20)
+
+```
+Logic → S3:   F0 00 00 66 14 20 <canal> <valor> F7
+```
+
+Controla el anillo LED del encoder VPot de cada canal. Enviado en bloques de 8 (canales 0-7) en cada iteración GoOnline.
+
+| Bits del valor | Significado |
+|----------------|-------------|
+| 7-6 | Modo: 0=single dot, 1=boost/cut, 2=fill left, 3=spread |
+| 4-0 | Posición (0-11) |
+
+S3 lo **ecoa inmediatamente**. Sin pantalla activa → stub.
+
+> En las iteraciones #1 y #2 el valor es `0x07` (posición 7, modo single). En la iteración #3 llegan valores reales del proyecto.
+
+---
+
 ## 5. MENSAJES S3 → LOGIC
 
 ### 5.1 Posición de Fader — Pitch Bend
@@ -291,7 +367,7 @@ S3 → Logic:   Ex <LSB> <MSB>      x = canal MIDI 0-7
 - El flag `SLAVE_FLAG_CALIB_SENDING` no está activo (durante calibración no se mandan valores a Logic)
 - El valor ha cambiado respecto al último enviado (filtro send-only-on-change, array `lastSentPb[]`)
 
-**Fórmula:** `pb = (faderPos × 14848) / 27000`
+**Fórmula:** `pb = (faderPos × LOGIC_PITCHBEND_MAX) / 27000`  → `pb = (faderPos × 14845) / 27000`
 
 ---
 

@@ -366,10 +366,10 @@ void RS485Master::setFaderTarget(uint8_t id, uint16_t value14bit) {
         if (_ch[id].calibratedMax > _ch[id].calibratedMin) {
             // Slave calibrado: mapear a rango real
             uint16_t span = _ch[id].calibratedMax - _ch[id].calibratedMin;
-            faderTarget = _ch[id].calibratedMin + ((uint32_t)value14bit * span / 14848);
+            faderTarget = _ch[id].calibratedMin + ((uint32_t)value14bit * span / LOGIC_PITCHBEND_MAX);
         } else {
             // Slave no calibrado aún: usar rango teórico (0-27000)
-            faderTarget = (uint32_t)value14bit * 27000 / 14848;
+            faderTarget = (uint32_t)value14bit * 27000 / LOGIC_PITCHBEND_MAX;
         }
         _ch[id].faderTarget = faderTarget;
         _ch[id].dirty       = true;

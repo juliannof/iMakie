@@ -51,6 +51,10 @@ extern volatile ConnectionState logicConnectionState;
 // --- Calibración (2026-05-16 19:25) ---
 #define MAX_CALIBRATION_RETRIES 5    // máx reintentos antes de fallar slave
 
+// --- Fader Logic PitchBend (2026-05-18, confirmado MIDI monitor canal 2) ---
+// signed: min=-8192 (raw 0), max=+6653 (raw 14845) → span = 6653 - (-8192) = 14845
+#define LOGIC_PITCHBEND_MAX  14845
+
 // --- NeoPixel Status LED (2026-05-16 19:40) ---
 #define NEOPIXEL_PIN 48              // GPIO 48 (WS2812B RGB)
 #define NEOPIXEL_COUNT 1             // 1 LED
