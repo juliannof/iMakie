@@ -73,12 +73,6 @@ void RS485Master::runTask() {
     _stateTimer = micros();
     uint32_t _cycleCount = 0;
     for (;;) {
-        extern uint8_t g_logicConnected;
-        if (!g_logicConnected) {
-            vTaskDelay(pdMS_TO_TICKS(100));
-            continue;
-        }
-
         switch (_busState) {
 
             case BusState::SEND:

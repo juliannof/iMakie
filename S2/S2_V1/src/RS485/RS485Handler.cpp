@@ -112,7 +112,7 @@ void onMasterData(const MasterPacket& pkt) {
     }
 
     // ── Fader / Motor ─────────────────────────────────────────
-    float newFader = pkt.faderTarget / 16383.0f;
+    float newFader = pkt.faderTarget / 27000.0f;
     if (fabsf(faderPositions - newFader) > 0.001f) {
         faderPositions = newFader;
         Motor::setTargetFromS3(pkt.faderTarget);  // User can override (master) (2026-05-16 10:52)
